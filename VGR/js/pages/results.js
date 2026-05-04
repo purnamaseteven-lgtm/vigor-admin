@@ -325,15 +325,16 @@ window.openAddResultModal = () => {
     `);
 };
 
-window.saveResultEntry = () => {
+window.saveResultEntry = async () => {
   const values = ['res_r1', 'res_r2', 'res_r3', 'res_r4', 'res_r5'].map(id => document.getElementById(id)?.value.trim());
   if (values.some(v => !/^\d{4}$/.test(v || ''))) {
     toast('All result fields must be 4 digits', 'error');
     return;
   }
-  getResultsStore().unshift({
+  const entry = {
     id: 'RES' + Date.now().toString().slice(-6),
     pool: document.getElementById('res_pool')?.value || POOLS[0],
+    drawDate: document.getElementById('res_date')?.value || new Date().toISOString().slice(0, 10),
     date: document.getElementById('res_date')?.value || new Date().toISOString().slice(0, 10),
     period: document.getElementById('res_period')?.value || Date.now().toString().slice(-8),
     r1: values[0],
@@ -343,7 +344,14 @@ window.saveResultEntry = () => {
     r5: values[4],
     status: document.getElementById('res_status')?.value || 'Pending',
     publishedBy: 'adminsub40'
-  });
+  };
+  if (window.db?.dbSaveLotteryResult) {
+    const { error } = await window.db.dbSaveLotteryResult(entry);
+    if (error) return toast('Save failed: ' + error.message, 'error');
+  } else {
+    getResultsStore().unshift(entry);
+    saveState();
+  }
   saveState();
   closeModalBtn();
   window.go('results-list');

@@ -3,13 +3,16 @@
    Handles: PGSoft Seamless API + Payment Webhooks + Cloudflare API
    Deploy to: Railway (https://railway.app)
    ═══════════════════════════════════════════════════════════════ */
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import seamlessRouter from './routes/seamless.js';
 import paymentRouter from './routes/payment.js';
 import cloudflareRouter from './routes/cloudflare.js';
 import adminRouter from './routes/admin.js';
+
+loadEnv();
+loadEnv({ path: '../.env.server', override: false });
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +22,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(o => o.tr
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && allowedOrigins.length === 0)) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -47,6 +50,7 @@ app.get('/health', (req, res) => {
 // ── Routes ───────────────────────────────────────────────────────
 app.use('/api/seamless', seamlessRouter);
 app.use('/api/webhooks', paymentRouter);
+app.use('/api/payments', paymentRouter);
 app.use('/api/cloudflare', cloudflareRouter);
 app.use('/api/admin', adminRouter);
 

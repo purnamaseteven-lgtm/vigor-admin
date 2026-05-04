@@ -85,10 +85,35 @@ const mapLotteryBet = r => ({
 });
 const mapLotteryResult = r => ({
     id: r.id, pool: r.pool, drawDate: r.draw_date,
+    r1: r.result_1st, r2: r.result_2nd, r3: r.result_3rd,
+    r4: Array.isArray(r.starter) ? r.starter.join(', ') : r.starter,
+    r5: Array.isArray(r.consolation) ? r.consolation.join(', ') : r.consolation,
     result1st: r.result_1st, result2nd: r.result_2nd, result3rd: r.result_3rd,
     consolation: r.consolation || [], starter: r.starter || [],
     isSettled: r.is_settled, settledAt: r.settled_at,
 });
+
+function rpcOk(data) {
+    return data && (data.ok === true || data.code === 'already_processed');
+}
+
+async function runMoneyRpc(name, params) {
+    const { data, error } = await supabase.rpc(name, params);
+    if (error) return { data, error };
+    if (!rpcOk(data)) {
+        return { data, error: { message: data?.message || data?.code || 'Transaction was not processed' } };
+    }
+    return { data, error: null };
+}
+
+async function getAuthHeaders() {
+    if (!SUPABASE_ENABLED || !supabase) return { 'Content-Type': 'application/json' };
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+        'Content-Type': 'application/json',
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    };
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  STATE → DB MAPPERS (camelCase → snake_case)
@@ -275,7 +300,9 @@ const PAGE_FETCHES = {
     'admin-management':       [fetchSettings],
     'bets-list':              [fetchLotteryBets],
     'bets-table':             [fetchLotteryBets],
-    'results-listing':        [fetchLotteryResults],
+    'results-list':           [fetchLotteryResults],
+    'results-scan':           [fetchLotteryResults],
+    'results-analyze':        [fetchLotteryResults, fetchLotteryBets],
     'bonus-report':           [fetchBonuses],
     'bonus-agent-freebet':    [fetchBonuses],
 };
@@ -323,6 +350,7 @@ export async function dbAdjustMemberBalance(memberId, amount, notes, processedBy
     const member = STATE.members.find(m => m.id === memberId);
     if (!member) return { error: { message: 'Member not found' } };
     const newBalance = member.balance + amount;
+    if (newBalance < 0) return { error: { message: 'Insufficient member balance' } };
     if (!SUPABASE_ENABLED || !supabase) {
         member.balance = newBalance; saveState(); return { error: null };
     }
@@ -414,35 +442,25 @@ export async function dbAddDeposit(deposit) {
     return { data, error };
 }
 export async function dbApproveDeposit(id, adminUser = 'admin') {
-    const now = new Date().toLocaleString('id-ID');
-    const update = { status: 'Approved', processed_by: adminUser, date: now };
     if (!SUPABASE_ENABLED || !supabase) {
         const i = STATE.deposits.findIndex(x => x.id === id);
         if (i !== -1) STATE.deposits[i] = { ...STATE.deposits[i], status: 'Approved', processedBy: adminUser };
         saveState(); return { error: null };
     }
-    const dep = STATE.deposits.find(d => d.id === id);
-    const { error } = await supabase.from('deposits').update(update).eq('id', id);
+    const { error } = await runMoneyRpc('approve_deposit', { p_deposit_id: id, p_processed_by: adminUser });
     if (!error) {
-        await fetchDeposits();
-        // Credit member balance
-        if (dep) await dbAdjustMemberBalance(
-            STATE.members.find(m => m.username === dep.member)?.id,
-            dep.amount, `Deposit approved ${id}`, adminUser
-        );
-        await dbWriteLog('Approve Deposit', id, `Approved ${dep?.amount} from ${dep?.member}`, adminUser);
+        await Promise.all([fetchDeposits(), fetchMembers(), fetchLogs()]);
     }
     return { error };
 }
 export async function dbRejectDeposit(id, adminUser = 'admin') {
-    const now = new Date().toLocaleString('id-ID');
     if (!SUPABASE_ENABLED || !supabase) {
         const i = STATE.deposits.findIndex(x => x.id === id);
         if (i !== -1) STATE.deposits[i] = { ...STATE.deposits[i], status: 'Rejected', processedBy: adminUser };
         saveState(); return { error: null };
     }
-    const { error } = await supabase.from('deposits').update({ status: 'Rejected', processed_by: adminUser, date: now }).eq('id', id);
-    if (!error) await fetchDeposits();
+    const { error } = await runMoneyRpc('reject_deposit', { p_deposit_id: id, p_processed_by: adminUser });
+    if (!error) await Promise.all([fetchDeposits(), fetchLogs()]);
     return { error };
 }
 
@@ -458,34 +476,25 @@ export async function dbAddWithdrawal(withdrawal) {
     return { data, error };
 }
 export async function dbApproveWithdrawal(id, adminUser = 'admin') {
-    const now = new Date().toLocaleString('id-ID');
     if (!SUPABASE_ENABLED || !supabase) {
         const i = STATE.withdrawals.findIndex(x => x.id === id);
         if (i !== -1) STATE.withdrawals[i] = { ...STATE.withdrawals[i], status: 'Approved', processedBy: adminUser };
         saveState(); return { error: null };
     }
-    const wd = STATE.withdrawals.find(w => w.id === id);
-    const { error } = await supabase.from('withdrawals').update({ status: 'Approved', processed_by: adminUser, date: now }).eq('id', id);
+    const { error } = await runMoneyRpc('approve_withdrawal', { p_withdrawal_id: id, p_processed_by: adminUser });
     if (!error) {
-        await fetchWithdrawals();
-        // Debit member balance
-        if (wd) await dbAdjustMemberBalance(
-            STATE.members.find(m => m.username === wd.member)?.id,
-            -wd.amount, `Withdrawal approved ${id}`, adminUser
-        );
-        await dbWriteLog('Approve Withdrawal', id, `Approved ${wd?.amount} for ${wd?.member}`, adminUser);
+        await Promise.all([fetchWithdrawals(), fetchMembers(), fetchLogs()]);
     }
     return { error };
 }
 export async function dbRejectWithdrawal(id, adminUser = 'admin') {
-    const now = new Date().toLocaleString('id-ID');
     if (!SUPABASE_ENABLED || !supabase) {
         const i = STATE.withdrawals.findIndex(x => x.id === id);
         if (i !== -1) STATE.withdrawals[i] = { ...STATE.withdrawals[i], status: 'Rejected', processedBy: adminUser };
         saveState(); return { error: null };
     }
-    const { error } = await supabase.from('withdrawals').update({ status: 'Rejected', processed_by: adminUser, date: now }).eq('id', id);
-    if (!error) await fetchWithdrawals();
+    const { error } = await runMoneyRpc('reject_withdrawal', { p_withdrawal_id: id, p_processed_by: adminUser });
+    if (!error) await Promise.all([fetchWithdrawals(), fetchLogs()]);
     return { error };
 }
 
@@ -659,8 +668,11 @@ export async function dbSaveLotteryResult(result) {
     }
     const { data, error } = await supabase.from('lottery_results').upsert({
         pool: result.pool, draw_date: result.drawDate,
-        result_1st: result.result1st, result_2nd: result.result2nd, result_3rd: result.result3rd,
-        consolation: result.consolation || [], starter: result.starter || [],
+        result_1st: result.result1st || result.r1,
+        result_2nd: result.result2nd || result.r2,
+        result_3rd: result.result3rd || result.r3,
+        consolation: result.consolation || (result.r5 ? [result.r5] : []),
+        starter: result.starter || (result.r4 ? [result.r4] : []),
         is_settled: result.isSettled || false,
     }, { onConflict: 'pool,draw_date' }).select().single();
     if (!error && data) {
@@ -764,15 +776,11 @@ export async function dbAddAdmin(adminData, password = null) {
 
     // Prefer server-side creation (has service_role key to create Auth users)
     const API_BASE    = import.meta.env.VITE_API_SERVER_URL || '';
-    const ADMIN_KEY   = import.meta.env.VITE_ADMIN_API_KEY  || 'vigor-internal-admin-key';
     if (API_BASE && password) {
         try {
             const res = await fetch(`${API_BASE}/api/admin/create-user`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type':       'application/json',
-                    'x-vigor-admin-key':  ADMIN_KEY,
-                },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({ ...adminData, password }),
             });
             const result = await res.json();
@@ -835,12 +843,11 @@ export async function dbDeleteAdmin(id) {
 
     // Try server-side auth user deletion first
     const API_BASE  = import.meta.env.VITE_API_SERVER_URL || '';
-    const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY  || 'vigor-internal-admin-key';
     if (API_BASE) {
         try {
             await fetch(`${API_BASE}/api/admin/delete-user`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-vigor-admin-key': ADMIN_KEY },
+                headers: await getAuthHeaders(),
                 body: JSON.stringify({ userId: id }),
             });
             // Auth delete also cascades profile via FK — but do it explicitly too

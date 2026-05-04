@@ -30,13 +30,9 @@ Edit file `.env`:
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGci...
 VITE_API_SERVER_URL=https://your-app.up.railway.app
-VITE_PG_OPERATOR_TOKEN=...    (dari PGSoft)
-VITE_PG_SECRET_KEY=...        (dari PGSoft)
-VITE_UNOPAY_API_KEY=...       (dari Unopay)
-VITE_COIN2PAY_API_KEY=...     (dari Coin2Pay)
-VITE_SAWALA_TOKEN=...         (dari Sawala)
-VITE_CLOUDFLARE_API_TOKEN=... (dari Cloudflare)
 ```
+
+Jangan taruh token/secret provider di frontend `.env`. Semua secret seperti PGSoft, payment gateway, Cloudflare, dan Supabase service role harus berada di `.env.server` atau Railway Variables.
 
 ---
 
@@ -97,8 +93,6 @@ Di GitHub repo → **Settings → Secrets → Actions**, tambahkan:
 ```
 VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
-SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
 VITE_API_SERVER_URL
 VERCEL_TOKEN
 VERCEL_ORG_ID

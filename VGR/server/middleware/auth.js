@@ -1,5 +1,13 @@
 /* ─── SERVER MIDDLEWARE ─── */
 import { createClient } from '@supabase/supabase-js';
+import { config as loadEnv } from 'dotenv';
+
+loadEnv();
+loadEnv({ path: '../.env.server', override: false });
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for the backend server');
+}
 
 // Supabase admin client (service_role bypasses RLS — server ops only!)
 export const supabaseAdmin = createClient(

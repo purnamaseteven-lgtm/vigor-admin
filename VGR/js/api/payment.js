@@ -4,15 +4,23 @@
    All calls go through the backend server to keep secrets safe.
    ═══════════════════════════════════════════════════════════════ */
 import { STATE } from '../core/state.js';
+import { supabase, SUPABASE_ENABLED } from '../core/supabase.js';
 
 const API_BASE = import.meta.env.VITE_API_SERVER_URL || 'http://localhost:3000';
+const ALLOW_PAYMENT_MOCKS = import.meta.env.DEV && import.meta.env.VITE_ENABLE_PAYMENT_MOCKS === 'true';
 
 // ── Generic API call through backend ────────────────────────────
 async function callServer(path, payload) {
     try {
+        const { data: { session } } = SUPABASE_ENABLED && supabase
+            ? await supabase.auth.getSession()
+            : { data: { session: null } };
         const res = await fetch(`${API_BASE}${path}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            },
             body: JSON.stringify(payload),
         });
         return await res.json();
@@ -39,8 +47,7 @@ export const UNOPAY_METHODS = [
  * Returns: { paymentCode, vaNumber, qrCode, expiredAt } or error
  */
 export async function createUnopayDeposit({ member, amount, method, depositId }) {
-    const enabled = import.meta.env.VITE_UNOPAY_API_KEY;
-    if (!enabled || enabled === 'your_unopay_api_key') {
+    if (ALLOW_PAYMENT_MOCKS) {
         // Demo mode — return mock response
         return {
             data: {
@@ -86,8 +93,7 @@ export const CRYPTO_LIST = [
  * Create Coin2Pay crypto deposit
  */
 export async function createCoin2PayDeposit({ member, amountIdr, crypto, depositId }) {
-    const enabled = import.meta.env.VITE_COIN2PAY_API_KEY;
-    if (!enabled || enabled === 'your_coin2pay_api_key') {
+    if (ALLOW_PAYMENT_MOCKS) {
         const rates = { BTC: 950000000, ETH: 45000000, USDT: 15800, BNB: 6000000, LTC: 1200000 };
         const cryptoAmt = (amountIdr / (rates[crypto] || 15800)).toFixed(8);
         return {
@@ -128,8 +134,7 @@ export async function checkCoin2PayStatus(orderId) {
  * Create Sawala payment
  */
 export async function createSawalaDeposit({ member, amount, depositId }) {
-    const enabled = import.meta.env.VITE_SAWALA_TOKEN;
-    if (!enabled || enabled === 'your_sawala_token') {
+    if (ALLOW_PAYMENT_MOCKS) {
         return {
             data: {
                 transaction_id: depositId,

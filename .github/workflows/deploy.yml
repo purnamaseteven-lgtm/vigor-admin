@@ -11,7 +11,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # JOB 1: Build & Lint Frontend
+  # JOB 1: Build & Test Frontend
   # ─────────────────────────────────────────────────────────────
   build-frontend:
     name: Build Frontend (Vite)
@@ -43,13 +43,6 @@ jobs:
           VITE_APP_VERSION:       ${{ github.sha }}
         run: npm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: VGR/dist/
-          retention-days: 7
-
   # ─────────────────────────────────────────────────────────────
   # JOB 2: Build & Test Backend
   # ─────────────────────────────────────────────────────────────
@@ -80,57 +73,14 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PG_OPERATOR_TOKEN:         test_token
           PG_SECRET_KEY:             test_secret
+          ADMIN_API_KEY:             test_key
           NODE_ENV:                  test
-        run: |
-          timeout 5 node index.js || echo "Server exited (expected in test)"
+        run: timeout 5 node index.js || echo "Server exited (expected in test)"
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 3: Deploy Frontend to Vercel (main branch only)
-  # ─────────────────────────────────────────────────────────────
-  deploy-frontend:
-    name: Deploy Frontend → Vercel
-    needs: [build-frontend, build-backend]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Pull Vercel environment
-        working-directory: VGR
-        env:
-          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build with Vercel
-        working-directory: VGR
-        env:
-          VERCEL_TOKEN:           ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:          ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID:      ${{ secrets.VERCEL_PROJECT_ID }}
-          VITE_SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_API_SERVER_URL:    ${{ secrets.VITE_API_SERVER_URL }}
-          VITE_ADMIN_API_KEY:     ${{ secrets.VITE_ADMIN_API_KEY }}
-          VITE_APP_NAME:          VIGOR Admin
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel
-        working-directory: VGR
-        env:
-          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-  # ─────────────────────────────────────────────────────────────
-  # JOB 4: Deploy Backend to Railway (main branch only)
+  # JOB 3: Deploy Backend to Railway (main branch only)
+  # Vercel deployment is handled automatically by Vercel's
+  # native GitHub integration (rootDirectory: VGR, framework: vite)
   # ─────────────────────────────────────────────────────────────
   deploy-backend:
     name: Deploy Backend → Railway
@@ -150,10 +100,10 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           cd VGR/server
-          railway up --service vigor-backend --project-id ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service vigor-backend --project ${{ secrets.RAILWAY_PROJECT_ID }}
 
   # ─────────────────────────────────────────────────────────────
-  # JOB 5: Run Supabase migrations (main branch only)
+  # JOB 4: Run Supabase migrations (main branch only)
   # ─────────────────────────────────────────────────────────────
   migrate-db:
     name: Run Supabase Migrations
@@ -170,11 +120,10 @@ jobs:
         with:
           version: latest
 
-      - name: Link Supabase project
+      - name: Link and push migrations
+        working-directory: VGR
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
-
-      - name: Push migrations
-        working-directory: VGR
-        run: supabase db push
+        run: |
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          supabase db push

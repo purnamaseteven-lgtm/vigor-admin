@@ -1,5 +1,5 @@
 /* ─── FINANCE PAGES ─── */
-import { STATE, fmtCur } from '../core/state.js';
+import { STATE, fmtCur, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, renderPagerHTML } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, BANKS, STATUSES } from '../utils/helpers.js';
@@ -215,9 +215,6 @@ window.handleFinance = async (type, id, action) => {
       ? (action === 'approve' ? window.db.dbApproveDeposit : window.db.dbRejectDeposit)
       : (action === 'approve' ? window.db.dbApproveWithdrawal : window.db.dbRejectWithdrawal);
     ({ error } = await fn(id, adminUser));
-    if (!error && window.db.dbWriteLog) {
-      window.db.dbWriteLog(`${label} ${status}`, id, `${label} ${id} ${status} by ${adminUser}`);
-    }
   } else {
     window.stateUpdate(type === 'deposit' ? 'deposits' : 'withdrawals', id, { status, processedBy: adminUser });
   }
@@ -452,13 +449,28 @@ window.setAdjType = (type, btn) => {
   }
 };
 
-window.submitAdjustment = () => {
+window.submitAdjustment = async () => {
   const user = document.getElementById('adj_username').value;
   const type = document.getElementById('adj_type').value;
   const amount = parseFloat(document.getElementById('adj_amount').value);
   const notes = document.getElementById('adj_notes').value;
 
   if (!user || !amount) return toast('Username and Amount are required', 'error');
+  if (amount <= 0) return toast('Amount must be greater than zero', 'error');
+
+  const member = STATE.members.find(m => m.username === user);
+  if (!member) return toast('Member not found', 'error');
+
+  const signedAmount = type === 'withdrawal' ? -amount : amount;
+  const adminUser = STATE.profile.username || 'admin';
+
+  if (window.db?.dbAdjustMemberBalance) {
+    const { error } = await window.db.dbAdjustMemberBalance(member.id, signedAmount, notes || `${type} adjustment`, adminUser);
+    if (error) return toast('Adjustment failed: ' + error.message, 'error');
+    if (window.db.fetchMembers) await window.db.fetchMembers();
+  } else {
+    member.balance = (member.balance || 0) + signedAmount;
+  }
 
   const newAdj = {
     id: 'ADJ' + Date.now().toString().slice(-6),
@@ -467,10 +479,11 @@ window.submitAdjustment = () => {
     amount: amount,
     notes: notes,
     date: new Date().toLocaleString(),
-    processedBy: STATE.profile.username
+    processedBy: adminUser
   };
 
   STATE.adjustments.unshift(newAdj);
+  saveState();
   toast('Adjustment processed successfully', 'success');
   closeModalBtn();
   go('finance-adjustment');

@@ -9,19 +9,47 @@ const router = Router();
 const SUPABASE_URL         = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Middleware: require internal API key for these routes
-function requireInternalAuth(req, res, next) {
-    const apiKey = req.headers['x-vigor-admin-key'];
-    const expectedKey = process.env.ADMIN_API_KEY || 'vigor-internal-admin-key';
-    if (apiKey !== expectedKey) {
-        return res.status(401).json({ error: 'Unauthorized: invalid admin key' });
+async function requireSuperAdmin(req, res, next) {
+    try {
+        const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+        if (!token) return res.status(401).json({ error: 'Unauthorized: missing bearer token' });
+        if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+            return res.status(503).json({ error: 'Supabase not configured on server' });
+        }
+
+        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        const user = await userRes.json().catch(() => ({}));
+        if (!userRes.ok || !user?.id) {
+            return res.status(401).json({ error: 'Unauthorized: invalid session' });
+        }
+
+        const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/admin_profiles?id=eq.${encodeURIComponent(user.id)}&select=id,username,role,status`, {
+            headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            },
+        });
+        const profiles = await profileRes.json().catch(() => []);
+        const profile = profiles[0];
+        if (!profileRes.ok || !profile || profile.role !== 'SuperAdmin' || profile.status !== 'Active') {
+            return res.status(403).json({ error: 'Forbidden: SuperAdmin access required' });
+        }
+
+        req.adminProfile = profile;
+        next();
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-    next();
 }
 
 // ── POST /api/admin/create-user ──────────────────────────────────
 // Creates a Supabase Auth user + inserts admin_profile row
-router.post('/create-user', requireInternalAuth, async (req, res) => {
+router.post('/create-user', requireSuperAdmin, async (req, res) => {
     const { username, name, role, company, shop, status, password } = req.body;
 
     if (!username || !password) {
@@ -99,7 +127,7 @@ router.post('/create-user', requireInternalAuth, async (req, res) => {
 
 // ── POST /api/admin/delete-user ──────────────────────────────────
 // Deletes Supabase Auth user (hard delete)
-router.post('/delete-user', requireInternalAuth, async (req, res) => {
+router.post('/delete-user', requireSuperAdmin, async (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId required' });
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -126,7 +154,7 @@ router.post('/delete-user', requireInternalAuth, async (req, res) => {
 
 // ── POST /api/admin/reset-password ──────────────────────────────
 // Resets password for an existing Supabase Auth user
-router.post('/reset-password', requireInternalAuth, async (req, res) => {
+router.post('/reset-password', requireSuperAdmin, async (req, res) => {
     const { userId, newPassword } = req.body;
     if (!userId || !newPassword) return res.status(400).json({ error: 'userId and newPassword required' });
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {

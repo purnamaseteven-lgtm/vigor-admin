@@ -219,7 +219,7 @@ pages['dev-menu-config'] = () => {
         integrations:       { providerSetup: true, apiLogs: true, developerDocs: true },
         customization:      { templateBuilder: true, templatePreview: true, promotions: true, systemTheme: true, globalBanner: true, appNotification: true, announcements: true, siteConfig: true, seoTools: true },
         settings:           { commission: true, referralRate: true, poolsList: true, games: true, agentGameSettings: true, togelCommission: true, limitCreditOut: true, vipDesigner: true, rebateCalc: true, financeLimits: true },
-        tools:              { coin2pay: true, hostManagement: true, sawala: true, unopay: true },
+        tools:              { coin2pay: true, hostManagement: true, sawala: true, unopay: true, nawalaScan: true },
         crm:                { dashboard: true, segments: true, missions: true, tournaments: true, automation: true, push: true, dormancy: true, loyalty: true },
         memo:               { memoBox: true, autoMemo: true },
         reports:            { winloss: true, agentDaily: true, limitCredit: true, lostMoney: true, togelLost: true, topTurnover: true },

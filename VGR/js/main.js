@@ -26,6 +26,7 @@ import './pages/seamless.js';
 import './pages/master.js';
 import './pages/crm.js';
 import './pages/manual.js';
+import './pages/nawala.js';
 import './pages/missing-pages.js';
 
 import './pages/simulator.js';

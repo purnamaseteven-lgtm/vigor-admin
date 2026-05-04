@@ -532,6 +532,7 @@ export function renderSidebar() {
                 <div class="nav-link" style="${check('tools', 'hostManagement') ? '' : 'display:none'}" onclick="go('tools-host')"><i class="fa-solid fa-server nav-icon"></i><span class="nav-label">Host Management</span></div>
                 <div class="nav-link" style="${check('tools', 'sawala') ? '' : 'display:none'}" onclick="go('tools-sawala')"><i class="fa-solid fa-comments nav-icon"></i><span class="nav-label">Sawala</span></div>
                 <div class="nav-link" style="${check('tools', 'unopay') ? '' : 'display:none'}" onclick="go('tools-unopay')"><i class="fa-solid fa-credit-card nav-icon"></i><span class="nav-label">Unopay Payment</span></div>
+                <div class="nav-link" style="${check('tools', 'nawalaScan') ? '' : 'display:none'}" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div>
             </div>
         </div>`;
     }

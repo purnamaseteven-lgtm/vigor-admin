@@ -65,7 +65,13 @@ pages['global-member-list'] = () => {
               <td>${m.phone}</td>
               <td><div style="font-weight:500">${m.bank}</div><div style="font-size:.7rem;color:var(--text3)">${m.bankAccount}</div></td>
               <td style="font-weight:600">${fmtCur(m.balance)}</td>
-              <td>${badge(m.status, m.status === 'Active' ? 'success' : 'danger')}</td>
+              <td>
+                <button onclick="window.toggleMemberStatus('${m.id}','${m.status === 'Active' ? 'Suspended' : 'Active'}','${m.username}')"
+                  class="btn btn-sm" title="${m.status === 'Active' ? 'Suspend' : 'Activate'}"
+                  style="background:${m.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${m.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${m.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700">
+                  ${m.status === 'Active' ? '✓ Active' : '✗ ' + m.status}
+                </button>
+              </td>
               <td>${m.joined}</td>
               <td>${actionBtns(
     `openFormModal('member','${m.id}')`,
@@ -79,6 +85,29 @@ pages['global-member-list'] = () => {
     `)}
     ${renderPagerHTML(PG, total, pp, cp)}
   `;
+};
+
+// ── Member status toggle (Active ↔ Suspended) ──────────────────────
+import { saveState } from '../core/state.js';
+import { toast } from '../ui/components.js';
+window.toggleMemberStatus = async (id, newStatus, username) => {
+  const label = newStatus === 'Active' ? 'activate' : 'suspend';
+  if (!confirm(`Are you sure you want to ${label} member [${username}]?`)) return;
+  const member = STATE.members.find(m => m.id === id);
+  if (!member) return;
+  if (window.db?.dbUpdateMember) {
+    const { error } = await window.db.dbUpdateMember(id, { status: newStatus });
+    if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+    if (window.db?.dbWriteLog) window.db.dbWriteLog(
+      newStatus === 'Active' ? 'Activate Member' : 'Suspend Member',
+      username, `Member ${username} status → ${newStatus}`
+    );
+  } else {
+    member.status = newStatus;
+    saveState();
+  }
+  toast(`Member [${username}] ${newStatus === 'Active' ? 'activated ✓' : 'suspended ✗'}`, 'success');
+  window.go('global-member-list');
 };
 
 pages['tier-history'] = () => {

@@ -28,13 +28,14 @@ pages['statistics'] = () => {
   const members = STATE.members.length;
   const active = STATE.members.filter(m => m.status === 'Active').length;
 
-  const companyStats = COMPANIES.slice(0, 10).map(c => ({
-    company: c,
-    deposit: rnd(5, 50) * 1000000,
-    withdraw: rnd(2, 30) * 1000000,
-    members: rnd(50, 500),
-    ggr: rnd(3, 20) * 1000000
-  }));
+  // Real: group deposits/withdrawals/members by company from STATE
+  const companyStats = (STATE.companies.length > 0 ? STATE.companies : COMPANIES.map(c => ({ username: c, name: c }))).map(c => {
+    const key = c.username || c.name;
+    const dep = STATE.deposits.filter(d => d.company === key && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+    const wd  = STATE.withdrawals.filter(w => w.company === key && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+    const mems = STATE.members.filter(m => m.company === key).length;
+    return { company: key, deposit: dep, withdraw: wd, members: mems, ggr: dep - wd };
+  }).filter(c => c.deposit > 0 || c.members > 0).slice(0, 15);
 
   return `
     ${pageHeader('Statistics', '<span>Home</span><span class="sep">›</span><span>Statistics</span>', `
@@ -257,18 +258,30 @@ pages['provider-analytics'] = () => {
 /* ─── AGENT DAILY REPORT ─── */
 pages['reports-agent-daily'] = () => {
   const PG = 'reports-agent-daily';
-  const rows = COMPANIES.slice(0, 15).map((c, i) => ({
-    company: c,
-    members: rnd(50, 500),
-    newMembers: rnd(1, 20),
-    deposit: rnd(10, 100) * 1000000,
-    depositCount: rnd(10, 100),
-    withdraw: rnd(5, 80) * 1000000,
-    withdrawCount: rnd(5, 80),
-    ggr: rnd(5, 50) * 1000000,
-    commission: rnd(2, 20) * 1000000,
-    date: '27/04/2026'
-  }));
+  // Real: aggregate deposits/withdrawals/members from STATE by company
+  const commRate = parseFloat(STATE.settings?.commission_rate || STATE.settings?.commission || 5) / 100;
+  const allKeys = STATE.companies.length > 0
+    ? STATE.companies.map(c => c.username || c.name)
+    : COMPANIES.slice(0, 15);
+  const rows = allKeys.map(company => {
+    const deps = STATE.deposits.filter(d => d.company === company && d.status === 'Approved');
+    const wds  = STATE.withdrawals.filter(w => w.company === company && w.status === 'Approved');
+    const totalDep = deps.reduce((s, d) => s + d.amount, 0);
+    const totalWd  = wds.reduce((s, w) => s + w.amount, 0);
+    const ggr = totalDep - totalWd;
+    return {
+      company,
+      members:      STATE.members.filter(m => m.company === company).length,
+      newMembers:   0,
+      deposit:      totalDep,
+      depositCount: deps.length,
+      withdraw:     totalWd,
+      withdrawCount: wds.length,
+      ggr,
+      commission:   Math.max(0, Math.round(ggr * commRate)),
+      date: new Date().toLocaleDateString('id-ID'),
+    };
+  }).filter(r => r.members > 0 || r.deposit > 0);
 
   return `
     ${pageHeader('Agent Daily Report', '<span>Reports</span><span class="sep">›</span><span>Daily Report</span>', `
@@ -345,16 +358,22 @@ pages['reports-agent-daily'] = () => {
 /* ─── WIN LOSS REPORT ─── */
 pages['reports-winloss'] = () => {
   const PG = 'reports-winloss';
-  const rows = MEMBERS.slice(0, 20).map((m, i) => {
-    const bet = rnd(10, 200) * 50000;
-    const win = i % 3 === 0 ? rnd(5, 300) * 50000 : 0;
-    return {
-      member: m, company: COMPANIES[i % COMPANIES.length],
-      betAmt: bet, winAmt: win, net: bet - win,
-      bets: rnd(10, 100), wins: rnd(5, 50),
-      period: 'April 2026'
-    };
+  // Real: aggregate from lottery bets + seamless transactions by member
+  const betMap = {};
+  (STATE.lotteryBets || []).forEach(b => {
+    if (!betMap[b.member]) betMap[b.member] = { member: b.member, company: b.company, betAmt: 0, winAmt: 0, bets: 0, wins: 0 };
+    betMap[b.member].betAmt += b.betAmount || 0;
+    betMap[b.member].bets++;
+    if (b.status === 'Won') { betMap[b.member].winAmt += b.winAmount || 0; betMap[b.member].wins++; }
   });
+  (STATE.seamless?.transactions || []).forEach(t => {
+    const key = t.player;
+    if (!betMap[key]) betMap[key] = { member: t.player, company: t.company, betAmt: 0, winAmt: 0, bets: 0, wins: 0 };
+    betMap[key].betAmt += t.betAmount || 0;
+    betMap[key].bets++;
+    if ((t.winAmount || 0) > 0) { betMap[key].winAmt += t.winAmount; betMap[key].wins++; }
+  });
+  const rows = Object.values(betMap).map(r => ({ ...r, net: r.betAmt - r.winAmt })).sort((a, b) => b.betAmt - a.betAmt);
 
   const totalBet = rows.reduce((s, r) => s + r.betAmt, 0);
   const totalWin = rows.reduce((s, r) => s + r.winAmt, 0);
@@ -411,7 +430,8 @@ pages['reports-winloss'] = () => {
 
   <div class="card">
     <div class="card-body">
-      ${tableWrap(`
+      ${rows.length === 0 ? `<div style="text-align:center;padding:3rem;color:var(--text3)"><i class="fa-solid fa-dice" style="font-size:2rem;margin-bottom:1rem;display:block"></i><div style="font-size:.9rem">No game transaction data yet.<br>Win/Loss report will populate once lottery bets or seamless transactions are recorded.</div></div>` :
+      tableWrap(`
           <table>
             <thead>
               <tr><th>#</th><th>Member</th><th>Company</th><th>Total Bet</th><th>Total Win</th><th>Net</th><th>Bet Count</th><th>Win Count</th><th>Win Rate</th></tr>
@@ -442,15 +462,18 @@ pages['reports-winloss'] = () => {
     </div>
   </div>`;
 };
+window.onProviderFilterChange = (val) => { setFilter('reports-winloss', 'provider', val); window.go('reports-winloss'); };
 
 /* ─── LIMIT CREDIT REPORT ─── */
 pages['reports-limit-credit'] = () => {
-  const rows = COMPANIES.slice(0, 12).map((c, i) => ({
-    company: c,
-    creditLimit: rnd(500, 2000) * 1000000,
-    creditUsed: rnd(100, 1900) * 1000000,
-    date: `${rnd(20, 27)} /04/2026`
-  })).map(r => ({ ...r, percentage: Math.round((r.creditUsed / r.creditLimit) * 100) }));
+  // Real: use STATE.companies credit field as creditUsed
+  const defaultLimit = parseFloat(STATE.settings?.default_credit_limit || 5000000000);
+  const rows = (STATE.companies.length > 0 ? STATE.companies : COMPANIES.slice(0, 12).map(c => ({ username: c, credit: 0 }))).map(c => {
+    const creditUsed  = Math.abs(c.credit || 0);
+    const creditLimit = c.maxCredit || defaultLimit;
+    const percentage  = creditLimit > 0 ? Math.min(100, Math.round((creditUsed / creditLimit) * 100)) : 0;
+    return { company: c.username || c.name, creditLimit, creditUsed, percentage, date: new Date().toLocaleDateString('id-ID') };
+  });
 
   return `
     ${pageHeader('Limit Credit Report', '<span>Reports</span><span class="sep">›</span><span>Limit Credit</span>', `
@@ -505,22 +528,27 @@ pages['reports-limit-credit'] = () => {
 
 /* ─── TOGEL LOST MONEY ─── */
 pages['reports-togel-lost'] = () => {
-  const POOLS = ['SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA'];
-  const rows = POOLS.map(pool => ({
-    pool,
-    totalBet: rnd(500, 5000) * 50000,
-    totalPayout: rnd(800, 7000) * 50000,
-    net: 0,
-    periods: rnd(5, 30)
-  })).map(r => ({ ...r, net: r.totalBet - r.totalPayout }));
+  // Real: aggregate STATE.lotteryBets by pool
+  const poolMap = {};
+  (STATE.lotteryBets || []).forEach(b => {
+    if (!poolMap[b.pool]) poolMap[b.pool] = { pool: b.pool, totalBet: 0, totalPayout: 0, periodSet: new Set() };
+    poolMap[b.pool].totalBet += b.betAmount || 0;
+    if (b.status === 'Won') poolMap[b.pool].totalPayout += b.winAmount || 0;
+    if (b.drawDate) poolMap[b.pool].periodSet.add(b.drawDate);
+  });
+  const rows = Object.values(poolMap).map(r => ({ pool: r.pool, totalBet: r.totalBet, totalPayout: r.totalPayout, net: r.totalBet - r.totalPayout, periods: r.periodSet.size }));
 
-  const memberLoss = MEMBERS.slice(0, 12).map((m, i) => ({
-    member: m, company: COMPANIES[i % COMPANIES.length],
-    pool: POOLS[i % POOLS.length],
-    totalBet: rnd(10, 200) * 50000,
-    totalLoss: rnd(5, 150) * 50000,
-    period: 'April 2026'
-  }));
+  // Members with highest loss (deposit - withdrawal per member)
+  const memberLoss = STATE.members.slice(0, 12).map(m => {
+    const dep  = STATE.deposits.filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+    const wd   = STATE.withdrawals.filter(w => w.member === m.username && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+    const loss = dep - wd;
+    const bets = (STATE.lotteryBets || []).filter(b => b.member === m.username);
+    const topPool = bets.length > 0
+      ? Object.entries(bets.reduce((acc, b) => { acc[b.pool] = (acc[b.pool] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0]?.[0]
+      : '-';
+    return { member: m.username, company: m.company, pool: topPool, totalBet: dep, totalLoss: Math.max(0, loss), period: new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) };
+  }).filter(r => r.totalLoss > 0).sort((a, b) => b.totalLoss - a.totalLoss);
 
   return `
     ${pageHeader('Togel Lost Money Report', '<span>Reports</span><span class="sep">›</span><span>Togel Lost</span>', `
@@ -580,13 +608,13 @@ pages['reports-togel-lost'] = () => {
 
 /* ─── LOST MONEY REPORT ─── */
 pages['reports-lost-money'] = () => {
-  const rows = STATE.members.slice(0, 20).map((m, i) => ({
-    member: m.username, name: m.name, company: m.company, bank: m.bank,
-    totalDeposit: rnd(10, 200) * 100000,
-    totalWithdraw: rnd(5, 100) * 100000,
-    bonusUsed: rnd(0, 10) * 50000,
-    net: 0
-  })).map(r => ({ ...r, net: r.totalDeposit - r.totalWithdraw - r.bonusUsed }));
+  // Real: compute per-member net from actual deposits/withdrawals/bonuses
+  const rows = STATE.members.map(m => {
+    const totalDeposit  = STATE.deposits.filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+    const totalWithdraw = STATE.withdrawals.filter(w => w.member === m.username && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+    const bonusUsed     = (STATE.bonuses || []).filter(b => b.member === m.username && b.status === 'Claimed').reduce((s, b) => s + (b.bonusAmount || 0), 0);
+    return { member: m.username, name: m.name, company: m.company, bank: m.bank, totalDeposit, totalWithdraw, bonusUsed, net: totalDeposit - totalWithdraw - bonusUsed };
+  }).filter(r => r.totalDeposit > 0 || r.totalWithdraw > 0);
 
   return `
     ${pageHeader('Lost Money Report', '<span>Reports</span><span class="sep">›</span><span>Lost Money</span>', `
@@ -642,14 +670,28 @@ pages['reports-lost-money'] = () => {
 
 /* ─── TOP TURNOVER MEMBERS ─── */
 pages['reports-top-turnover'] = () => {
-  const rows = STATE.members.slice(0, 20).map((m, i) => ({
-    rank: i + 1, member: m.username, name: m.name, company: m.company,
-    turnover: rnd(50, 500) * 1000000,
-    bets: rnd(100, 2000),
-    wins: rnd(50, 1000),
-    netWin: rnd(-100, 100) * 1000000,
-    lastActivity: `${rnd(20, 27)} /04/2026`
-  })).sort((a, b) => b.turnover - a.turnover).map((r, i) => ({ ...r, rank: i + 1 }));
+  // Real: aggregate turnover from lotteryBets + seamless transactions per member
+  const turnoverMap = {};
+  (STATE.lotteryBets || []).forEach(b => {
+    if (!turnoverMap[b.member]) turnoverMap[b.member] = { member: b.member, company: b.company, turnover: 0, bets: 0, wins: 0, netWin: 0, lastActivity: b.date || '' };
+    turnoverMap[b.member].turnover += b.betAmount || 0;
+    turnoverMap[b.member].bets++;
+    if (b.status === 'Won') { turnoverMap[b.member].wins++; turnoverMap[b.member].netWin += b.winAmount || 0; }
+    else { turnoverMap[b.member].netWin -= b.betAmount || 0; }
+    if ((b.date || '') > turnoverMap[b.member].lastActivity) turnoverMap[b.member].lastActivity = b.date;
+  });
+  (STATE.seamless?.transactions || []).forEach(t => {
+    if (!turnoverMap[t.player]) turnoverMap[t.player] = { member: t.player, company: t.company, turnover: 0, bets: 0, wins: 0, netWin: 0, lastActivity: '' };
+    turnoverMap[t.player].turnover += t.betAmount || 0;
+    turnoverMap[t.player].bets++;
+    turnoverMap[t.player].netWin += (t.winAmount || 0) - (t.betAmount || 0);
+    if ((t.winAmount || 0) > 0) turnoverMap[t.player].wins++;
+  });
+  // Enrich with member info from STATE.members
+  const rows = Object.values(turnoverMap).map(r => {
+    const m = STATE.members.find(x => x.username === r.member);
+    return { ...r, name: m?.name || r.member, rank: 0 };
+  }).sort((a, b) => b.turnover - a.turnover).map((r, i) => ({ ...r, rank: i + 1 }));
 
   const medals = ['🥇', '🥈', '🥉'];
 

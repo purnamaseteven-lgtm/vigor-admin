@@ -40,24 +40,31 @@ pages['settings-commission'] = () => {
               <tr>
                 <th>#</th>
                 <th>${activeTab === 'whitelabel' ? 'Whitelabel' : activeTab === 'master' ? 'Master WL' : 'Company'}</th>
+                <th>Commission Rate</th>
                 <th>Last Updated</th>
                 <th style="text-align:right">Action</th>
               </tr>
             </thead>
             <tbody>
-              ${COMPANIES.slice(0, 15).map((c, i) => `
+              ${(STATE.companies.length > 0 ? STATE.companies : COMPANIES.slice(0, 15).map((c, i) => ({ username: c, id: `C${i}`, updated_at: null }))).map((c, i) => {
+                const name = c.username || c.name || c;
+                const commKey = `commission_${activeTab}_${name}`;
+                const commVal = STATE.settings?.[commKey] || STATE.settings?.['commission_rate'] || '5';
+                const updatedAt = c.updated_at ? new Date(c.updated_at).toLocaleDateString('id-ID') : '-';
+                return `
                 <tr>
                   <td>${i + 1}</td>
                   <td>
-                    <div style="font-weight:700">${c}</div>
-                    <div style="font-size:.72rem; color:var(--text3); text-transform:uppercase">${activeTab}${100 + i}</div>
+                    <div style="font-weight:700">${name}</div>
+                    <div style="font-size:.72rem; color:var(--text3)">${c.type || activeTab} · ${c.status || 'Active'}</div>
                   </td>
-                  <td>2${rnd(4, 7)}/04/2026</td>
+                  <td style="font-size:.78rem;font-weight:600;color:var(--acc)">${commVal}%</td>
+                  <td style="font-size:.75rem;color:var(--text3)">${updatedAt}</td>
                   <td style="text-align:right">
-                    <button class="btn btn-sm btn-icon" style="background:var(--acc); color:#fff" onclick="toast('Edit commission for ${c}','info')"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="btn btn-sm btn-icon" style="background:var(--acc); color:#fff" onclick="window.editCommission('${name}','${activeTab}','${commVal}')"><i class="fa-solid fa-pen-to-square"></i></button>
                   </td>
-                </tr>
-              `).join('')}
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
         `)}
@@ -571,4 +578,40 @@ window.saveFinanceSettings = async () => {
 
   addLog('Update Settings', 'finance', `Finance limits updated — min:${minDep} max_dep:${maxDep} max_wd:${maxWd}`);
   toast('Finance settings saved!', 'success');
+};
+
+// ── Commission editor ────────────────────────────────────────────────
+window.editCommission = (company, tab, currentVal) => {
+  const { openModal, closeModalBtn } = window;
+  openModal(`Edit Commission — ${company}`, `
+    <div class="form-grid">
+      <div class="form-field" style="grid-column:1/-1">
+        <label>Commission Rate for <strong>${company}</strong> (${tab})</label>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <input id="comm_val" type="number" class="form-control" value="${currentVal}" min="0" max="100" step="0.1" style="width:120px" />
+          <span style="font-weight:700;font-size:1.1rem">%</span>
+        </div>
+        <div style="font-size:.75rem;color:var(--text3);margin-top:.3rem">Enter commission percentage (0–100)</div>
+      </div>
+    </div>
+  `, `
+    <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+    <button class="btn btn-primary" onclick="window.saveCommission('${company}','${tab}')">Save</button>
+  `);
+};
+
+window.saveCommission = async (company, tab) => {
+  const val = parseFloat(document.getElementById('comm_val')?.value || '5');
+  if (isNaN(val) || val < 0 || val > 100) { toast('Invalid rate (0–100)', 'error'); return; }
+  const key = `commission_${tab}_${company}`;
+  if (!STATE.settings) STATE.settings = {};
+  STATE.settings[key] = String(val);
+  if (window.db?.dbSaveSetting) {
+    const { error } = await window.db.dbSaveSetting(key, String(val));
+    if (error) { toast('Save failed: ' + error.message, 'error'); return; }
+    if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Commission', company, `Commission for ${company} (${tab}) set to ${val}%`);
+  }
+  if (typeof closeModalBtn === 'function') closeModalBtn();
+  toast(`Commission for ${company} saved: ${val}%`, 'success');
+  window.go('settings-commission');
 };

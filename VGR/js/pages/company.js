@@ -50,7 +50,11 @@ pages['master'] = () => {
                   <td style="font-size:.75rem">${c.email}</td>
                   <td style="font-weight:700">${fmtCur(c.credit)}</td>
                   <td>${fmt(c.members)}</td>
-                  <td>${badge(c.status, c.status === 'Active' ? 'success' : 'danger')}</td>
+                  <td>
+                    <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
+                      class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                  </td>
                   <td style="font-size:.75rem">${c.joined}</td>
                   <td>${actionBtns(
     `window.openFormModal('company','${c.id}')`,
@@ -339,7 +343,11 @@ pages['company-list'] = () => {
                   <td style="font-size:.75rem">${c.phone}</td>
                   <td style="font-weight:700">${fmtCur(c.credit)}</td>
                   <td><span style="font-weight:600">${fmt(c.members)}</span></td>
-                  <td>${badge(c.status, c.status === 'Active' ? 'success' : 'danger')}</td>
+                  <td>
+                    <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
+                      class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                  </td>
                   <td style="font-size:.75rem">${c.joined}</td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
@@ -395,7 +403,11 @@ pages['master-whitelabel-list'] = () => {
                   <td>${badge(c.type, c.type === 'Master' ? 'purple' : 'indigo')}</td>
                   <td style="font-weight:700">${fmtCur(c.credit)}</td>
                   <td>${fmt(c.members)}</td>
-                  <td>${badge(c.status, c.status === 'Active' ? 'success' : 'danger')}</td>
+                  <td>
+                    <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
+                      class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                  </td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
       `confirmAction('Delete Record','Delete record [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','master-whitelabel-list'),'Delete','danger')`
@@ -451,7 +463,11 @@ pages['whitelabel-list'] = () => {
                   <td style="font-weight:700">${fmtCur(c.credit)}</td>
                   <td>${fmt(c.members)}</td>
                   <td style="font-size:.75rem">${c.joined}</td>
-                  <td>${badge(c.status, c.status === 'Active' ? 'success' : 'danger')}</td>
+                  <td>
+                    <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
+                      class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                  </td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
       `confirmAction('Delete Whitelabel','Delete whitelabel [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','whitelabel-list'),'Delete','danger')`
@@ -839,4 +855,26 @@ window.openCompanyTypeForm = (type) => {
     const statusEl = document.getElementById('f_status');
     if (statusEl) statusEl.value = 'Active';
   });
+};
+
+
+// ── Company / Whitelabel / Master status toggle ──────────────────────
+window.toggleCompanyStatus = async (id, newStatus, username) => {
+  const label = newStatus === 'Active' ? 'activate' : 'deactivate';
+  if (!confirm(`Are you sure you want to ${label} company [${username}]?`)) return;
+  const company = STATE.companies.find(c => c.id === id);
+  if (!company) return;
+  if (window.db?.dbUpdateCompany) {
+    const { error } = await window.db.dbUpdateCompany(id, { status: newStatus });
+    if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+    if (window.db?.dbWriteLog) window.db.dbWriteLog(
+      newStatus === 'Active' ? 'Activate Company' : 'Deactivate Company',
+      username, `Company [${username}] status → ${newStatus}`
+    );
+  } else {
+    company.status = newStatus;
+    stateUpdate('companies', id, { status: newStatus });
+  }
+  toast(`Company [${username}] ${newStatus === 'Active' ? 'activated ✓' : 'deactivated ✗'}`, 'success');
+  window.go('company-list');
 };

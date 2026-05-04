@@ -519,42 +519,90 @@ window.openHostForm = (id = null) => {
     `);
 };
 
-window.saveHostDetail = (id) => {
+window.saveHostDetail = async (id) => {
   const data = {
-    host: document.getElementById('hs_host').value,
-    company: document.getElementById('hs_company').value,
+    host:     document.getElementById('hs_host').value,
+    company:  document.getElementById('hs_company').value,
     redirect: document.getElementById('hs_redirect').value,
-    code: document.getElementById('hs_code').value,
-    ssl: document.getElementById('hs_ssl').value,
-    isApp: document.getElementById('hs_isApp').checked,
+    code:     document.getElementById('hs_code').value,
+    ssl:      document.getElementById('hs_ssl').value,
+    isApp:    document.getElementById('hs_isApp').checked,
   };
 
   if (!data.host) return toast('Host name is required', 'error');
 
   if (id) {
+    // Update existing host config
     const h = STATE.tools.hosts.find(x => x.id === id);
-    Object.assign(h, data);
+    if (h) {
+      Object.assign(h, data);
+      // Push redirect update to Cloudflare if zoneId known and redirect set
+      if (h.zoneId && data.redirect) {
+        const API_BASE = import.meta.env.VITE_API_SERVER_URL || '';
+        if (API_BASE) {
+          fetch(`${API_BASE}/api/cloudflare/update-redirect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ zoneId: h.zoneId, from: data.host, to: data.redirect, code: parseInt(data.code) }),
+          }).catch(() => {});
+        }
+      }
+      if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Host', data.host, `Updated host config for ${data.host}`);
+    }
     toast('Host configuration updated', 'success');
   } else {
-    STATE.tools.hosts.push({
-      id: 'H' + Date.now().toString().slice(-4),
+    // Provision new host — call Cloudflare backend to create zone
+    const newHost = {
+      id:      'H' + Date.now().toString().slice(-4),
       ...data,
-      ns: 'ram.ns.cloudflare.com, sue.ns.cloudflare.com',
+      ns:      'Pending...',
       created: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      build: 'Pending'
-    });
-    toast('Host provisioning started', 'success');
+      build:   'Pending',
+      zoneId:  null,
+    };
+    STATE.tools.hosts.push(newHost);
+    saveState();
+    go('tools-host');
+    toast('Host provisioning started...', 'info');
 
-    // Simulate build process
-    setTimeout(() => {
-      const h = STATE.tools.hosts.find(x => x.host === data.host);
-      if (h) {
-        h.build = 'Built';
-        saveState();
-        go('tools-host');
-        toast(`Build complete for ${data.host}`, 'success');
+    // Call Cloudflare backend
+    const API_BASE = import.meta.env.VITE_API_SERVER_URL || '';
+    if (API_BASE) {
+      try {
+        const res  = await fetch(`${API_BASE}/api/cloudflare/add-domain`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ domain: data.host, company: data.company }),
+        });
+        const json = await res.json();
+        const h    = STATE.tools.hosts.find(x => x.host === data.host);
+        if (h) {
+          if (json.ns) {
+            h.ns      = Array.isArray(json.ns) ? json.ns.join(', ') : json.ns;
+            h.zoneId  = json.zoneId || null;
+            h.build   = 'Built';
+          } else {
+            h.build   = json.error ? 'Error' : 'Built';
+          }
+          saveState();
+          go('tools-host');
+          toast(json.error ? `CF error: ${json.error}` : `Domain ${data.host} provisioned ✓`, json.error ? 'error' : 'success');
+        }
+      } catch (e) {
+        const h = STATE.tools.hosts.find(x => x.host === data.host);
+        if (h) { h.build = 'Error'; saveState(); }
+        toast('Cloudflare API unreachable', 'error');
       }
-    }, 5000);
+    } else {
+      // No backend URL — simulate
+      setTimeout(() => {
+        const h = STATE.tools.hosts.find(x => x.host === data.host);
+        if (h) { h.build = 'Built'; h.ns = 'ram.ns.cloudflare.com, sue.ns.cloudflare.com'; saveState(); go('tools-host'); }
+        toast(`Build complete for ${data.host}`, 'success');
+      }, 3000);
+    }
+    if (window.db?.dbWriteLog) window.db.dbWriteLog('Provision Host', data.host, `Provisioned domain: ${data.host} [${data.company}]`);
+    return; // already called go() above
   }
 
   saveState();
@@ -572,20 +620,27 @@ window.deleteHostDetail = (id) => {
     `);
 };
 
-window.confirmDeleteHost = (id) => {
+window.confirmDeleteHost = async (id) => {
   const h = STATE.tools.hosts.find(x => x.id === id);
-  if (h) {
-    STATE.tools.deletedHosts.unshift({
-      host: h.host,
-      ns: h.ns,
-      deletedAt: new Date().toLocaleString('en-GB')
-    });
-    STATE.tools.hosts = STATE.tools.hosts.filter(x => x.id !== id);
-    saveState();
-    closeModalBtn();
-    go('tools-host');
-    toast('Host deleted and moved to history', 'warning');
+  if (!h) return;
+
+  // Call Cloudflare backend to remove zone if zoneId known
+  const API_BASE = import.meta.env.VITE_API_SERVER_URL || '';
+  if (API_BASE && h.zoneId) {
+    fetch(`${API_BASE}/api/cloudflare/remove-domain`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ zoneId: h.zoneId }),
+    }).catch(() => {});
   }
+
+  STATE.tools.deletedHosts.unshift({ host: h.host, ns: h.ns, deletedAt: new Date().toLocaleString('en-GB') });
+  STATE.tools.hosts = STATE.tools.hosts.filter(x => x.id !== id);
+  saveState();
+  if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Host', h.host, `Deleted domain: ${h.host}`);
+  closeModalBtn();
+  go('tools-host');
+  toast('Host deleted and moved to history', 'warning');
 };
 window.payWinner = (id) => { const w = STATE.tools.tournamentWinners.find(x => x.id === id); if (!w) return; w.status = 'Paid'; saveState(); go('invoice-tournament'); toast(`Prize paid to ${w.member}`, 'success'); };
 window.payAllWinners = () => { STATE.tools.tournamentWinners.forEach(w => { w.status = 'Paid'; }); saveState(); go('invoice-tournament'); toast('All payouts processed', 'success'); };

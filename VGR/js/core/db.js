@@ -273,38 +273,112 @@ export const fetchSettings = async () => {
 
 // ── Map page → fetches ─────────────────────────────────────────
 const PAGE_FETCHES = {
-    'dashboard':              [fetchDeposits, fetchWithdrawals, fetchMembers],
-    'global-member-list':     [fetchMembers],
-    'tier-history':           [fetchMembers],
-    'company-list':           [fetchCompanies],
-    'company-create':         [fetchCompanies],
-    'bank-list':              [fetchBanks],
-    'deposit-list':           [fetchDeposits],
-    'withdrawal-list':        [fetchWithdrawals],
-    'pgsoft-transactions':    [fetchSeamlessTransactions],
-    'pgsoft-games':           [fetchSeamlessGames],
-    'pgsoft-api-logs':        [fetchSeamlessApiLogs],
-    'seamless-transactions':  [fetchSeamlessTransactions],
-    'seamless-games':         [fetchSeamlessGames],
-    'seamless-api-logs':      [fetchSeamlessApiLogs],
-    'logs-admin':             [fetchLogs],
-    'memo-list':              [fetchMemos],
-    'settings-commission':    [fetchSettings],
-    'settings-referral-rate': [fetchSettings],
-    'settings-finance':       [fetchSettings],
-    'custom-promotion-list':  [fetchPromotions],
-    'promotions':             [fetchPromotions],
-    'custom-promotions':      [fetchPromotions],
-    'announcement-list':      [fetchAnnouncements],
-    'announcements':          [fetchAnnouncements],
-    'admin-management':       [fetchSettings],
-    'bets-list':              [fetchLotteryBets],
-    'bets-table':             [fetchLotteryBets],
-    'results-list':           [fetchLotteryResults],
-    'results-scan':           [fetchLotteryResults],
-    'results-analyze':        [fetchLotteryResults, fetchLotteryBets],
-    'bonus-report':           [fetchBonuses],
-    'bonus-agent-freebet':    [fetchBonuses],
+    // ── Core ──────────────────────────────────────────────────
+    'dashboard':                    [fetchDeposits, fetchWithdrawals, fetchMembers],
+
+    // ── Members ───────────────────────────────────────────────
+    'global-member-list':           [fetchMembers],
+    'tier-history':                 [fetchMembers],
+    'finance-adjustment':           [fetchMembers],
+
+    // ── Companies & Banks ─────────────────────────────────────
+    'company-list':                 [fetchCompanies],
+    'company-create':               [fetchCompanies],
+    'master':                       [fetchCompanies],
+    'whitelabel-list':              [fetchCompanies],
+    'master-whitelabel-list':       [fetchCompanies],
+    'bank-list':                    [fetchBanks],
+    'bank-create':                  [fetchBanks],
+
+    // ── Finance ───────────────────────────────────────────────
+    'deposit-list':                 [fetchDeposits],
+    'withdrawal-list':              [fetchWithdrawals],
+
+    // ── Bets & Results ────────────────────────────────────────
+    'bets-list':                    [fetchLotteryBets],
+    'bets-table':                   [fetchLotteryBets],
+    'bets-transferred':             [fetchLotteryBets],
+    'results-list':                 [fetchLotteryResults],
+    'results-scan':                 [fetchLotteryResults],
+    'results-analyze':              [fetchLotteryResults, fetchLotteryBets],
+
+    // ── Bonus ─────────────────────────────────────────────────
+    'bonus-report':                 [fetchBonuses],
+    'bonus-agent-freebet':          [fetchBonuses],
+    'bonus-agent-freebet-report':   [fetchBonuses],
+    'bonus-freebet-report':         [fetchBonuses],
+    'bonus-pragmatic-frb':          [fetchBonuses],
+
+    // ── Promotions ────────────────────────────────────────────
+    'custom-promotion-list':        [fetchPromotions],
+    'promotions':                   [fetchPromotions],
+    'custom-promotions':            [fetchPromotions],
+    'promotion-release':            [fetchPromotions],
+    'promotion-rolling-release':    [fetchPromotions],
+
+    // ── Announcements ─────────────────────────────────────────
+    'announcement-list':            [fetchAnnouncements],
+    'announcements':                [fetchAnnouncements],
+    'custom-app-notification':      [fetchAnnouncements],
+    'app-notification':             [fetchAnnouncements],
+    'custom-global-banner':         [fetchAnnouncements],
+
+    // ── Seamless ──────────────────────────────────────────────
+    'pgsoft-transactions':          [fetchSeamlessTransactions],
+    'pgsoft-games':                 [fetchSeamlessGames],
+    'pgsoft-api-logs':              [fetchSeamlessApiLogs],
+    'seamless-transactions':        [fetchSeamlessTransactions],
+    'seamless-games':               [fetchSeamlessGames],
+    'seamless-api-logs':            [fetchSeamlessApiLogs],
+    'seamless-config':              [fetchSeamlessGames],
+
+    // ── Logs ──────────────────────────────────────────────────
+    'logs-admin':                   [fetchLogs],
+    'logs-company':                 [fetchLogs],
+    'logs-member':                  [fetchLogs],
+    'logs-whitelabel':              [fetchLogs],
+    'logs-master-wl':               [fetchLogs],
+
+    // ── Memos ─────────────────────────────────────────────────
+    'memo-list':                    [fetchMemos],
+    'memo-auto':                    [fetchMemos],
+
+    // ── Settings ──────────────────────────────────────────────
+    'settings-commission':          [fetchSettings],
+    'settings-referral-rate':       [fetchSettings],
+    'settings-finance':             [fetchSettings],
+    'settings-pools':               [fetchSettings],
+    'settings-togel-commission':    [fetchSettings],
+    'settings-limit-credit-out':    [fetchSettings],
+    'settings-vip-designer':        [fetchSettings, fetchMembers],
+    'settings-rebate-calc':         [fetchSettings],
+    'rebate-calc':                  [fetchSettings],
+    'dev-menu-config':              [fetchSettings],
+    'admin-management':             [fetchSettings],
+    'settings-games':               [fetchSeamlessGames],
+    'settings-agent-games':         [fetchSeamlessGames],
+
+    // ── Customization ─────────────────────────────────────────
+    'custom-site-config':           [fetchSettings],
+    'custom-theme':                 [fetchSettings],
+    'custom-seo':                   [fetchSettings],
+    'custom-vip':                   [fetchSettings, fetchMembers],
+
+    // ── Statistics & Reports ──────────────────────────────────
+    'statistics':                   [fetchDeposits, fetchWithdrawals, fetchMembers, fetchCompanies],
+    'provider-analytics':           [fetchSeamlessTransactions, fetchMembers],
+    'device-report':                [fetchMembers],
+    'reports-agent-daily':          [fetchDeposits, fetchWithdrawals, fetchCompanies],
+    'reports-winloss':              [fetchDeposits, fetchWithdrawals, fetchMembers],
+    'reports-limit-credit':         [fetchMembers, fetchCompanies],
+    'reports-togel-lost':           [fetchLotteryBets, fetchLotteryResults],
+    'reports-lost-money':           [fetchLotteryBets],
+    'reports-top-turnover':         [fetchLotteryBets, fetchMembers],
+
+    // ── Invoice ───────────────────────────────────────────────
+    'invoice-monthly':              [fetchDeposits, fetchWithdrawals, fetchCompanies],
+    'invoice-file':                 [fetchDeposits, fetchWithdrawals],
+    'invoice-tournament':           [fetchMembers, fetchBonuses],
 };
 
 export async function fetchForPage(page) {

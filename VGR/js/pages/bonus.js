@@ -284,8 +284,8 @@ window.openFreebetModal = () => {
     `);
 };
 
-window.saveFreebet = () => {
-  getFreebets().unshift({
+window.saveFreebet = async () => {
+  const entry = {
     id: 'FB' + Date.now().toString().slice(-6),
     member: document.getElementById('fb_member')?.value || MEMBERS[0],
     company: document.getElementById('fb_company')?.value || COMPANIES[0],
@@ -294,19 +294,38 @@ window.saveFreebet = () => {
     amount: parseInt(document.getElementById('fb_amount')?.value || '0', 10),
     rounds: parseInt(document.getElementById('fb_rounds')?.value || '0', 10),
     used: 0,
-    expiry: '30/04/2026',
+    expiry: new Date(Date.now() + 7 * 86400000).toLocaleDateString('id-ID'),
     status: 'Active',
     createdAt: new Date().toLocaleString('id-ID')
-  });
+  };
+  // Persist to DB via bonuses table (type = Freebet)
+  if (window.db?.dbCreateBonus) {
+    const { error } = await window.db.dbCreateBonus({
+      member: entry.member, company: entry.company,
+      type: 'Freebet',
+      bonusAmount: entry.amount,
+      depositAmount: 0, turnoverRequired: 0,
+      expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+    });
+    if (error) { toast('DB error: ' + error.message, 'error'); return; }
+    if (window.db?.dbWriteLog) window.db.dbWriteLog('Issue Freebet', entry.member, `Issued freebet Rp ${entry.amount} (${entry.rounds} rounds)`);
+  }
+  // Also update local freebets display cache
+  getFreebets().unshift(entry);
   saveState();
   closeModalBtn();
   window.go('bonus-agent-freebet');
   toast('Freebet issued', 'success');
 };
 
-window.cancelFreebet = (id) => {
+window.cancelFreebet = async (id) => {
   const item = getFreebets().find(f => f.id === id);
   if (!item) return;
+  // Cancel in DB if this is a DB-backed bonus
+  if (window.db?.dbCancelBonus) {
+    await window.db.dbCancelBonus(id);
+    if (window.db?.dbWriteLog) window.db.dbWriteLog('Cancel Freebet', item.member, `Cancelled freebet ${id}`);
+  }
   item.status = 'Expired';
   saveState();
   window.go('bonus-agent-freebet');
@@ -345,16 +364,31 @@ window.openPragmaticCampaignModal = () => {
     `);
 };
 
-window.saveCampaign = () => {
+window.saveCampaign = async () => {
+  const name    = document.getElementById('pc_name')?.value || 'Campaign';
+  const game    = document.getElementById('pc_game')?.value || GAMES_PP[0];
+  const rounds  = parseInt(document.getElementById('pc_rounds')?.value || '10', 10);
+  const issued  = parseInt(document.getElementById('pc_issued')?.value || '0', 10);
+  const expires = new Date(Date.now() + 30 * 86400000).toISOString();
+
+  // Persist campaign as a special bonus record in DB
+  if (window.db?.dbCreateBonus) {
+    const { error } = await window.db.dbCreateBonus({
+      member: 'system', company: null,
+      type: 'Pragmatic FRB',
+      bonusAmount: 0, depositAmount: 0,
+      turnoverRequired: 0,
+      expiresAt: expires,
+    });
+    if (error) { toast('DB error: ' + error.message, 'error'); return; }
+    if (window.db?.dbWriteLog) window.db.dbWriteLog('Create Campaign', 'pragmatic', `Created FRB campaign: ${name} (${game}, ${rounds} rounds, ${issued} issued)`);
+  }
   getCampaigns().unshift({
     id: 'PFB' + Date.now().toString().slice(-6),
-    name: document.getElementById('pc_name')?.value || 'Campaign',
-    game: document.getElementById('pc_game')?.value || GAMES_PP[0],
+    name, game,
     betLevel: parseInt(document.getElementById('pc_bet')?.value || '1', 10),
-    rounds: parseInt(document.getElementById('pc_rounds')?.value || '10', 10),
-    issued: parseInt(document.getElementById('pc_issued')?.value || '0', 10),
-    used: 0,
-    expiry: '30/04/2026',
+    rounds, issued, used: 0,
+    expiry: new Date(Date.now() + 30 * 86400000).toLocaleDateString('id-ID'),
     status: 'Active'
   });
   saveState();

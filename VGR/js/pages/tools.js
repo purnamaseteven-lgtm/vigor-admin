@@ -417,10 +417,14 @@ window.editUnopaySettings = () => {
   const c = STATE.tools.unopayConfig;
   openModal('Unopay Settings', `<div class="form-grid"><div class="form-field"><label>API Version</label><input id="uo_ver" value="${c.apiVersion}" /></div><div class="form-field"><label>Connected</label><select id="uo_conn"><option ${c.connected ? 'selected' : ''}>true</option><option ${!c.connected ? 'selected' : ''}>false</option></select></div></div>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.saveUnopaySettings()">Save</button>`);
 };
-window.saveUnopaySettings = () => {
+window.saveUnopaySettings = async () => {
   STATE.tools.unopayConfig.apiVersion = document.getElementById('uo_ver')?.value || STATE.tools.unopayConfig.apiVersion;
   STATE.tools.unopayConfig.connected = (document.getElementById('uo_conn')?.value || 'true') === 'true';
-  saveState(); closeModalBtn(); go('tools-unopay'); toast('Settings updated', 'success');
+  saveState();
+  if (window.db?.dbSaveSetting) {
+    await window.db.dbSaveSetting('payment_config_unopay', JSON.stringify(STATE.tools.unopayConfig));
+  }
+  closeModalBtn(); go('tools-unopay'); toast('Settings updated', 'success');
 };
 window.viewToolRecord = (type, id) => {
   const map = { unopay: STATE.tools.unopayTx, coin2pay: STATE.tools.coin2payTx };
@@ -445,9 +449,26 @@ window.editSawala = () => {
   const s = STATE.tools.sawala;
   openModal('Edit Sawala Config', `<div class="form-grid"><div class="form-field"><label>Endpoint</label><input id="sw_endpoint" value="${s.endpoint}" /></div><div class="form-field"><label>Webhook</label><input id="sw_webhook" value="${s.webhook}" /></div><div class="form-field"><label>Callback IP</label><input id="sw_ip" value="${s.callbackIp}" /></div></div>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.saveSawala()">Save</button>`);
 };
-window.saveSawala = () => { const s = STATE.tools.sawala; s.endpoint = document.getElementById('sw_endpoint')?.value || s.endpoint; s.webhook = document.getElementById('sw_webhook')?.value || s.webhook; s.callbackIp = document.getElementById('sw_ip')?.value || s.callbackIp; saveState(); closeModalBtn(); go('tools-sawala'); toast('Settings saved', 'success'); };
+window.saveSawala = async () => {
+  const s = STATE.tools.sawala;
+  s.endpoint  = document.getElementById('sw_endpoint')?.value || s.endpoint;
+  s.webhook   = document.getElementById('sw_webhook')?.value || s.webhook;
+  s.callbackIp = document.getElementById('sw_ip')?.value || s.callbackIp;
+  saveState();
+  if (window.db?.dbSaveSetting) {
+    await window.db.dbSaveSetting('payment_config_sawala', JSON.stringify({ endpoint: s.endpoint, webhook: s.webhook, callbackIp: s.callbackIp }));
+  }
+  closeModalBtn(); go('tools-sawala'); toast('Settings saved', 'success');
+};
 window.openSmarticoCampaign = () => { openModal('Add Campaign', `<div class="form-grid"><div class="form-field"><label>Name</label><input id="sm_name" value="New Campaign" /></div><div class="form-field"><label>Type</label><input id="sm_type" value="Gamification" /></div></div>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.saveSmarticoCampaign()">Save</button>`); };
-window.saveSmarticoCampaign = () => { STATE.tools.smarticoCampaigns.unshift({ id: 'SM' + Date.now().toString().slice(-4), name: document.getElementById('sm_name')?.value || 'Campaign', type: document.getElementById('sm_type')?.value || 'Gamification', status: 'Active', players: 0, completion: 0 }); saveState(); closeModalBtn(); go('tools-smartico'); toast('Campaign added', 'success'); };
+window.saveSmarticoCampaign = () => {
+  const name = document.getElementById('sm_name')?.value || 'Campaign';
+  const type = document.getElementById('sm_type')?.value || 'Gamification';
+  STATE.tools.smarticoCampaigns.unshift({ id: 'SM' + Date.now().toString().slice(-4), name, type, status: 'Active', players: 0, completion: 0 });
+  saveState();
+  if (window.db?.dbWriteLog) window.db.dbWriteLog('Create Smartico Campaign', 'smartico', `Created campaign: ${name} [${type}]`);
+  closeModalBtn(); go('tools-smartico'); toast('Campaign added', 'success');
+};
 window.viewSmarticoCampaign = (id) => { const c = STATE.tools.smarticoCampaigns.find(x => x.id === id); if (!c) return; openModal('Campaign Detail', `<pre style="white-space:pre-wrap">${JSON.stringify(c, null, 2)}</pre>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`); };
 window.toggleSmarticoCampaign = (id) => { const c = STATE.tools.smarticoCampaigns.find(x => x.id === id); if (!c) return; c.status = c.status === 'Active' ? 'Paused' : 'Active'; saveState(); go('tools-smartico'); toast('Campaign updated', 'success'); };
 window.openHostForm = (id = null) => {

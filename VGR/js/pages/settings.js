@@ -1,7 +1,7 @@
 /* ─── SETTINGS PAGES ─── */
-import { STATE, addLog, fmtCur, fmt } from '../core/state.js';
+import { STATE, addLog, fmtCur, fmt, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
-import { pageHeader, filterCard, tableWrap, badge, toast } from '../ui/components.js';
+import { pageHeader, filterCard, tableWrap, badge, openModal, closeModalBtn, toast } from '../ui/components.js';
 import { COMPANIES, rnd } from '../utils/helpers.js';
 
 pages['settings-commission'] = () => {
@@ -86,7 +86,7 @@ pages['settings-pools'] = () => {
   const POOLS = ['4D Togel External', '4D Togel Vigor', '4D Togel Global', '6D Togel Vigor', 'SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA', 'MAGNUM', 'DAMACAI', 'TOTO'];
   return `
     ${pageHeader('Pools Management', '<span>Settings</span><span class="sep">›</span><span>Pools</span>', `
-      <button class="btn btn-primary" onclick="toast('Add pool','success')"><i class="fa-solid fa-plus"></i> Add Pool</button>`
+      <button class="btn btn-primary" onclick="window.openAddPoolModal()"><i class="fa-solid fa-plus"></i> Add Pool</button>`
   )}
     
     <div class="card">
@@ -105,18 +105,18 @@ pages['settings-pools'] = () => {
               </tr>
             </thead>
             <tbody>
-              ${POOLS.map((p, i) => `
+              ${getPools().map((p, i) => `
                 <tr>
                   <td>${i + 1}</td>
-                  <td><strong>${p}</strong></td>
-                  <td>${p.slice(0, 3)}</td>
-                  <td>${['Mon,Wed,Thu,Sat', 'Everyday', 'Mon-Sat', 'Mon,Wed,Fri', 'Everyday', 'Wed,Sat', 'Wed,Sat', 'Wed,Sat'][i]}</td>
-                  <td>18:00 / 10:00</td>
-                  <td><label class="toggle"><input type="checkbox" ${i < 5 ? 'checked' : ''}/><div class="toggle-slider"></div></label></td>
+                  <td><strong>${p.name}</strong></td>
+                  <td>${p.code}</td>
+                  <td style="font-size:.78rem">${p.days}</td>
+                  <td style="font-size:.78rem">${p.closeTime} / ${p.openTime}</td>
+                  <td><label class="toggle"><input type="checkbox" ${p.active ? 'checked' : ''} onchange="window.togglePool('${p.id}',this.checked)"/><div class="toggle-slider"></div></label></td>
                   <td>
                     <div class="action-btns">
-                      <button class="btn btn-sm btn-icon" style="background:#f59e0b;color:#fff"><i class="fa-solid fa-pen"></i></button>
-                      <button class="btn btn-sm btn-danger btn-icon"><i class="fa-solid fa-trash"></i></button>
+                      <button class="btn btn-sm btn-icon" style="background:#f59e0b;color:#fff" onclick="window.openEditPoolModal('${p.id}')"><i class="fa-solid fa-pen"></i></button>
+                      <button class="btn btn-sm btn-danger btn-icon" onclick="window.deletePool('${p.id}','${p.name}')"><i class="fa-solid fa-trash"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -169,7 +169,7 @@ pages['settings-limit-credit-out'] = () => {
                       </div>
                     </td>
                     <td>${badge(pct > 100 ? 'Blocked' : pct > 90 ? 'Warning' : 'OK', pct > 100 ? 'danger' : pct > 90 ? 'warning' : 'success')}</td>
-                    <td><button class="btn btn-sm btn-primary" onclick="toast('Credit updated','success')"><i class="fa-solid fa-pen"></i></button></td>
+                    <td><button class="btn btn-sm btn-primary" onclick="window.openSettingsCreditLimitModal('${name}',${limit})"><i class="fa-solid fa-pen"></i></button></td>
                   </tr>`;
   }).join('')}
             </tbody>
@@ -266,7 +266,7 @@ pages['settings-referral-rate'] = () => {
                     </td>
                     <td>${activeReferrals}</td>
                     <td style="color:var(--green);font-weight:600">${fmtCur(totalEarned)}</td>
-                    <td><button class="btn btn-sm btn-primary" onclick="toast('Edit ${c} referral','info')"><i class="fa-solid fa-pen"></i></button></td>
+                    <td><button class="btn btn-sm btn-primary" onclick="window.editCompanyReferralRate('${c}')"><i class="fa-solid fa-pen"></i></button></td>
                   </tr>`;
     }).join('')}
               </tbody>
@@ -678,4 +678,184 @@ window.saveTogelCommissionAll = async () => {
   await Promise.all(saves);
   saveState();
   toast('Togel commission settings saved ✓', 'success');
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  POOL MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+const DEFAULT_POOLS = [
+    { id: 'P1', name: '4D Togel External', code: '4TE', days: 'Mon,Wed,Thu,Sat', closeTime: '18:00', openTime: '10:00', active: true },
+    { id: 'P2', name: '4D Togel Vigor',    code: '4TV', days: 'Everyday',         closeTime: '18:00', openTime: '10:00', active: true },
+    { id: 'P3', name: '4D Togel Global',   code: '4TG', days: 'Mon-Sat',          closeTime: '18:00', openTime: '10:00', active: true },
+    { id: 'P4', name: '6D Togel Vigor',    code: '6TV', days: 'Mon,Wed,Fri',      closeTime: '18:00', openTime: '10:00', active: true },
+    { id: 'P5', name: 'SINGAPORE',         code: 'SGP', days: 'Everyday',         closeTime: '18:00', openTime: '10:00', active: true },
+    { id: 'P6', name: 'HONGKONG',          code: 'HKG', days: 'Wed,Sat',          closeTime: '22:00', openTime: '10:00', active: false },
+    { id: 'P7', name: 'SYDNEY',            code: 'SYD', days: 'Wed,Sat',          closeTime: '15:00', openTime: '10:00', active: false },
+    { id: 'P8', name: 'PCSO',              code: 'PCS', days: 'Wed,Sat',          closeTime: '21:00', openTime: '10:00', active: false },
+    { id: 'P9', name: 'CAMBODIA',          code: 'CMB', days: 'Everyday',         closeTime: '20:00', openTime: '10:00', active: false },
+    { id: 'P10', name: 'MAGNUM',           code: 'MGM', days: 'Wed,Sat',          closeTime: '19:00', openTime: '10:00', active: false },
+    { id: 'P11', name: 'DAMACAI',          code: 'DAM', days: 'Wed,Sat',          closeTime: '19:00', openTime: '10:00', active: false },
+    { id: 'P12', name: 'TOTO',             code: 'TOT', days: 'Wed,Sat',          closeTime: '19:00', openTime: '10:00', active: false },
+];
+function getPools() {
+    if (!STATE.pools || STATE.pools.length === 0) STATE.pools = DEFAULT_POOLS;
+    return STATE.pools;
+}
+
+function poolForm(entry = {}) {
+    return `
+    <div class="form-grid">
+        <div class="form-field">
+            <label>Pool Name <span style="color:var(--red)">*</span></label>
+            <input id="pl_name" class="form-control" value="${entry.name || ''}" placeholder="e.g. HONGKONG" />
+        </div>
+        <div class="form-field">
+            <label>Code</label>
+            <input id="pl_code" class="form-control" value="${entry.code || ''}" placeholder="3-char code" maxlength="5" />
+        </div>
+        <div class="form-field" style="grid-column:1/-1">
+            <label>Draw Days</label>
+            <input id="pl_days" class="form-control" value="${entry.days || ''}" placeholder="e.g. Mon,Wed,Sat or Everyday" />
+        </div>
+        <div class="form-field">
+            <label>Close Time</label>
+            <input id="pl_close" type="time" class="form-control" value="${entry.closeTime || '18:00'}" />
+        </div>
+        <div class="form-field">
+            <label>Open Time</label>
+            <input id="pl_open" type="time" class="form-control" value="${entry.openTime || '10:00'}" />
+        </div>
+    </div>`;
+}
+
+window.openAddPoolModal = () => {
+    openModal('Add Pool', poolForm(), `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.savePool()"><i class="fa-solid fa-plus"></i> Add Pool</button>
+    `);
+};
+
+window.openEditPoolModal = (id) => {
+    const pool = getPools().find(p => p.id === id);
+    if (!pool) return;
+    openModal('Edit Pool: ' + pool.name, poolForm(pool), `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.savePool('${id}')"><i class="fa-solid fa-check"></i> Save</button>
+    `);
+};
+
+window.savePool = (id = null) => {
+    const name = document.getElementById('pl_name')?.value.trim();
+    if (!name) { toast('Pool name is required', 'error'); return; }
+    const code = (document.getElementById('pl_code')?.value.trim() || name.slice(0, 3)).toUpperCase();
+    const days = document.getElementById('pl_days')?.value.trim() || 'Everyday';
+    const closeTime = document.getElementById('pl_close')?.value || '18:00';
+    const openTime = document.getElementById('pl_open')?.value || '10:00';
+    const pools = getPools();
+    if (id) {
+        const pool = pools.find(p => p.id === id);
+        if (pool) Object.assign(pool, { name, code, days, closeTime, openTime });
+    } else {
+        pools.push({ id: 'P' + Date.now(), name, code, days, closeTime, openTime, active: true });
+    }
+    saveState();
+    addLog('Settings', 'Pools', id ? `Updated pool ${name}` : `Added pool ${name}`);
+    closeModalBtn();
+    toast(id ? 'Pool updated' : 'Pool added', 'success');
+    window.go('settings-pools');
+};
+
+window.togglePool = (id, active) => {
+    const pool = getPools().find(p => p.id === id);
+    if (pool) { pool.active = active; saveState(); }
+    toast(`Pool ${active ? 'enabled' : 'disabled'}`, active ? 'success' : 'warning');
+};
+
+window.deletePool = (id, name) => {
+    if (typeof window.confirmAction === 'function') {
+        window.confirmAction('Delete Pool', `Delete pool ${name}?`, () => {
+            STATE.pools = getPools().filter(p => p.id !== id);
+            saveState(); toast('Pool deleted', 'success'); window.go('settings-pools');
+        }, 'Delete', 'danger');
+    } else {
+        STATE.pools = getPools().filter(p => p.id !== id);
+        saveState(); toast('Pool deleted', 'success'); window.go('settings-pools');
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  CREDIT LIMIT EDITOR (from settings-limit-credit-out)
+// ═══════════════════════════════════════════════════════════════
+window.openSettingsCreditLimitModal = (name, currentLimit) => {
+    openModal(`Credit Limit — ${name}`, `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Credit Limit (Rp) <span style="color:var(--red)">*</span></label>
+                <input id="scl_limit" type="number" class="form-control" value="${currentLimit}" min="0" step="1000000" />
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveSettingsCreditLimit('${name}')"><i class="fa-solid fa-check"></i> Save</button>
+    `);
+};
+
+window.saveSettingsCreditLimit = async (name) => {
+    const limit = parseInt(document.getElementById('scl_limit')?.value || '0', 10);
+    if (isNaN(limit) || limit < 0) { toast('Invalid credit limit', 'error'); return; }
+    STATE.settings[`creditLimit_${name}`] = limit;
+    const co = STATE.companies.find(c => (c.username || c.name) === name);
+    if (co) { co.creditLimit = limit; co.credit = co.credit || 0; }
+    saveState();
+    if (window.db?.dbSaveSetting) await window.db.dbSaveSetting(`credit_limit_${name}`, String(limit), name);
+    addLog('Settings', name, `Credit limit updated to ${limit}`);
+    closeModalBtn();
+    toast(`Credit limit for ${name} updated`, 'success');
+    window.go('settings-limit-credit-out');
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  REFERRAL RATE PER COMPANY EDITOR
+// ═══════════════════════════════════════════════════════════════
+window.editCompanyReferralRate = (company) => {
+    const currentRef = STATE.settings[`referral_company_rate_${company}`] || STATE.settings.referral || 2;
+    const currentSlot = STATE.settings[`referral_company_slot_${company}`] || STATE.settings.referralSlot || 0.5;
+    openModal(`Referral Rate — ${company}`, `
+        <div class="form-grid">
+            <div class="form-field">
+                <label>Referral Rate (%)</label>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                    <input id="cr_ref" type="number" class="form-control" value="${currentRef}" min="0" max="100" step="0.1" style="width:100px" />
+                    <span>%</span>
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Slot Rate (%)</label>
+                <div style="display:flex;align-items:center;gap:.5rem">
+                    <input id="cr_slot" type="number" class="form-control" value="${currentSlot}" min="0" max="100" step="0.1" style="width:100px" />
+                    <span>%</span>
+                </div>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveCompanyReferralRate('${company}')"><i class="fa-solid fa-check"></i> Save</button>
+    `);
+};
+
+window.saveCompanyReferralRate = async (company) => {
+    const ref = parseFloat(document.getElementById('cr_ref')?.value);
+    const slot = parseFloat(document.getElementById('cr_slot')?.value);
+    if (isNaN(ref) || ref < 0) { toast('Invalid referral rate', 'error'); return; }
+    STATE.settings[`referral_company_rate_${company}`] = ref;
+    STATE.settings[`referral_company_slot_${company}`] = slot;
+    saveState();
+    if (window.db?.dbSaveSetting) {
+        await window.db.dbSaveSetting(`referral_company_rate_${company}`, String(ref), company);
+        if (!isNaN(slot)) await window.db.dbSaveSetting(`referral_company_slot_${company}`, String(slot), company);
+    }
+    addLog('Settings', company, `Referral rate set to ${ref}%, slot: ${slot}%`);
+    closeModalBtn();
+    toast(`Referral rate for ${company} saved`, 'success');
+    window.go('settings-referral-rate');
 };

@@ -1,5 +1,5 @@
 /* ─── DASHBOARD PAGE ─── */
-import { STATE, fmt, fmtCur } from '../core/state.js';
+import { STATE, fmt, fmtCur, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
 
 // ── Registration KPI helpers ──
@@ -95,9 +95,42 @@ function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMe
   ];
 }
 
+// ── Date range helpers ──
+function getDashDateRange() {
+  const range = STATE._dashRange || 'today';
+  const now = new Date();
+  const todayISO = now.toISOString().slice(0, 10);
+  let from = todayISO;
+  if (range === '7d') {
+    const d = new Date(now); d.setDate(d.getDate() - 7);
+    from = d.toISOString().slice(0, 10);
+  } else if (range === '1m') {
+    const d = new Date(now); d.setMonth(d.getMonth() - 1);
+    from = d.toISOString().slice(0, 10);
+  }
+  return { range, from, to: todayISO };
+}
+
+function filterByDateRange(items, dateField) {
+  const { from, to } = getDashDateRange();
+  return items.filter(item => {
+    const d = (item[dateField] || '').slice(0, 10);
+    return d >= from && d <= to;
+  });
+}
+
+window.setDashRange = (range) => {
+  STATE._dashRange = range;
+  saveState();
+  if (window.go) window.go('dashboard');
+};
+
 pages['dashboard'] = () => {
-  const totalDeposit = STATE.deposits.filter(d => d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
-  const totalWithdraw = STATE.withdrawals.filter(w => w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+  const { range } = getDashDateRange();
+  const rangeDeposits = filterByDateRange(STATE.deposits.filter(d => d.status === 'Approved'), 'date');
+  const rangeWithdrawals = filterByDateRange(STATE.withdrawals.filter(w => w.status === 'Approved'), 'date');
+  const totalDeposit = rangeDeposits.reduce((s, d) => s + d.amount, 0);
+  const totalWithdraw = rangeWithdrawals.reduce((s, w) => s + w.amount, 0);
   const totalMembers = STATE.members.length;
   const activeMembers = STATE.members.filter(m => m.status === 'Active').length;
   const { todayRegs, totalRegs, converted } = computeRegKPIs();
@@ -125,9 +158,9 @@ pages['dashboard'] = () => {
       </div>
       <div style="display:flex; gap:.75rem; align-items:center">
          <div style="display:flex; background:rgba(255,255,255,0.05); padding:.25rem; border-radius:10px; border:1px solid rgba(255,255,255,0.1)">
-            <button class="btn btn-xs btn-secondary" style="border:none; background:var(--bg3)" onclick="toast('Range set to Today','info')">Today</button>
-            <button class="btn btn-xs btn-secondary" style="border:none; opacity:0.6" onclick="toast('Range set to 7 Days','info')">7 Days</button>
-            <button class="btn btn-xs btn-secondary" style="border:none; opacity:0.6" onclick="toast('Range set to 1 Month','info')">1 Month</button>
+            <button class="btn btn-xs btn-secondary" style="border:none; ${range==='today'?'background:var(--acc);color:#fff':'opacity:0.6'}" onclick="window.setDashRange('today')">Today</button>
+            <button class="btn btn-xs btn-secondary" style="border:none; ${range==='7d'?'background:var(--acc);color:#fff':'opacity:0.6'}" onclick="window.setDashRange('7d')">7 Days</button>
+            <button class="btn btn-xs btn-secondary" style="border:none; ${range==='1m'?'background:var(--acc);color:#fff':'opacity:0.6'}" onclick="window.setDashRange('1m')">1 Month</button>
          </div>
          <div style="position:relative">
             <input type="date" class="form-control" style="width:140px; height:32px; font-size:11px; padding-left:2rem" value="2026-05-01">

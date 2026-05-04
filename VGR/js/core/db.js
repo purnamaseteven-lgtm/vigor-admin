@@ -923,6 +923,10 @@ export async function dbUpdateSeamlessConfig(config) {
 //  SETTINGS
 // ══════════════════════════════════════════════════════════════════
 export async function dbSaveSetting(key, value, company = null) {
+    // Always persist to STATE.settings so demo mode works too
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings[key] = value;
+    saveState();
     if (!SUPABASE_ENABLED || !supabase) return { error: null };
     const { error } = await supabase.from('settings').upsert(
         { key, value: String(value), company, updated_at: new Date().toISOString() },

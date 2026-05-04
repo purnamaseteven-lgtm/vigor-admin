@@ -367,14 +367,19 @@ window.openFreebetModal = () => {
 };
 
 window.saveFreebet = async () => {
+  const amount = parseInt(document.getElementById('fb_amount')?.value || '0', 10);
+  const rounds = parseInt(document.getElementById('fb_rounds')?.value || '0', 10);
+  if (!document.getElementById('fb_member')?.value) { toast('Member is required', 'error'); return; }
+  if (isNaN(amount) || amount <= 0) { toast('Amount must be greater than 0', 'error'); return; }
+  if (isNaN(rounds) || rounds <= 0) { toast('Rounds must be greater than 0', 'error'); return; }
   const entry = {
     id: 'FB' + Date.now().toString().slice(-6),
     member: document.getElementById('fb_member')?.value || MEMBERS[0],
     company: document.getElementById('fb_company')?.value || COMPANIES[0],
     provider: document.getElementById('fb_provider')?.value || PROVIDERS[0],
     game: document.getElementById('fb_game')?.value || 'Slot Game Custom',
-    amount: parseInt(document.getElementById('fb_amount')?.value || '0', 10),
-    rounds: parseInt(document.getElementById('fb_rounds')?.value || '0', 10),
+    amount,
+    rounds,
     used: 0,
     expiry: new Date(Date.now() + 7 * 86400000).toLocaleDateString('id-ID'),
     status: 'Active',
@@ -447,10 +452,13 @@ window.openPragmaticCampaignModal = () => {
 };
 
 window.saveCampaign = async () => {
-  const name    = document.getElementById('pc_name')?.value || 'Campaign';
+  const name    = document.getElementById('pc_name')?.value?.trim() || '';
   const game    = document.getElementById('pc_game')?.value || GAMES_PP[0];
-  const rounds  = parseInt(document.getElementById('pc_rounds')?.value || '10', 10);
+  const rounds  = parseInt(document.getElementById('pc_rounds')?.value || '0', 10);
   const issued  = parseInt(document.getElementById('pc_issued')?.value || '0', 10);
+  if (!name) { toast('Campaign name is required', 'error'); return; }
+  if (isNaN(rounds) || rounds <= 0) { toast('Rounds must be greater than 0', 'error'); return; }
+  if (isNaN(issued) || issued <= 0) { toast('Issued count must be greater than 0', 'error'); return; }
   const expires = new Date(Date.now() + 30 * 86400000).toISOString();
 
   // Persist campaign as a special bonus record in DB

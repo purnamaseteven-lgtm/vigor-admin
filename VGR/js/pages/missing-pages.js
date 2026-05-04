@@ -346,7 +346,7 @@ pages['widget-configure'] = () => {
                 </div>
                 <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.5rem">
                     <button class="btn btn-secondary" onclick="go('widget-library')">Cancel</button>
-                    <button class="btn btn-primary" onclick="toast('Widget saved!','success');go('widget-library')"><i class="fa-solid fa-check"></i> Save</button>
+                    <button class="btn btn-primary" onclick="window.saveWidgetConfig('${wid || ''}')"><i class="fa-solid fa-check"></i> Save Widget</button>
                 </div>
             </div>
         </div>
@@ -357,4 +357,37 @@ pages['widget-configure'] = () => {
             </div>
         </div>
     </div>`;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  WIDGET CONFIGURE SAVE
+// ═══════════════════════════════════════════════════════════════
+window.saveWidgetConfig = (wid) => {
+    const name = document.querySelector('#main-content input[placeholder="My Widget"]')?.value?.trim() ||
+                 document.querySelector('#widget_name')?.value?.trim();
+    const maxItems = document.querySelector('#main-content input[type="number"]')?.value || '12';
+    const autoRotate = document.querySelector('#main-content select')?.value || 'Yes';
+    const category = document.querySelectorAll('#main-content select')[1]?.value || 'Navigation';
+
+    if (!STATE.savedWidgets) STATE.savedWidgets = [];
+    const existing = wid ? STATE.savedWidgets.find(w => w.id === wid) : null;
+    if (existing) {
+        Object.assign(existing, { name: name || existing.name, maxItems: Number(maxItems), autoRotate, category, updatedAt: new Date().toISOString() });
+    } else {
+        const def = WIDGET_DEFS.find(d => d.id === window.pendingWidget);
+        STATE.savedWidgets.push({
+            id: window.pendingWidget || ('W' + Date.now()),
+            name: name || (def?.name || 'My Widget'),
+            cat: category,
+            icon: def?.icon || 'fa-puzzle-piece',
+            bg: def?.bg || 'var(--acc)',
+            maxItems: Number(maxItems),
+            autoRotate,
+            createdAt: new Date().toISOString(),
+        });
+    }
+    saveState();
+    window.pendingWidget = null;
+    if (typeof window.toast === 'function') window.toast('Widget saved successfully', 'success');
+    window.go('widget-library');
 };

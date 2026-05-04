@@ -1,7 +1,7 @@
 /* ─── REPORTS, STATISTICS & ANALYTICS PAGES ─── */
-import { STATE, fmt, fmtCur, MEMBERS, COMPANIES } from '../core/state.js';
+import { STATE, fmt, fmtCur, MEMBERS, COMPANIES, saveState, addLog } from '../core/state.js';
 import { pages } from '../core/router.js';
-import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, renderPagerHTML } from '../ui/components.js';
+import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, renderPagerHTML, openModal, closeModalBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, rnd, makeDates, makeData, getFilter, setFilter } from '../utils/helpers.js';
 
 const PROVIDERS_LIST = ['PRAGMATIC PLAY', 'HABANERO', 'MICROGAMING', 'EVOLUTION', 'PG SOFT', 'JOKER', 'SPADEGAMING', 'RTG', 'PLAYTECH', 'NETENT'];
@@ -563,7 +563,10 @@ pages['reports-limit-credit'] = () => {
 
   return `
     ${pageHeader('Limit Credit Report', '<span>Reports</span><span class="sep">›</span><span>Limit Credit</span>', `
-      <button class="btn btn-secondary btn-sm" onclick="window.exportTableCSV(null,'credit_report.csv')"><i class="fa-solid fa-download"></i> Export</button>`)
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-secondary btn-sm" onclick="window.exportTableCSV(null,'credit_report.csv')"><i class="fa-solid fa-download"></i> Export</button>
+        <button class="btn btn-secondary btn-sm" onclick="window.printReport('Limit Credit Report')"><i class="fa-solid fa-print"></i> Print</button>
+      </div>`)
     }
 
   <div class="card">
@@ -601,7 +604,7 @@ pages['reports-limit-credit'] = () => {
                     </td>
                     <td style="font-size:.75rem">${r.date}</td>
                     <td>
-                      <button class="btn btn-sm btn-primary" onclick="toast('Set credit limit for ${r.company}','info')"><i class="fa-solid fa-pen"></i> Edit Limit</button>
+                      <button class="btn btn-sm btn-primary" onclick="window.openCreditLimitModal('${r.company}',${r.creditLimit})"><i class="fa-solid fa-pen"></i> Edit Limit</button>
                     </td>
                   </tr>`;
     }).join('')}
@@ -916,8 +919,7 @@ pages['device-report'] = () => {
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center">
             <span class="card-title">Device Sessions & Campaign Triggers</span>
             <div style="display:flex; gap:.5rem">
-                <button class="btn btn-xs btn-success" onclick="toast('Bulk action: Add 5k to all APK users','success')"><i class="fa-solid fa-gift"></i> Bulk Add 5k (App)</button>
-                <button class="btn btn-xs btn-primary" onclick="toast('Bulk action: Push 30% Cashback to all App Users','success')"><i class="fa-solid fa-bell"></i> Push 30% Cashback</button>
+                <button class="btn btn-xs btn-primary" onclick="go('crm-push')"><i class="fa-solid fa-bell"></i> CRM Push Notification</button>
             </div>
         </div>
         <div class="card-body">
@@ -986,4 +988,73 @@ window.onProviderFilterChange = (val) => {
   window.setFilter(PG, 'provider', val);
   window.setFilter(PG, 'game', 'All');
   window.go(PG);
+};
+
+// ─── Credit Limit Edit Modal ──────────────────────────────────
+window.openCreditLimitModal = (company, currentLimit) => {
+    openModal(`Edit Credit Limit — ${company}`, `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Company</label>
+                <input class="form-control" value="${company}" disabled />
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Credit Limit (Rp) <span style="color:var(--red)">*</span></label>
+                <input id="cl_limit" type="number" class="form-control" value="${currentLimit}" min="0" step="1000000" />
+                <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Current: ${typeof fmtCur === 'function' ? fmtCur(currentLimit) : currentLimit}</div>
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Notes</label>
+                <input id="cl_notes" class="form-control" placeholder="Reason for change..." />
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveCreditLimit('${company}')"><i class="fa-solid fa-check"></i> Save Limit</button>
+    `);
+};
+
+window.saveCreditLimit = async (company) => {
+    const limit = parseInt(document.getElementById('cl_limit')?.value || '0', 10);
+    const notes = document.getElementById('cl_notes')?.value.trim() || '';
+    if (isNaN(limit) || limit < 0) { toast('Invalid credit limit', 'error'); return; }
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings[`creditLimit_${company}`] = limit;
+    STATE.settings.defaultCreditLimit = limit; // fallback update
+    // Also update in companies array if exists
+    const co = STATE.companies.find(c => (c.username || c.name) === company);
+    if (co) co.creditLimit = limit;
+    saveState();
+    if (window.db?.dbSaveSetting) {
+        await window.db.dbSaveSetting(`credit_limit_${company}`, String(limit), company);
+    }
+    addLog('Credit Limit', company, `Credit limit set to ${limit}${notes ? ' — ' + notes : ''}`);
+    closeModalBtn();
+    toast(`Credit limit for ${company} updated`, 'success');
+    window.go('report-limit-credit');
+};
+
+// ─── PDF Print Export ──────────────────────────────────────────
+window.printReport = (title) => {
+    const content = document.getElementById('main-content')?.innerHTML || document.querySelector('.page-content')?.innerHTML || document.body.innerHTML;
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { toast('Pop-up blocked. Allow pop-ups to print.', 'warning'); return; }
+    win.document.write(`<!DOCTYPE html><html><head>
+        <title>${title || 'VIGOR Report'}</title>
+        <style>
+            @media print { @page { size: A4 landscape; margin: 10mm; } }
+            body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; background: #fff; }
+            table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+            th { background: #0f172a; color: #fff; padding: 6px 8px; text-align: left; }
+            td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; }
+            tr:nth-child(even) td { background: #f8fafc; }
+            h2 { margin: 0 0 1rem; font-size: 16px; }
+            .no-print { display: none; }
+        </style>
+    </head><body>
+        <h2>${title || 'VIGOR Report'} — ${new Date().toLocaleDateString('id-ID')}</h2>
+        ${content}
+        <script>window.onload=()=>{ window.print(); window.close(); }<\/script>
+    </body></html>`);
+    win.document.close();
 };

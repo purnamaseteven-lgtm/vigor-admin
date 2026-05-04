@@ -1,7 +1,7 @@
 /* ─── LOGS & MEMO PAGES ─── */
-import { STATE, stateAdd } from '../core/state.js';
+import { STATE, stateAdd, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
-import { pageHeader, filterCard, fsInput, fsActions, tableWrap, badge, renderPagerHTML, toast } from '../ui/components.js';
+import { pageHeader, filterCard, fsInput, fsActions, tableWrap, badge, renderPagerHTML, openModal, closeModalBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, rnd, MEMBERS } from '../utils/helpers.js';
 
 pages['logs-admin'] = () => {
@@ -60,7 +60,7 @@ pages['memo-list'] = () => {
       <div class="card">
         <div class="card-body" style="padding:0">
           <div style="padding:1rem;border-bottom:1px solid var(--border)">
-            <button class="btn btn-primary w-full" onclick="toast('Compose memo','info')"><i class="fa-solid fa-pen"></i> Compose</button>
+            <button class="btn btn-primary w-full" onclick="window.openComposeMemoModal()"><i class="fa-solid fa-pen"></i> Compose</button>
           </div>
           <div class="memo-sidebar">
             <div class="memo-nav-item active"><i class="fa-solid fa-inbox"></i> Inbox <span class="badge badge-warning" style="margin-left:auto">2</span></div>
@@ -139,7 +139,7 @@ pages['memo-auto'] = () => {
 
     return `
     ${pageHeader('Auto Memo', '<span>Memo</span><span class="sep">›</span><span>Auto Memo</span>', `
-      <button class="btn btn-primary" onclick="toast('Add auto memo rule','info')"><i class="fa-solid fa-plus"></i> Add Rule</button>`)}
+      <button class="btn btn-primary" onclick="window.openAddAutoMemoRuleModal()"><i class="fa-solid fa-plus"></i> Add Rule</button>`)}
 
     <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="stat-card">
@@ -202,4 +202,143 @@ pages['memo-auto'] = () => {
         </div>
       </div>
     </div>`;
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  COMPOSE MEMO MODAL
+// ═══════════════════════════════════════════════════════════════
+window.openComposeMemoModal = () => {
+    const adminList = (STATE.companies || []).map(c => c.username || c.name).filter(Boolean);
+    openModal('Compose Memo', `
+        <div class="form-grid">
+            <div class="form-field">
+                <label>To <span style="color:var(--red)">*</span></label>
+                <input id="memo_to" class="form-control" list="memo_to_list" placeholder="Username or role..." />
+                <datalist id="memo_to_list">
+                    <option>All Admins</option>
+                    <option>All Companies</option>
+                    ${adminList.map(a => `<option>${a}</option>`).join('')}
+                </datalist>
+            </div>
+            <div class="form-field">
+                <label>Category</label>
+                <select id="memo_category" class="form-control">
+                    <option>Finance</option>
+                    <option>Bonus</option>
+                    <option>System</option>
+                    <option>General</option>
+                    <option>Urgent</option>
+                </select>
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Subject <span style="color:var(--red)">*</span></label>
+                <input id="memo_subject" class="form-control" placeholder="Memo subject..." />
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Message <span style="color:var(--red)">*</span></label>
+                <textarea id="memo_message" class="form-control" rows="5" placeholder="Write your message..."></textarea>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.sendMemo()"><i class="fa-solid fa-paper-plane"></i> Send</button>
+    `);
+};
+
+window.sendMemo = async () => {
+    const to = document.getElementById('memo_to')?.value.trim();
+    const subject = document.getElementById('memo_subject')?.value.trim();
+    const message = document.getElementById('memo_message')?.value.trim();
+    const category = document.getElementById('memo_category')?.value;
+    if (!to) { toast('Recipient is required', 'error'); return; }
+    if (!subject) { toast('Subject is required', 'error'); return; }
+    if (!message) { toast('Message cannot be empty', 'error'); return; }
+
+    const memo = {
+        id: 'M' + Date.now(),
+        from: STATE.currentAdmin?.username || STATE.profile?.username || 'admin',
+        to, subject, message, category,
+        date: new Date().toLocaleString('id-ID'),
+        read: false,
+        type: 'sent',
+    };
+
+    if (!STATE.memos) STATE.memos = { inbox: [], sent: [], trash: [] };
+    STATE.memos.sent.unshift(memo);
+
+    if (window.db?.dbSendMemo) {
+        const { error } = await window.db.dbSendMemo({ from: memo.from, to, subject, message, category });
+        if (error) { toast('Send failed: ' + error.message, 'error'); return; }
+    }
+    saveState();
+    if (window.db?.dbWriteLog) window.db.dbWriteLog('Memo Sent', to, `Subject: ${subject}`);
+    closeModalBtn();
+    toast(`Memo sent to ${to}`, 'success');
+    window.go('memo-list');
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  ADD AUTO MEMO RULE MODAL
+// ═══════════════════════════════════════════════════════════════
+window.openAddAutoMemoRuleModal = (existingId = null) => {
+    const existing = existingId ? (STATE.autoMemoRules || []).find(r => r.id === existingId) : null;
+    openModal(existing ? 'Edit Auto Memo Rule' : 'Add Auto Memo Rule', `
+        <div class="form-grid">
+            <div class="form-field">
+                <label>Rule Name <span style="color:var(--red)">*</span></label>
+                <input id="amr_name" class="form-control" value="${existing?.name || ''}" placeholder="e.g. VIP Upgrade Notification" />
+            </div>
+            <div class="form-field">
+                <label>Trigger Event</label>
+                <select id="amr_trigger" class="form-control">
+                    ${['On first deposit approved','On withdrawal approved','On withdrawal rejected','On account suspended','On bonus approved','On tier level up','When credit reaches 80%','Every 1st of month','On new registration'].map(t => `<option ${existing?.trigger === t ? 'selected':''}>${t}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Target</label>
+                <select id="amr_target" class="form-control">
+                    <option ${(existing?.target||'') === 'Member' ? 'selected':''}>Member</option>
+                    <option ${(existing?.target||'') === 'Company' ? 'selected':''}>Company</option>
+                    <option ${(existing?.target||'') === 'All Admins' ? 'selected':''}>All Admins</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Status</label>
+                <select id="amr_active" class="form-control">
+                    <option value="1" ${(existing?.active !== false) ? 'selected':''}>Active</option>
+                    <option value="0" ${(existing?.active === false) ? 'selected':''}>Inactive</option>
+                </select>
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Template Message <span style="color:var(--red)">*</span></label>
+                <textarea id="amr_template" class="form-control" rows="4" placeholder="Use {member}, {amount}, {company} as variables...">${existing?.template || ''}</textarea>
+                <div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">Available variables: {member}, {amount}, {company}, {tier}, {month}</div>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveAutoMemoRule('${existingId || ''}')"><i class="fa-solid fa-check"></i> ${existing ? 'Update' : 'Add'} Rule</button>
+    `);
+};
+
+window.saveAutoMemoRule = (existingId = '') => {
+    const name = document.getElementById('amr_name')?.value.trim();
+    const trigger = document.getElementById('amr_trigger')?.value;
+    const target = document.getElementById('amr_target')?.value;
+    const template = document.getElementById('amr_template')?.value.trim();
+    const active = document.getElementById('amr_active')?.value === '1';
+    if (!name) { toast('Rule name is required', 'error'); return; }
+    if (!template) { toast('Template message is required', 'error'); return; }
+
+    if (!STATE.autoMemoRules) STATE.autoMemoRules = [];
+    if (existingId) {
+        const rule = STATE.autoMemoRules.find(r => r.id === existingId);
+        if (rule) Object.assign(rule, { name, trigger, target, template, active });
+    } else {
+        STATE.autoMemoRules.unshift({ id: 'AMR' + Date.now(), name, trigger, target, template, active, count: 0 });
+    }
+    saveState();
+    closeModalBtn();
+    toast(existingId ? 'Rule updated' : 'Auto memo rule added', 'success');
+    window.go('memo-auto');
 };

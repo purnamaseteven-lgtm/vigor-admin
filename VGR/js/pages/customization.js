@@ -522,9 +522,9 @@ pages['custom-seo'] = () => {
                 <div class="card-body" style="padding:1.5rem">
                     <div style="color:var(--acc);font-weight:900;font-size:.7rem;text-transform:uppercase;margin-bottom:.5rem">Quick Connect</div>
                     <div style="display:flex;flex-direction:column;gap:.75rem">
-                        <button class="btn btn-secondary btn-sm" onclick="toast('GTM Helper: Field placeholder updated','info')" style="justify-content:flex-start;background:rgba(255,255,255,0.05);border:none"><i class="fa-brands fa-google"></i> Tag Manager</button>
-                        <button class="btn btn-secondary btn-sm" onclick="toast('FB Pixel Template loaded','info')" style="justify-content:flex-start;background:rgba(255,255,255,0.05);border:none"><i class="fa-brands fa-facebook-f"></i> Facebook Pixel</button>
-                        <button class="btn btn-secondary btn-sm" onclick="toast('Hotjar tracking sample added','info')" style="justify-content:flex-start;background:rgba(255,255,255,0.05);border:none"><i class="fa-solid fa-fire"></i> Hotjar</button>
+                        <button class="btn btn-secondary btn-sm" onclick="window.openGTMModal()" style="justify-content:flex-start;background:rgba(255,255,255,0.05);border:none"><i class="fa-brands fa-google"></i> Tag Manager ${STATE.settings?.gtm_id ? '<span style="color:var(--green);font-size:.7rem;margin-left:.3rem">✓ Configured</span>' : ''}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="window.openFBPixelModal()" style="justify-content:flex-start;background:rgba(255,255,255,0.05);border:none"><i class="fa-brands fa-facebook-f"></i> Facebook Pixel ${STATE.settings?.fb_pixel_id ? '<span style="color:var(--green);font-size:.7rem;margin-left:.3rem">✓ Configured</span>' : ''}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="window.openHotjarModal()" style="justify-content:flex-start;background:rgba(255,255,255,0.05);border:none"><i class="fa-solid fa-fire"></i> Hotjar ${STATE.settings?.hotjar_id ? '<span style="color:var(--green);font-size:.7rem;margin-left:.3rem">✓ Configured</span>' : ''}</button>
                     </div>
                 </div>
             </div>
@@ -2144,5 +2144,121 @@ window.toggleAnnouncement = async (id, checked) => {
         if (a) { a.isActive = checked; saveState(); }
     }
     toast(`Announcement ${checked ? 'activated' : 'deactivated'}`, 'info');
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  GTM / FB PIXEL / HOTJAR QUICK CONNECT MODALS
+// ═══════════════════════════════════════════════════════════════
+window.openGTMModal = () => {
+    const current = STATE.settings?.gtm_id || '';
+    openModal('Google Tag Manager', `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1">
+                <label>GTM Container ID <span style="color:var(--red)">*</span></label>
+                <input id="gtm_id" class="form-control" value="${current}" placeholder="e.g. GTM-XXXXXXX" />
+                <div style="font-size:.72rem;color:var(--text3);margin-top:.25rem">Find it in your Google Tag Manager account → Container Settings.</div>
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label style="font-size:.8rem;color:var(--text3)">Preview — will inject into &lt;head&gt;:</label>
+                <code style="display:block;padding:.75rem;background:#0f172a;border-radius:8px;color:#94a3b8;font-size:.72rem;white-space:pre-wrap">&lt;!-- Google Tag Manager --&gt;\n&lt;script&gt;(function(w,d,s,l,i){...})(window,document,'script','dataLayer','${current || 'GTM-XXXXXXX'}');&lt;/script&gt;</code>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveGTMConfig()"><i class="fa-brands fa-google"></i> Install GTM</button>
+    `);
+};
+
+window.saveGTMConfig = async () => {
+    const id = document.getElementById('gtm_id')?.value.trim();
+    if (!id) { toast('GTM Container ID is required', 'error'); return; }
+    if (!/^GTM-[A-Z0-9]+$/.test(id)) { toast('Invalid GTM ID format (should be GTM-XXXXXXX)', 'warning'); return; }
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings.gtm_id = id;
+    // Inject script tag into injectHead
+    if (!STATE.seo) STATE.seo = {};
+    const existing = STATE.seo.injectHead || '';
+    const snippet = `<!-- Google Tag Manager -->\n<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${id}');<\/script>\n<!-- End Google Tag Manager -->`;
+    if (!existing.includes(id)) STATE.seo.injectHead = (existing ? existing + '\n\n' : '') + snippet;
+    saveState();
+    if (window.db?.dbSaveSetting) await window.db.dbSaveSetting('gtm_id', id);
+    closeModalBtn();
+    toast(`GTM ${id} installed successfully`, 'success');
+    window.go('seo-tools');
+};
+
+window.openFBPixelModal = () => {
+    const current = STATE.settings?.fb_pixel_id || '';
+    openModal('Facebook Pixel', `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Pixel ID <span style="color:var(--red)">*</span></label>
+                <input id="fb_pixel_id" class="form-control" value="${current}" placeholder="e.g. 123456789012345" />
+                <div style="font-size:.72rem;color:var(--text3);margin-top:.25rem">Find it in Facebook Ads Manager → Pixels → Your Pixel → Settings.</div>
+            </div>
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Events to Track</label>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap">
+                    ${['PageView','ViewContent','AddToCart','Purchase','Lead'].map(e => `
+                        <label style="display:flex;align-items:center;gap:.3rem;font-size:.82rem;cursor:pointer">
+                            <input type="checkbox" checked name="fb_event" value="${e}" /> ${e}
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveFBPixelConfig()"><i class="fa-brands fa-facebook-f"></i> Install Pixel</button>
+    `);
+};
+
+window.saveFBPixelConfig = async () => {
+    const id = document.getElementById('fb_pixel_id')?.value.trim();
+    if (!id || !/^\d{10,20}$/.test(id)) { toast('Invalid Pixel ID (should be a numeric ID)', 'error'); return; }
+    const events = Array.from(document.querySelectorAll('input[name="fb_event"]:checked')).map(el => el.value);
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings.fb_pixel_id = id;
+    if (!STATE.seo) STATE.seo = {};
+    const existing = STATE.seo.injectHead || '';
+    const snippet = `<!-- Facebook Pixel -->\n<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${id}');${events.includes('PageView') ? "fbq('track','PageView');" : ''}<\/script>\n<!-- End Facebook Pixel -->`;
+    if (!existing.includes(id)) STATE.seo.injectHead = (existing ? existing + '\n\n' : '') + snippet;
+    saveState();
+    if (window.db?.dbSaveSetting) await window.db.dbSaveSetting('fb_pixel_id', id);
+    closeModalBtn();
+    toast(`Facebook Pixel ${id} installed`, 'success');
+    window.go('seo-tools');
+};
+
+window.openHotjarModal = () => {
+    const current = STATE.settings?.hotjar_id || '';
+    openModal('Hotjar Tracking', `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1">
+                <label>Site ID <span style="color:var(--red)">*</span></label>
+                <input id="hj_id" class="form-control" value="${current}" placeholder="e.g. 1234567" />
+                <div style="font-size:.72rem;color:var(--text3);margin-top:.25rem">Find it in Hotjar Settings → Tracking Code → Site ID.</div>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveHotjarConfig()"><i class="fa-solid fa-fire"></i> Install Hotjar</button>
+    `);
+};
+
+window.saveHotjarConfig = async () => {
+    const id = document.getElementById('hj_id')?.value.trim();
+    if (!id || !/^\d+$/.test(id)) { toast('Invalid Site ID (should be numeric)', 'error'); return; }
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings.hotjar_id = id;
+    if (!STATE.seo) STATE.seo = {};
+    const existing = STATE.seo.injectHead || '';
+    const snippet = `<!-- Hotjar Tracking -->\n<script>(function(h,o,t,j,a,r){h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};h._hjSettings={hjid:${id},hjsv:6};a=o.getElementsByTagName('head')[0];r=o.createElement('script');r.async=1;r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;a.appendChild(r);})(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');<\/script>\n<!-- End Hotjar -->`;
+    if (!existing.includes(id)) STATE.seo.injectHead = (existing ? existing + '\n\n' : '') + snippet;
+    saveState();
+    if (window.db?.dbSaveSetting) await window.db.dbSaveSetting('hotjar_id', id);
+    closeModalBtn();
+    toast(`Hotjar Site ${id} installed`, 'success');
+    window.go('seo-tools');
 };
 

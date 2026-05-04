@@ -700,22 +700,52 @@ pages['profile'] = () => {
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
           <div class="form-group">
             <label class="form-label">Current Password</label>
-            <input type="password" class="form-control" placeholder="••••••••" />
+            <input type="password" id="cp_current" class="form-control" placeholder="••••••••" />
           </div>
           <div class="form-group">
             <label class="form-label">New Password</label>
-            <input type="password" class="form-control" placeholder="••••••••" />
+            <input type="password" id="cp_new" class="form-control" placeholder="Min 8 characters" />
           </div>
           <div class="form-group">
             <label class="form-label">Confirm Password</label>
-            <input type="password" class="form-control" placeholder="••••••••" />
+            <input type="password" id="cp_confirm" class="form-control" placeholder="••••••••" />
           </div>
         </div>
-        <button class="btn btn-warning mt-3" onclick="toast('Password updated successfully','success')"><i class="fa-solid fa-lock"></i> Update Password</button>
+        <div id="cp_strength_bar" style="height:4px;width:0;background:var(--green);border-radius:2px;margin:.5rem 0;transition:width .3s"></div>
+        <button class="btn btn-warning mt-3" onclick="window.changeAdminPassword()"><i class="fa-solid fa-lock"></i> Update Password</button>
       </div>
     </div>
   </div>
 </div>`;
+};
+
+/* ─── CHANGE PASSWORD ─── */
+window.changeAdminPassword = async () => {
+    const current = document.getElementById('cp_current')?.value;
+    const newPass = document.getElementById('cp_new')?.value;
+    const confirm = document.getElementById('cp_confirm')?.value;
+
+    if (!current) { toast('Current password is required', 'error'); return; }
+    if (!newPass || newPass.length < 8) { toast('New password must be at least 8 characters', 'error'); return; }
+    if (newPass !== confirm) { toast('Passwords do not match', 'error'); return; }
+
+    // Strength check
+    const hasUpper = /[A-Z]/.test(newPass);
+    const hasNum = /\d/.test(newPass);
+    const hasSpecial = /[!@#$%^&*]/.test(newPass);
+    const strength = (hasUpper ? 1 : 0) + (hasNum ? 1 : 0) + (hasSpecial ? 1 : 0) + (newPass.length >= 12 ? 1 : 0);
+    if (strength < 2) { toast('Password too weak. Use uppercase, numbers, or special characters.', 'warning'); return; }
+
+    if (window.supabase && typeof window.supabase.auth?.updateUser === 'function') {
+        const { error } = await window.supabase.auth.updateUser({ password: newPass });
+        if (error) { toast('Failed: ' + error.message, 'error'); return; }
+    }
+    // Clear fields
+    ['cp_current', 'cp_new', 'cp_confirm'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    addLog('Profile', STATE.currentAdmin?.username || 'admin', 'Password changed');
+    toast('Password updated successfully', 'success');
 };
 
 /* ─── HANDLERS ─── */

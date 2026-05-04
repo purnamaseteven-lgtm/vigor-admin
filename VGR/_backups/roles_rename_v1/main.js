@@ -1,0 +1,210 @@
+/* MAIN ENTRY POINT */
+import { initState } from './core/state.js';
+import { go, toggleMenu } from './core/router.js';
+import { requireAuth, onAuthChange } from './core/auth.js';
+import { initRealtime } from './core/realtime.js';
+import { SUPABASE_ENABLED } from './core/supabase.js';
+import { t, applyTranslations, changeLanguage } from './core/i18n.js';
+
+import './pages/dashboard.js';
+import './pages/members.js';
+import './pages/finance.js';
+import './pages/settings.js';
+import './pages/betting.js';
+import './builder/engine.js';
+import './pages/customization.js';
+import './pages/logs-memo.js';
+import './pages/company.js';
+import './pages/results.js';
+import './pages/admins.js';
+import './pages/bonus.js';
+import './pages/reports.js';
+import './pages/tools.js';
+import './pages/seamless.js';
+import './pages/master.js';
+import './pages/missing-pages.js';
+
+import './pages/simulator.js';
+import * as stateFuncs from './core/state.js';
+import * as routerFuncs from './core/router.js';
+import * as uiFuncs from './ui/components.js';
+import * as chartFuncs from './ui/charts.js';
+import * as helperFuncs from './utils/helpers.js';
+import * as formFuncs from './utils/forms.js';
+
+Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs, formFuncs);
+
+/* REAL-TIME WIDGET TIMERS */
+let jackpotInterval = null;
+let countdownInterval = null;
+let jackpotValue = 2847391204;
+
+function startRealTimeWidgets() {
+    if (jackpotInterval) clearInterval(jackpotInterval);
+    jackpotInterval = setInterval(() => {
+        jackpotValue += Math.floor(Math.random() * 1000) + 800;
+        document.querySelectorAll('.jk-value').forEach((el) => {
+            el.textContent = 'Rp ' + window.fmt(jackpotValue);
+        });
+    }, 1000);
+
+    if (countdownInterval) clearInterval(countdownInterval);
+    const target = Date.now() + (2 * 86400 + 14 * 3600 + 33 * 60 + 7) * 1000;
+    countdownInterval = setInterval(() => {
+        const rem = Math.max(0, Math.floor((target - Date.now()) / 1000));
+        const d = Math.floor(rem / 86400);
+        const h = Math.floor((rem % 86400) / 3600);
+        const m = Math.floor((rem % 3600) / 60);
+        const s = rem % 60;
+        document.querySelectorAll('.cd-num').forEach((el, i) => {
+            el.textContent = String([d, h, m, s][i] || 0).padStart(2, '0');
+        });
+    }, 1000);
+}
+
+/* SUPABASE MODE BANNER */
+function showModeBanner() {
+    if (SUPABASE_ENABLED) return;
+    const banner = document.createElement('div');
+    banner.id = 'modeBanner';
+    banner.style.cssText = `
+        position:fixed; bottom:1rem; right:1rem; z-index:9999;
+        background:rgba(14,165,233,.12); border:1px solid rgba(14,165,233,.3);
+        color:#38bdf8; border-radius:10px; padding:.6rem 1rem;
+        font-size:.75rem; display:flex; align-items:center; gap:.5rem;
+        backdrop-filter:blur(8px); cursor:pointer;
+    `;
+    banner.innerHTML = `
+        <i class="fa-solid fa-flask"></i>
+        <span><strong>Demo Mode</strong> - Supabase not connected. Data is mock only.</span>
+        <i class="fa-solid fa-xmark" onclick="this.parentElement.remove()" style="margin-left:.5rem;opacity:.6"></i>
+    `;
+    document.body.appendChild(banner);
+}
+
+window.simulateDevRole = (role) => {
+    STATE.currentAdmin.role = role;
+    const toastMsg = 'Dev Simulator: Role switched to ' + role;
+    if (window.toast) toast(toastMsg, 'success');
+
+    // Update the visual profile block so the dev knows their current simulated context
+    const hUser = document.querySelector('.header-user-info .huser-role');
+    if (hUser) hUser.textContent = 'SIMULATOR | ' + role;
+    const sUser = document.querySelector('.sidebar-user .user-role');
+    if (sUser) sUser.textContent = 'SIMULATOR | ' + role;
+
+    // Rerender the sidebar to apply the new role permissions matrix
+    renderSidebar();
+
+    // Update active state in sidebar just in case
+    setTimeout(() => {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        const currentPageStr = localStorage.getItem('VGR_PG') || 'dashboard';
+        const activeLink = document.querySelector(`.nav-link[onclick*="${currentPageStr}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+            const parentSub = activeLink.closest('.nav-submenu');
+            if (parentSub) {
+                parentSub.style.maxHeight = parentSub.scrollHeight + "px";
+                if (parentSub.previousElementSibling) parentSub.previousElementSibling.classList.add('active');
+            }
+        }
+    }, 50);
+};
+
+/* INIT */
+document.addEventListener('DOMContentLoaded', async () => {
+    initState();
+
+    const authed = await requireAuth();
+    if (!authed) return;
+
+    go('dashboard');
+
+    renderSidebar();
+    renderProfileDisplay();
+    window.initOmniSearch();
+
+    const homeMenuTrigger = document.querySelector('[onclick*="toggleMenu(\'homeMenu\'"]');
+    if (homeMenuTrigger) toggleMenu('homeMenu', homeMenuTrigger);
+
+
+    const theme = localStorage.getItem('VGR_THEME') || 'light';
+    const themeBtn = document.querySelector('[onclick="window.toggleTheme()"] i, [onclick="toggleTheme()"] i');
+    if (themeBtn) {
+        themeBtn.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    }
+
+    setTimeout(startRealTimeWidgets, 500);
+
+    if (SUPABASE_ENABLED) {
+        initRealtime();
+        onAuthChange((event) => {
+            if (event === 'TOKEN_REFRESHED') console.log('[Auth] Token refreshed');
+        });
+        console.log('[BERSAMA] Supabase mode - live data enabled');
+    } else {
+        showModeBanner();
+        showRoleSimulator();
+        console.log('[BERSAMA] Demo mode - using mock data');
+    }
+});
+
+function showRoleSimulator() {
+    const bar = document.createElement('div');
+    bar.style.cssText = `
+        position:fixed; top:0; left:50%; transform:translateX(-50%); z-index:10001;
+        background:rgba(15,23,42,.9); backdrop-filter:blur(10px); 
+        border:1px solid var(--border); border-top:none; border-radius:0 0 12px 12px;
+        padding:6px 12px; display:flex; align-items:center; gap:1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,.5);
+    `;
+
+    const roles = [
+        { r: 'SuperAdmin', c: 'Global', label: '🔑 Master Root', verified: true },
+        { r: 'SuperAdmin', c: 'Global', label: '🛡️ Super', verified: false },
+        { r: 'Company', c: 'HokiBet', label: '🏢 Company' },
+        { r: 'Shop', c: 'HokiBet', s: 'Sinar Rejeki', label: '🏪 Shop' }
+    ];
+
+    bar.innerHTML = `
+        <span style="font-size:10px; font-weight:800; color:var(--text3); text-transform:uppercase">Dev Simulator</span>
+        <div style="display:flex; gap:4px">
+            ${roles.map(r => `
+                <button class="btn btn-xs ${STATE.currentAdmin.role === r.r && (r.verified === undefined || STATE.currentAdmin.is2FAVerified === r.verified) ? 'btn-primary' : 'btn-secondary'}" 
+                        style="font-size:10px; padding:2px 8px"
+                        onclick="window.switchSimulatedRole('${r.r}', '${r.c}', '${r.s || ''}', ${r.verified || false})">
+                    ${r.label}
+                </button>
+            `).join('')}
+        </div>
+    `;
+    document.body.appendChild(bar);
+}
+
+window.switchSimulatedRole = (role, company, shop = '', verified = false) => {
+    STATE.currentAdmin = {
+        id: role === 'SuperAdmin' ? 'adm-1' : role === 'Company' ? 'adm-2' : 'adm-3',
+        username: role.toLowerCase() + '_sim',
+        name: role + ' Simulator',
+        role: role,
+        company: company,
+        shop: shop || null,
+        is2FAVerified: verified,
+        permissions: role === 'SuperAdmin' ? ['*'] : []
+    };
+
+    // Refresh UI
+    import('./ui/components.js').then(m => {
+        // Shared rendering logic for all roles (SuperAdmin uses centralized check() bypass)
+        m.renderSidebar();
+        m.renderProfileDisplay();
+
+        m.toast(`God-Mode Active: ${role} (${company})`, 'info');
+        go('dashboard');
+
+        const oldBar = document.querySelector('div[style*="z-index: 10001"]');
+        if (oldBar) oldBar.remove();
+        showRoleSimulator();
+    });
+};

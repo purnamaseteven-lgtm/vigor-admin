@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BERSAMA Admin</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="js/main.js"></script>
+  <script>
+    const theme = localStorage.getItem('VGR_THEME') || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+  </script>
+</head>
+
+<body>
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon"><i class="fa-solid fa-bolt"></i></div>
+        <span class="brand-name">BERSAMA</span>
+      </div>
+      <nav class="sidebar-nav" id="sidebarNav">
+        <div class="sidebar-menu-label">Main Menu</div>
+
+        <!-- Home -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('homeMenu', this)">
+            <i class="fa-solid fa-house nav-icon"></i>
+            <span class="nav-label">Home</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="homeMenu">
+            <div class="nav-link" onclick="go('dashboard')"><i class="fa-solid fa-chart-line nav-icon"></i><span
+                class="nav-label">Dashboard</span></div>
+            <div class="nav-link" onclick="go('statistics')"><i class="fa-solid fa-chart-bar nav-icon"></i><span
+                class="nav-label">Statistics</span></div>
+            <div class="nav-link" onclick="go('provider-analytics')"><i class="fa-solid fa-chart-pie nav-icon"></i><span
+                class="nav-label">Provider Analytics</span></div>
+          </div>
+        </div>
+
+        <!-- Master -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="go('master')">
+            <i class="fa-solid fa-crown nav-icon"></i>
+            <span class="nav-label">Master</span>
+          </div>
+        </div>
+
+        <!-- Company -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('companyMenu', this)">
+            <i class="fa-solid fa-building nav-icon"></i>
+            <span class="nav-label">Company</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="companyMenu">
+            <div class="nav-link" onclick="go('company-create')"><i class="fa-solid fa-plus nav-icon"></i><span
+                class="nav-label">Create Company</span></div>
+            <div class="nav-link" onclick="go('company-list')"><i class="fa-solid fa-list nav-icon"></i><span
+                class="nav-label">Company List</span></div>
+          </div>
+        </div>
+
+        <!-- Whitelabel -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('wlMenu', this)">
+            <i class="fa-solid fa-tag nav-icon"></i>
+            <span class="nav-label">Whitelabel</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="wlMenu">
+            <div class="nav-link" onclick="go('master-whitelabel-list')"><i class="fa-solid fa-star nav-icon"></i><span
+                class="nav-label">Master Whitelabel</span></div>
+            <div class="nav-link" onclick="go('whitelabel-list')"><i class="fa-solid fa-list nav-icon"></i><span
+                class="nav-label">Whitelabel List</span></div>
+          </div>
+        </div>
+
+        <!-- Global Member -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('memberMenu', this)">
+            <i class="fa-solid fa-users nav-icon"></i>
+            <span class="nav-label">Global Member List</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="memberMenu">
+            <div class="nav-link" onclick="go('global-member-list')"><i
+                class="fa-solid fa-user-group nav-icon"></i><span class="nav-label">Global Member List</span></div>
+            <div class="nav-link" onclick="go('tier-history')"><i
+                class="fa-solid fa-clock-rotate-left nav-icon"></i><span class="nav-label">Tier History for
+                Member</span></div>
+          </div>
+        </div>
+
+        <!-- Bank Management -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('bankMenu', this)">
+            <i class="fa-solid fa-building-columns nav-icon"></i>
+            <span class="nav-label">Bank Management</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="bankMenu">
+            <div class="nav-link" onclick="go('bank-create')"><i class="fa-solid fa-plus nav-icon"></i><span
+                class="nav-label">Create Bank</span></div>
+            <div class="nav-link" onclick="go('bank-list')"><i class="fa-solid fa-list nav-icon"></i><span
+                class="nav-label">Bank List</span></div>
+          </div>
+        </div>
+
+        <!-- Finance -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('financeMenu', this)">
+            <i class="fa-solid fa-money-bill-transfer nav-icon"></i>
+            <span class="nav-label">Finance</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="financeMenu">
+            <div class="nav-link" onclick="go('deposit-list')"><i
+                class="fa-solid fa-arrow-down-to-bracket nav-icon"></i><span class="nav-label">Deposit</span></div>
+            <div class="nav-link" onclick="go('withdrawal-list')"><i
+                class="fa-solid fa-arrow-up-from-bracket nav-icon"></i><span class="nav-label">Withdrawal</span></div>
+          </div>
+        </div>
+
+        <!-- Seamless Integrations -->
+        <div class="sidebar-menu-label">Providers</div>
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('seamlessMenu', this)">
+            <i class="fa-solid fa-puzzle-piece nav-icon" style="color:#0ea5e9"></i>
+            <span class="nav-label">Seamless Integration</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="seamlessMenu">
+            <div class="nav-link" onclick="go('seamless-config')"><i class="fa-solid fa-gear nav-icon"></i><span
+                class="nav-label">Provider Settings</span></div>
+            <div class="nav-link" onclick="go('seamless-transactions')"><i
+                class="fa-solid fa-exchange-alt nav-icon"></i><span class="nav-label">Transactions</span></div>
+            <div class="nav-link" onclick="go('seamless-games')"><i class="fa-solid fa-gamepad nav-icon"></i><span
+                class="nav-label">Game Catalog</span></div>
+            <div class="nav-link" onclick="go('seamless-api-logs')"><i class="fa-solid fa-file-code nav-icon"></i><span
+                class="nav-label">API Logs</span></div>
+            <div class="nav-link" onclick="go('seamless-docs')"><i class="fa-solid fa-book nav-icon"></i><span
+                class="nav-label">API Documentation</span></div>
+          </div>
+        </div>
+
+        <!-- Bets -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('betsMenu', this)">
+            <i class="fa-solid fa-dice nav-icon"></i>
+            <span class="nav-label">Bets</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="betsMenu">
+            <div class="nav-link" onclick="go('bets-table')"><i class="fa-solid fa-table nav-icon"></i><span
+                class="nav-label">Bets Table</span></div>
+            <div class="nav-link" onclick="go('bets-list')"><i class="fa-solid fa-list nav-icon"></i><span
+                class="nav-label">Bets List</span></div>
+            <div class="nav-link" onclick="go('bets-transferred')"><i class="fa-solid fa-right-left nav-icon"></i><span
+                class="nav-label">Transfer Bets</span></div>
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('resultsMenu', this)">
+            <i class="fa-solid fa-flag-checkered nav-icon"></i>
+            <span class="nav-label">Results</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="resultsMenu">
+            <div class="nav-link" onclick="go('results-list')"><i class="fa-solid fa-list nav-icon"></i><span
+                class="nav-label">Results List</span></div>
+            <div class="nav-link" onclick="go('results-scan')"><i class="fa-solid fa-qrcode nav-icon"></i><span
+                class="nav-label">Results Scan</span></div>
+            <div class="nav-link" onclick="go('results-analyze')"><i
+                class="fa-solid fa-magnifying-glass-chart nav-icon"></i><span class="nav-label">Results Analyze</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bonus -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('bonusMenu', this)">
+            <i class="fa-solid fa-gift nav-icon"></i>
+            <span class="nav-label">Bonus</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="bonusMenu">
+            <div class="nav-link" onclick="go('bonus-agent-freebet')"><i class="fa-solid fa-ticket nav-icon"></i><span
+                class="nav-label">Agent Freebet</span></div>
+            <div class="nav-link" onclick="go('bonus-freebet-report')"><i
+                class="fa-solid fa-file-lines nav-icon"></i><span class="nav-label">Freebet Report</span></div>
+            <div class="nav-link" onclick="go('bonus-report')"><i class="fa-solid fa-file-contract nav-icon"></i><span
+                class="nav-label">Bonus Report</span></div>
+            <div class="nav-link" onclick="go('bonus-pragmatic-frb')"><i class="fa-solid fa-coins nav-icon"></i><span
+                class="nav-label">Pragmatic FRB</span></div>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('settingsMenu', this)">
+            <i class="fa-solid fa-gear nav-icon"></i>
+            <span class="nav-label" data-i18n="Settings">Settings</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="settingsMenu">
+            <div class="nav-link" onclick="go('settings-commission')"><i class="fa-solid fa-percent nav-icon"></i><span
+                class="nav-label">Commission</span></div>
+            <div class="nav-link" onclick="go('settings-referral-rate')"><i
+                class="fa-solid fa-share-nodes nav-icon"></i><span class="nav-label">Referral Rate</span></div>
+            <div class="nav-link" onclick="go('settings-pools')"><i class="fa-solid fa-water nav-icon"></i><span
+                class="nav-label">Pools</span></div>
+            <div class="nav-link" onclick="go('settings-games')"><i class="fa-solid fa-gamepad nav-icon"></i><span
+                class="nav-label">Games</span></div>
+            <div class="nav-link" onclick="go('settings-agent-games')"><i
+                class="fa-solid fa-chess-knight nav-icon"></i><span class="nav-label">Agent Game Settings</span></div>
+            <div class="nav-link" onclick="go('settings-togel-commission')"><i
+                class="fa-solid fa-ticket-simple nav-icon"></i><span class="nav-label">Togel Commission</span></div>
+            <div class="nav-link" onclick="go('settings-limit-credit-out')"><i
+                class="fa-solid fa-credit-card nav-icon"></i><span class="nav-label">Limit Credit Out</span></div>
+          </div>
+        </div>
+
+        <!-- Customization -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('customMenu', this)">
+            <i class="fa-solid fa-palette nav-icon"></i>
+            <span class="nav-label">Customization</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="customMenu">
+            <div class="nav-link" onclick="go('custom-site-config')"><i class="fa-solid fa-sliders nav-icon"></i><span
+                class="nav-label">Site Config</span></div>
+            <div class="nav-link" onclick="go('custom-template')"><i class="fa-solid fa-layer-group nav-icon"></i><span
+                class="nav-label">Templates List</span></div>
+            <div class="nav-link" onclick="go('custom-global-banner')"><i class="fa-solid fa-image nav-icon"></i><span
+                class="nav-label">Global Banner</span></div>
+            <div class="nav-link" onclick="go('custom-promotion-list')"><i
+                class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Global Promotion List</span></div>
+            <div class="nav-link" onclick="go('custom-theme')"><i class="fa-solid fa-droplet nav-icon"></i><span
+                class="nav-label">Branding & Theme</span></div>
+            <div class="nav-link" onclick="go('custom-vip')"><i class="fa-solid fa-id-card-clip nav-icon"></i><span
+                class="nav-label">VIP Tier Designer</span></div>
+            <div class="nav-link" onclick="go('custom-seo')"><i
+                class="fa-solid fa-magnifying-glass-chart nav-icon"></i><span class="nav-label">SEO Settings</span>
+            </div>
+            <div class="nav-link" onclick="go('custom-app-notification')"><i class="fa-solid fa-bell nav-icon"></i><span
+                class="nav-label">App Notification</span></div>
+            <div style="height:1px;background:var(--sb3);margin:.3rem 0"></div>
+            <div class="nav-link" onclick="go('widget-library')"><i class="fa-solid fa-puzzle-piece nav-icon"></i><span
+                class="nav-label">Widget Library</span></div>
+            <div class="nav-link" onclick="go('widget-configure');pendingWidget=null"><i
+                class="fa-solid fa-plus-square nav-icon"></i><span class="nav-label">Create Widget</span></div>
+            <div class="nav-link" onclick="go('template-builder')"><i
+                class="fa-solid fa-object-group nav-icon"></i><span class="nav-label">Template Builder</span></div>
+            <div class="nav-link" onclick="go('template-preview')"><i class="fa-solid fa-eye nav-icon"></i><span
+                class="nav-label">Template Preview</span></div>
+          </div>
+        </div>
+
+        <!-- Tools -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('toolsMenu', this)">
+            <i class="fa-solid fa-wrench nav-icon"></i>
+            <span class="nav-label" data-i18n="Tools">Tools</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="toolsMenu">
+            <div class="nav-link" onclick="go('tools-unopay')"><i class="fa-solid fa-money-bill-wave nav-icon"></i><span
+                class="nav-label">Unopay Payment</span></div>
+            <div class="nav-link" onclick="go('tools-coin2pay')"><i class="fa-solid fa-bitcoin-sign nav-icon"></i><span
+                class="nav-label">Coin2Pay</span></div>
+            <div class="nav-link" onclick="go('tools-sawala')"><i class="fa-solid fa-plug nav-icon"></i><span
+                class="nav-label">Sawala</span></div>
+            <div class="nav-link" onclick="go('tools-smartico')"><i class="fa-solid fa-robot nav-icon"></i><span
+                class="nav-label">Smartico</span></div>
+            <div class="nav-link" onclick="go('tools-host')"><i class="fa-solid fa-server nav-icon"></i><span
+                class="nav-label">Host</span></div>
+          </div>
+        </div>
+
+        <!-- Memo -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('memoMenu', this)">
+            <i class="fa-solid fa-note-sticky nav-icon"></i>
+            <span class="nav-label">Memo</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="memoMenu">
+            <div class="nav-link" onclick="go('memo-list')"><i class="fa-solid fa-inbox nav-icon"></i><span
+                class="nav-label">Memo</span></div>
+            <div class="nav-link" onclick="go('memo-auto')"><i class="fa-solid fa-robot nav-icon"></i><span
+                class="nav-label">Auto Memo</span></div>
+          </div>
+        </div>
+
+        <!-- Reports -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('reportsMenu', this)">
+            <i class="fa-solid fa-file-chart-column nav-icon"></i>
+            <span class="nav-label">Reports</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="reportsMenu">
+            <div class="nav-link" onclick="go('reports-agent-daily')"><i
+                class="fa-solid fa-calendar-day nav-icon"></i><span class="nav-label">Agent Daily Report</span></div>
+            <div class="nav-link" onclick="go('reports-winloss')"><i
+                class="fa-solid fa-scale-balanced nav-icon"></i><span class="nav-label">Win Loss Report</span></div>
+            <div class="nav-link" onclick="go('reports-limit-credit')"><i class="fa-solid fa-gauge nav-icon"></i><span
+                class="nav-label">Limit Credit Report</span></div>
+            <div class="nav-link" onclick="go('reports-togel-lost')"><i
+                class="fa-solid fa-triangle-exclamation nav-icon"></i><span class="nav-label">Togel Lost Money</span>
+            </div>
+            <div class="nav-link" onclick="go('reports-lost-money')"><i
+                class="fa-solid fa-arrow-trend-down nav-icon"></i><span class="nav-label">Lost Money Report</span></div>
+            <div class="nav-link" onclick="go('reports-top-turnover')"><i class="fa-solid fa-trophy nav-icon"></i><span
+                class="nav-label">Top Turnover Members</span></div>
+          </div>
+        </div>
+
+        <!-- Monthly Invoice -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('invoiceMenu', this)">
+            <i class="fa-solid fa-file-invoice nav-icon"></i>
+            <span class="nav-label">Monthly Invoice</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="invoiceMenu">
+            <div class="nav-link" onclick="go('invoice-tournament')"><i class="fa-solid fa-medal nav-icon"></i><span
+                class="nav-label">Tournament Winner List</span></div>
+            <div class="nav-link" onclick="go('invoice-monthly')"><i
+                class="fa-solid fa-calendar-check nav-icon"></i><span class="nav-label">Monthly Invoice</span></div>
+            <div class="nav-link" onclick="go('invoice-file')"><i class="fa-solid fa-folder-open nav-icon"></i><span
+                class="nav-label">File Management</span></div>
+          </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('logsMenu', this)">
+            <i class="fa-solid fa-scroll nav-icon"></i>
+            <span class="nav-label">Logs</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="logsMenu">
+            <div class="nav-link" onclick="go('logs-admin')"><i class="fa-solid fa-user-shield nav-icon"></i><span
+                class="nav-label">Admin Logs</span></div>
+            <div class="nav-link" onclick="go('logs-company')"><i class="fa-solid fa-building nav-icon"></i><span
+                class="nav-label">Company Logs</span></div>
+            <div class="nav-link" onclick="go('logs-whitelabel')"><i class="fa-solid fa-tag nav-icon"></i><span
+                class="nav-label">Whitelabel Logs</span></div>
+            <div class="nav-link" onclick="go('logs-master-wl')"><i class="fa-solid fa-star nav-icon"></i><span
+                class="nav-label">Master WL Logs</span></div>
+            <div class="nav-link" onclick="go('logs-member')"><i class="fa-solid fa-user nav-icon"></i><span
+                class="nav-label">Member Logs</span></div>
+          </div>
+        </div>
+
+        <div class="sidebar-menu-label">Account</div>
+        <div class="nav-item">
+          <div class="nav-link" onclick="go('profile')">
+            <i class="fa-solid fa-circle-user nav-icon"></i>
+            <span class="nav-label">Profile</span>
+          </div>
+        </div>
+        <div class="nav-item">
+          <div class="nav-link" onclick="logout()">
+            <i class="fa-solid fa-right-from-bracket nav-icon"></i>
+            <span class="nav-label">Logout</span>
+          </div>
+        </div>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user">
+          <div class="user-avatar">AS</div>
+          <div class="user-info">
+            <div class="user-name">adminsub40</div>
+            <div class="user-role">SUBSTAG · Admin</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main" id="main">
+      <!-- HEADER -->
+      <header class="header">
+        <button class="header-toggle" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+        <div class="search-container">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="omniSearchInput" placeholder="Type '/' or 'Ctrl+K' to find anything..."
+            onfocus="this.placeholder='Search member, tx, or menu...'"
+            onblur="this.placeholder='Type \'/\' or \'Ctrl+K\' to find anything...'">
+          <div class="search-shortcut">/</div>
+        </div>
+        <div class="header-actions">
+          <!-- DEV SIMULATOR -->
+          <div
+            style="display:flex; align-items:center; background:rgba(14,165,233,0.1); border:1px dashed var(--acc); padding:0.2rem 0.5rem; border-radius:6px; margin-right:1rem;">
+            <i class="fa-solid fa-code" style="color:var(--acc); font-size:0.75rem; margin-right:6px;"></i>
+            <span style="font-size:0.7rem; color:var(--text3); font-weight:700; margin-right:6px;">DEV SIM:</span>
+            <select class="form-control"
+              style="width:110px;height:24px;background:var(--bg1);padding:0 .4rem;font-size:0.75rem;border:none;color:var(--acc)"
+              onchange="if(window.simulateDevRole) window.simulateDevRole(this.value)">
+              <option value="SuperAdmin">SuperAdmin</option>
+              <option value="Company">Company / WL</option>
+              <option value="Master">Master Agent</option>
+              <option value="Shop">Shop / Bo</option>
+              <option value="Agent">Sub Agent</option>
+            </select>
+            <button class="btn btn-xs btn-primary" style="margin-left:8px; height:24px; padding:0 8px;"
+              onclick="window.go('dev-menu-config')" title="Configure Permissions Matrix"><i
+                class="fa-solid fa-gears"></i></button>
+          </div>
+
+          <select class="form-control" style="width:110px;height:32px;font-size:0.8rem;margin-right:1rem;"
+            onchange="changeLanguage(this.value)">
+            <option value="en">English</option>
+            <option value="id">Indonesian</option>
+          </select>
+          <button class="header-icon-btn" onclick="window.toggleTheme()" title="Toggle Theme"><i
+              class="fa-solid fa-moon"></i></button>
+          <button class="header-icon-btn" onclick="window.showInbox()" title="Inbox"><i
+              class="fa-regular fa-envelope"></i><span class="badge"></span></button>
+          <button class="header-icon-btn" onclick="toast('System Cleanup','info')" title="Cleanup"><i
+              class="fa-solid fa-trash-can"></i></button>
+          <div class="header-user" onclick="go('profile')">
+            <div class="header-avatar">AS</div>
+            <div class="header-user-info">
+              <div class="huser-name">adminusb40</div>
+              <div class="huser-role">SUBSTAG | Super Admin</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT -->
+      <main class="content-area" id="pageContent">
+        <!-- rendered by JS -->
+      </main>
+
+      <footer class="app-footer">© 2019 VIGOR ALL RIGHTS RESERVED</footer>
+    </div>
+  </div>
+
+  <!-- MODAL CONTAINER -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">Modal</span>
+        <button class="modal-close" onclick="closeModalBtn()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+</body>
+
+</html>

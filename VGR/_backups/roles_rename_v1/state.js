@@ -1,0 +1,362 @@
+/* ─── STATE MANAGEMENT ─── */
+export const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+export const fmtCur = (n) => "Rp " + fmt(n);
+
+export const NL = ['Santoso', 'Wijaya', 'Kusuma', 'Rahayu', 'Pratama', 'Sari', 'Utama', 'Nugroho', 'Halim', 'Setiawan', 'Gunawan', 'Hidayat', 'Irawan', 'Jaya', 'Kartika', 'Lestari', 'Mulyadi', 'Nurhadi', 'Okta', 'Purnama'];
+export const MEMBERS = ['alex99', 'lucy_star', 'budi_gacor', 'dave_king', 'mega_win', 'susi88', 'user_unopay', 'p Purnama', 'Gunawan_W', 'Rahayu_Sari', 'Pratama_J', 'Wijaya_K', 'Santoso_U', 'Hidayat_H', 'Irawan_G', 'Nurhadi_M', 'Halim_L', 'Jaya_O', 'Setiawan_E', 'Okta_R'];
+export const BANKS = ['BCA', 'BNI', 'BRI', 'MANDIRI', 'DANAMON', 'CIMB', 'PERMATA', 'MAYBANK'];
+export const COMPANIES = ['vigor88', 's88pw', 's88pb', 's88gw', 'Pgw1', 'budi', 'dedek', 'dhanur', 'ebert', 'cas88', 'whitelabel1', 'client3', 'client5', 'ac88', 'tiger88', 'casino888', 'play77', 'pro99', 'jackpot1', 'lucky88'];
+export const STATUSES = ['Active', 'Inactive', 'Suspended', 'Blocked'];
+export const GAMES = ['4D', '3D', '2D', 'Colok Bebas', 'Colok Naga', 'Colok Jitu', '50-50', 'Shio'];
+export const PROVIDERS = ['All Providers', 'PRAGMATIC PLAY', 'HABANERO', 'MICROGAMING', 'SBOBET', 'EVOLUTION', 'JOKER', 'SPADEGAMING'];
+
+export const PG_GAMES = [
+    { id: 1, name: "Honey Trap of Diao Chan", type: "Slot" }, { id: 2, name: "Hood vs Wolf", type: "Slot" },
+    { id: 3, name: "Hotpot", type: "Slot" }, { id: 6, name: "Medusa II", type: "Slot" },
+    { id: 7, name: "Fortune Mouse", type: "Slot" }, { id: 18, name: "Dragon Hatch", type: "Slot" },
+    { id: 35, name: "Mahjong Ways", type: "Slot" }, { id: 36, name: "Fortune Tiger", type: "Slot" },
+    { id: 37, name: "Fortune Rabbit", type: "Slot" }, { id: 38, name: "Fortune Ox", type: "Slot" },
+    { id: 39, name: "Ganesha Gold", type: "Slot" }, { id: 40, name: "Double Fortune", type: "Slot" },
+    { id: 42, name: "Wild Bandito", type: "Slot" }, { id: 48, name: "Candy Burst", type: "Slot" },
+    { id: 54, name: "Mahjong Ways 2", type: "Slot" }, { id: 57, name: "Wild Bounty Showdown", type: "Slot" },
+    { id: 59, name: "Treasures of Aztec", type: "Slot" }, { id: 60, name: "The Great Icescape", type: "Slot" },
+    { id: 63, name: "Cash Mania", type: "Slot" }, { id: 65, name: "Buffalo Win", type: "Slot" },
+    { id: 68, name: "Baccarat Deluxe", type: "Card" }, { id: 69, name: "Lucky Neko", type: "Slot" },
+    { id: 71, name: "Crypto Gold", type: "Slot" }, { id: 73, name: "Supermarket Spree", type: "Slot" },
+    { id: 74, name: "Heist Stakes", type: "Slot" }, { id: 75, name: "Mafia Mayhem", type: "Slot" },
+];
+export const PG_CURRENCIES = ['IDR', 'CNY', 'THB', 'VND', 'BRL', 'INR', 'KRW', 'USD', 'EUR', 'TRY', 'RUB', 'UAH', 'KZT', 'UZS', 'BDT', 'MMK', 'KHR', 'LAK', 'PHP', 'PKR', 'NPR', 'MXN', 'PEN', 'CLP', 'COP', 'ARS', 'PYG', 'UYU', 'BOB', 'CRC', 'NGN', 'KES', 'GHS', 'TZS', 'UGX', 'ZAR', 'EGP', 'MAD', 'DZD', 'TND', 'LBP', 'SAR', 'AED', 'QAR', 'OMR', 'BHD', 'KWD', 'JOD', 'IQD', 'IRR', 'GEL', 'AZN', 'AMD', 'USDT', 'USDC', 'MBTC', 'UBTC', 'TRX', 'TUSD'];
+
+export const STATE = {
+    members: [],
+    admins: [
+        { id: 'adm-1', username: 'super_root', name: 'Master System', role: 'SuperAdmin', company: 'Global', status: 'Active', lastLogin: '2026-04-29 10:00' },
+        { id: 'adm-2', username: 'owner_hokibet', name: 'HokiBet Owner', role: 'Company', company: 'HokiBet', status: 'Active', lastLogin: '2026-04-28 15:30' },
+        { id: 'adm-3', username: 'shop_sinar', name: 'Sinar Rejeki Shop', role: 'Shop', company: 'HokiBet', shop: 'Sinar Rejeki', status: 'Active', lastLogin: '2026-04-29 08:15' }
+    ],
+    currentAdmin: {
+        id: 'adm-1',
+        username: 'antigravity',
+        name: 'Super Admin',
+        role: 'SuperAdmin',
+        company: 'Global',
+        is2FAVerified: false,
+        permissions: ['*']
+    },
+    PERMISSIONS: {
+        FINANCE_VIEW: 'view_finance',
+        FINANCE_EDIT: 'edit_finance',
+        ADMIN_MANAGE: 'manage_admins',
+        HOST_MANAGE: 'manage_hosts',
+        BUILDER_ACCESS: 'access_builder'
+    },
+    companies: ['Global', 'HokiBet', 'MegaWin', 'DragonSlot', 'ZenithCasino'],
+    shops: [
+        { id: 'sh-1', name: 'Sinar Rejeki', company: 'HokiBet' },
+        { id: 'sh-2', name: 'Metro Game', company: 'MegaWin' }
+    ],
+    banks: [], deposits: [], withdrawals: [], announcements: [],
+    notifications: [], promotions: [], memos: { inbox: [], sent: [], trash: [] }, logs: [],
+    savedWidgets: [], savedLayouts: [],
+    theme: {
+        primary: '#0ea5e9',
+        accent: '#8b5cf6',
+        radius: '10px',
+        font: 'Segoe UI',
+        darkMode: true,
+        presets: 'default'
+    },
+    vipTiers: [
+        { id: 'VIP1', name: 'Bronze', turnover: 0, rebate: 0.3, referral: 0.1, color: '#cd7f32' },
+        { id: 'VIP2', name: 'Silver', turnover: 100000000, rebate: 0.5, referral: 0.2, color: '#c0c0c0' },
+        { id: 'VIP3', name: 'Gold', turnover: 500000000, rebate: 0.7, referral: 0.3, color: '#ffd700' },
+        { id: 'VIP4', name: 'Platinum', turnover: 2500000000, rebate: 0.9, referral: 0.4, color: '#e5e4e2' },
+        { id: 'VIP5', name: 'Diamond', turnover: 10000000000, rebate: 1.2, referral: 0.5, color: '#b9f2ff' }
+    ],
+    seo: {
+        title: 'VIGOR - Modern Online Gaming Experience',
+        description: 'Join the most trusted gaming platform with instant withdraw and huge jackpots.',
+        keywords: 'casino, slot, betting, gambling, jackpot, pragmatic play',
+        ogImage: 'https://vigor.gaming/og-image.jpg',
+        robots: 'index, follow',
+        googleAnalyticsId: 'G-XXXXXXXXXX',
+        injectHead: '',
+        injectBody: ''
+    },
+    bannerLayoutSections: {},
+    seamless: {
+        config: {
+            operatorToken: 'VGR-OPR-2024-ABCD', secretKey: 'sk_live_a1b25cde5f3gh46ijkl',
+            apiDomain: 'https://api.seamless.vigor', callbackDomain: 'https://api.vigor88.com',
+            currency: 'IDR', baseUnit: 1000, hashAuth: true,
+            salt: 'SALT_VGR_2024_XYZ', groupId: 1,
+            whitelistedIPs: ['103.28.12.0/24', '202.134.56.78', '10.0.0.0/8'],
+            status: 'Active', env: 'Production', lastSync: '2026-04-28 22:15:00',
+            endpoints: {
+                verifySession: '/api/seamless/VerifySession',
+                getWallet: '/api/seamless/Cash/Get',
+                transferInOut: '/api/seamless/Cash/TransferInOut',
+                adjustment: '/api/seamless/Cash/Adjustment',
+                updateBetDetail: '/api/seamless/Cash/UpdateBetDetail',
+            }
+        },
+        transactions: [], games: [], apiLogs: []
+    },
+    profile: { username: 'adminsub40', name: 'SUBSTAG', language: 'English' },
+    settings: { commission: 80, referral: 2, referralSlot: 0.5, minDeposit: 25000, maxDeposit: 50000000, maxWithdraw: 25000000, maintenanceMode: false, companyReferralStatus: {} },
+    _filters: {}, _page: {}, _perPage: {},
+
+    // Global Permission Matrix for Granular Menu Access
+    permissionMatrix: {
+        SuperAdmin: {
+            home: { dashboard: true, statistics: true, providerAnalytics: true, deviceReport: true },
+            master: { whitelist: true, blacklist: true, masterWhitelist: true },
+            administrators: { systemAdmins: true, rolePermissions: true },
+            companyManagement: { whitelabelList: true, regisNewCompany: true },
+            whitelabel: { whitelabelList: true, masterWlList: true },
+            members: { memberList: true, addMember: true, tierHistory: true },
+            bankManagement: { bankList: true, createNewBank: true },
+            finance: { deposit: true, withdrawal: true },
+            bets: { betsListing: true, bettingTable: true, transferredList: true },
+            bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: true },
+            results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
+            integrations: { providerSetup: true, apiLogs: true, developerDocs: true },
+            customization: { templateBuilder: true, templatePreview: true, promotions: true, systemTheme: true, globalBanner: true, appNotification: true, siteConfig: true, seoTools: true },
+            settings: { commission: true, referralRate: true, poolsList: true, games: true, agentGameSettings: true, togelCommission: true, limitCreditOut: true, vipDesigner: true, rebateCalc: true },
+            tools: { coin2pay: true, hostManagement: true, sawala: true, smartico: true, unopay: true },
+            memo: { memoBox: true, autoMemo: true },
+            reports: { winloss: true, agentDaily: true, limitCredit: true, lostMoney: true, togelLost: true, topTurnover: true },
+            invoice: { monthly: true, fileManagement: true, tournamentWinners: true },
+            logs: { adminLogs: true, companyLogs: true, whitelabelLogs: true, memberLogs: true, masterWlLogs: true }
+        },
+        Company: {
+            home: { dashboard: true, statistics: true, providerAnalytics: true, deviceReport: true },
+            master: { whitelist: false, blacklist: false, masterWhitelist: false },
+            administrators: { systemAdmins: false, rolePermissions: false },
+            companyManagement: { whitelabelList: true, regisNewCompany: true },
+            whitelabel: { whitelabelList: true, masterWlList: true },
+            members: { memberList: true, addMember: true, tierHistory: true },
+            bankManagement: { bankList: true, createNewBank: true },
+            finance: { deposit: true, withdrawal: true },
+            bets: { betsListing: true, bettingTable: true, transferredList: true },
+            bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: true },
+            results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
+            integrations: { providerSetup: true, apiLogs: true, developerDocs: true },
+            customization: { siteConfig: true, promotions: true, templateBuilder: true, templatePreview: true, seoTools: true, systemTheme: true, globalBanner: true, appNotification: true },
+            settings: { commission: true, referralRate: true, poolsList: true, games: true, agentGameSettings: true, togelCommission: true, limitCreditOut: true, vipDesigner: true, rebateCalc: true },
+            tools: { coin2pay: true, hostManagement: false, sawala: true, smartico: false, unopay: true },
+            memo: { memoBox: true, autoMemo: true },
+            reports: { winloss: true, agentDaily: true, limitCredit: true, lostMoney: true, togelLost: true, topTurnover: true },
+            invoice: { monthly: true, fileManagement: true, tournamentWinners: true },
+            logs: { adminLogs: false, companyLogs: true, whitelabelLogs: true, memberLogs: true, masterWlLogs: true }
+        },
+        Master: {
+            home: { dashboard: true, statistics: true, providerAnalytics: false, deviceReport: false },
+            master: { whitelist: false, blacklist: false, masterWhitelist: false },
+            administrators: { systemAdmins: false, rolePermissions: false },
+            companyManagement: { whitelabelList: false, regisNewCompany: false },
+            whitelabel: { whitelabelList: true, masterWlList: false },
+            members: { memberList: true, addMember: true, tierHistory: true },
+            bankManagement: { bankList: true, createNewBank: true },
+            finance: { deposit: true, withdrawal: true },
+            bets: { betsListing: true, bettingTable: true, transferredList: true },
+            bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: false },
+            results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
+            integrations: { providerSetup: false, apiLogs: false, developerDocs: false },
+            customization: { promotions: true, templateBuilder: false, seoTools: false, systemTheme: false },
+            settings: { commission: false, referralRate: false, poolsList: false, games: false, agentGameSettings: false, togelCommission: false, limitCreditOut: false },
+            tools: { coin2pay: true, hostManagement: false, sawala: false, smartico: false, unopay: false },
+            memo: { memoBox: true, autoMemo: false },
+            reports: { winloss: true, agentDaily: true, limitCredit: false, lostMoney: false, togelLost: false, topTurnover: false },
+            invoice: { monthly: false, fileManagement: false, tournamentWinners: false },
+            logs: { adminLogs: false, companyLogs: false, whitelabelLogs: false, memberLogs: false, masterWlLogs: false }
+        },
+        Shop: {
+            home: { dashboard: true, statistics: false, providerAnalytics: false, deviceReport: false },
+            master: { whitelist: false, blacklist: false, masterWhitelist: false },
+            administrators: { systemAdmins: false, rolePermissions: false },
+            companyManagement: { whitelabelList: false, regisNewCompany: false },
+            whitelabel: { whitelabelList: false, masterWlList: false },
+            members: { memberList: true, addMember: true, tierHistory: false },
+            bankManagement: { bankList: true, createNewBank: false },
+            finance: { deposit: true, withdrawal: true },
+            bets: { betsListing: true, bettingTable: true, transferredList: false },
+            bonus: { bonusReport: false, agentFreebet: false, agentFreebetReport: false, pragmaticFrb: false },
+            results: { resultsListing: true, resultScan: false, resultsAnalyze: false },
+            integrations: { providerSetup: false, apiLogs: false, developerDocs: false },
+            customization: { promotions: false, templateBuilder: false, seoTools: false, systemTheme: false },
+            settings: { commission: false, referralRate: false, poolsList: false, games: false, agentGameSettings: false, togelCommission: false, limitCreditOut: false },
+            tools: { coin2pay: false, hostManagement: false, sawala: false, smartico: false, unopay: false },
+            memo: { memoBox: true, autoMemo: false },
+            reports: { winloss: false, agentDaily: false, limitCredit: false, lostMoney: false, togelLost: false, topTurnover: false },
+            invoice: { monthly: false, fileManagement: false, tournamentWinners: false },
+            logs: { adminLogs: false, companyLogs: false, whitelabelLogs: false, memberLogs: false, masterWlLogs: false }
+        },
+        Agent: {
+            home: { dashboard: true, statistics: false, providerAnalytics: false, deviceReport: false },
+            master: { whitelist: false, blacklist: false, masterWhitelist: false },
+            administrators: { systemAdmins: false, rolePermissions: false },
+            companyManagement: { whitelabelList: false, regisNewCompany: false },
+            whitelabel: { whitelabelList: false, masterWlList: false },
+            members: { memberList: true, addMember: false, tierHistory: false },
+            bankManagement: { bankList: false, createNewBank: false },
+            finance: { deposit: true, withdrawal: true },
+            bets: { betsListing: true, bettingTable: false, transferredList: false },
+            bonus: { bonusReport: false, agentFreebet: false, agentFreebetReport: false, pragmaticFrb: false },
+            results: { resultsListing: true, resultScan: false, resultsAnalyze: false },
+            integrations: { providerSetup: false, apiLogs: false, developerDocs: false },
+            customization: { promotions: false, templateBuilder: false, seoTools: false, systemTheme: false },
+            settings: { commission: false, referralRate: false, poolsList: false, games: false, agentGameSettings: false, togelCommission: false, limitCreditOut: false },
+            tools: { coin2pay: false, hostManagement: false, sawala: false, smartico: false, unopay: false },
+            memo: { memoBox: true, autoMemo: false },
+            reports: { winloss: false, agentDaily: false, limitCredit: false, lostMoney: false, togelLost: false, topTurnover: false },
+            invoice: { monthly: false, fileManagement: false, tournamentWinners: false },
+            logs: { adminLogs: false, companyLogs: false, whitelabelLogs: false, memberLogs: false, masterWlLogs: false }
+        }
+    }
+};
+
+export const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+export function addLog(action, target = '', description = '', actor = 'adminsub40') {
+    const ip = `${rnd(100, 200)}.${rnd(10, 99)}.${rnd(1, 250)}.${rnd(1, 254)}`;
+    const date = new Date().toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    STATE.logs.unshift({ id: 'L' + Date.now(), date, actor, ip, action, target, description });
+    if (STATE.logs.length > 200) STATE.logs.pop();
+}
+
+export function initState() {
+    const saved = localStorage.getItem('VGR_STATE');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            // Deep merge permissionMatrix to ensure new modules/sub-menus are picked up
+            if (parsed.permissionMatrix) {
+                Object.keys(STATE.permissionMatrix).forEach(role => {
+                    if (parsed.permissionMatrix[role]) {
+                        Object.keys(STATE.permissionMatrix[role]).forEach(mod => {
+                            if (parsed.permissionMatrix[role][mod]) {
+                                STATE.permissionMatrix[role][mod] = { ...STATE.permissionMatrix[role][mod], ...parsed.permissionMatrix[role][mod] };
+                            }
+                        });
+                    }
+                });
+                delete parsed.permissionMatrix;
+            }
+            Object.assign(STATE, parsed);
+            return;
+        } catch (e) { console.error("Failed to parse saved state", e); }
+    }
+
+    // Init Members
+    for (let i = 0; i < 60; i++) {
+        const u = MEMBERS[i % MEMBERS.length] + (i > 20 ? '_' + i : '');
+        const co = COMPANIES[i % COMPANIES.length];
+        STATE.members.push({
+            id: 'M' + (1000 + i), username: u, name: NL[i % NL.length] + ' ' + NL[(i + 2) % NL.length], company: co,
+            phone: '08' + rnd(100, 999) + rnd(1000, 9999), bank: BANKS[i % BANKS.length], bankAccount: String(rnd(100000000, 999999999)),
+            balance: rnd(0, 500) * 50000, status: i % 15 === 0 ? 'Inactive' : 'Active',
+            joined: rnd(1, 28) + '/' + rnd(1, 4) + '/2024', lastLogin: rnd(1, 27) + '/04/2026', ip: '192.168.1.' + rnd(1, 254)
+        });
+    }
+
+    COMPANIES.forEach((c, i) => {
+        STATE.companies.push({
+            id: 'C' + (100 + i), username: c, name: c.toUpperCase() + ' Group', email: c + '@gaming.io',
+            phone: '021' + rnd(1000000, 9999999), credit: rnd(10, 500) * 1000000, members: rnd(100, 1000),
+            status: i % 10 === 0 ? 'Inactive' : 'Active', type: i < 5 ? 'Whitelabel' : i < 15 ? 'Company' : 'Master', joined: '2023-12-07'
+        });
+    });
+    BANKS.forEach((b, i) => {
+        STATE.banks.push({ id: 'B' + (200 + i), bank: b, accountName: 'VIGOR ' + b, accountNumber: String(rnd(100000000, 999999999)), type: 'Both', minDeposit: 10000, maxDeposit: 100000000, status: 'Active' });
+    });
+    for (let i = 0; i < 40; i++) {
+        const m = STATE.members[rnd(0, STATE.members.length - 1)];
+        STATE.deposits.push({ id: 'DEP' + (5000 + i), member: m.username, company: m.company, bank: m.bank, amount: rnd(2, 100) * 50000, status: i < 5 ? 'Pending' : i % 8 === 0 ? 'Rejected' : 'Approved', date: rnd(20, 27) + '/04/2026 ' + rnd(10, 23) + ':' + rnd(10, 59), processedBy: i < 5 ? '' : 'adminsub40' });
+    }
+    for (let i = 0; i < 30; i++) {
+        const m = STATE.members[rnd(0, STATE.members.length - 1)];
+        STATE.withdrawals.push({ id: 'WIT' + (8000 + i), member: m.username, company: m.company, bank: m.bank, accountNumber: m.bankAccount, amount: rnd(5, 200) * 50000, status: i < 3 ? 'Pending' : i % 10 === 0 ? 'Rejected' : 'Approved', date: rnd(20, 27) + '/04/2026 ' + rnd(10, 23) + ':' + rnd(10, 59), processedBy: i < 3 ? '' : 'adminsub40' });
+    }
+    STATE.memos.inbox = [];
+    STATE.promotions = [];
+    STATE.announcements = [];
+    STATE.notifications = [];
+    STATE.lotteryBets = [];
+
+    PROVIDERS.forEach((prov, idx) => {
+        if (prov === 'All Providers') return;
+        PG_GAMES.forEach((g, i) => {
+            STATE.seamless.games.push({ id: g.id + (idx * 100), provider: prov, name: g.name + (prov !== 'PG_SOFT' ? ' (' + prov + ')' : ''), type: "Slot", status: i % 12 === 0 ? 'Maintenance' : 'Active', rtp: (94 + Math.random() * 3).toFixed(2), maxWin: rnd(5000, 50000), betSizes: '0.20 - 100.00', popularity: rnd(60, 100) });
+        });
+    });
+    const txTypes = ['BetPayout', 'BetPayout', 'BetPayout', 'BonusToCash', 'FreeGameToCash'];
+    const walletTypes = ['C', 'C', 'C', 'B', 'G'];
+    for (let i = 0; i < 80; i++) {
+        const m = STATE.members[rnd(0, STATE.members.length - 1)];
+        const g = STATE.seamless.games[rnd(0, STATE.seamless.games.length - 1)];
+        const betAmt = rnd(1, 500) * 1000;
+        const winAmt = rnd(0, 1) ? rnd(0, betAmt * 3) : 0;
+        const transferAmt = winAmt - betAmt;
+        const txTypeIdx = rnd(0, txTypes.length - 1);
+        STATE.seamless.transactions.push({
+            id: 'TX' + (9000 + i), traceId: crypto.randomUUID ? crypto.randomUUID() : `${rnd(10000000, 99999999)}-${rnd(1000, 9999)}-${rnd(1000, 9999)}-${rnd(1000, 9999)}-${rnd(100000000000, 999999999999)}`,
+            player: m.username, company: m.company, provider: g.provider, gameId: g.id, gameName: g.name,
+            parentBetId: String(rnd(1800000000000, 1899999999999)),
+            betId: String(rnd(1800000000000, 1899999999999)),
+            betAmount: betAmt, winAmount: winAmt, transferAmount: transferAmt,
+            realTransferAmount: transferAmt * 1000,
+            transactionType: txTypes[txTypeIdx], walletType: walletTypes[txTypeIdx],
+            currency: 'IDR', isEndRound: i % 3 === 0, isFeature: i % 7 === 0,
+            status: i < 2 ? 'Pending' : 'Completed',
+            createTime: Date.now() - rnd(60000, 86400000 * 5),
+            balanceAfter: rnd(100, 5000) * 1000
+        });
+    }
+    const apiEndpoints = ['/VerifySession', '/Cash/Get', '/Cash/TransferInOut', '/Cash/TransferInOut', '/Cash/TransferInOut', '/Cash/Adjustment', '/Cash/UpdateBetDetail'];
+    const httpStatuses = [200, 200, 200, 200, 200, 200, 200, 200, 200, 400, 500];
+    for (let i = 0; i < 50; i++) {
+        const ep = apiEndpoints[rnd(0, apiEndpoints.length - 1)];
+        const hs = httpStatuses[rnd(0, httpStatuses.length - 1)];
+        STATE.seamless.apiLogs.push({
+            id: 'LOG' + (7000 + i), timestamp: Date.now() - rnd(60000, 86400000 * 3),
+            provider: PROVIDERS[rnd(1, PROVIDERS.length - 1)],
+            endpoint: ep, method: 'POST', httpStatus: hs,
+            traceId: `${rnd(10000000, 99999999)}-${rnd(1000, 9999)}-${rnd(1000, 9999)}-${rnd(1000, 9999)}-${rnd(100000000000, 999999999999)}`,
+            responseTime: rnd(5, hs > 200 ? 9500 : 350) + 'ms',
+            player: STATE.members[rnd(0, STATE.members.length - 1)].username,
+            status: hs === 200 ? 'OK' : hs === 400 ? 'Bad Request' : 'Server Error',
+            requestBody: `operator_token=VGR-OPR-2024-ABCD&secret_key=***&player_name=${STATE.members[rnd(0, STATE.members.length - 1)].username}`,
+            responseBody: hs === 200 ? '{"data":{"balance_amount":' + rnd(100, 50000) + '.00,"currency_code":"IDR"},"error":null}' : '{"data":null,"error":{"code":' + (hs === 400 ? '1034' : '1200') + ',"message":"' + (hs === 400 ? 'Request is not valid' : 'Internal server error') + '"}}'
+        });
+    }
+
+    addLog('login', 'adminsub40', 'Admin logged in successfully');
+    applyTheme();
+    saveState();
+}
+
+export function applyTheme() {
+    const root = document.documentElement;
+    const t = STATE.theme;
+    root.style.setProperty('--acc', t.primary);
+    root.style.setProperty('--purple', t.accent);
+    root.style.setProperty('--radius', t.radius);
+    root.style.setProperty('font-family', t.font + ', system-ui, sans-serif');
+    if (t.darkMode) {
+        root.setAttribute('data-theme', 'dark');
+    } else {
+        root.removeAttribute('data-theme');
+    }
+}
+
+export function saveState() {
+    localStorage.setItem('VGR_STATE', JSON.stringify(STATE));
+}
+
+export function stateAdd(key, rec) { STATE[key].unshift(rec); saveState(); }
+export function stateUpdate(key, id, data) { const idx = STATE[key].findIndex(x => x.id === id); if (idx !== -1) STATE[key][idx] = { ...STATE[key][idx], ...data }; saveState(); }
+export function stateDelete(key, id) { STATE[key] = STATE[key].filter(x => x.id !== id); saveState(); }
+
+export function stateSaveWidget(type, name, props) { STATE.savedWidgets.push({ id: 'SW' + Date.now(), type, name, props, createdAt: new Date().toLocaleDateString() }); }
+export function stateSaveLayout(name, layout, zones) { STATE.savedLayouts.push({ id: 'SL' + Date.now(), name, layout, zones }); }

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check \"C:\\\\Project\\\\Git\\\\Git\\\\bin\\\\VGR\\\\js\\\\app.js\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Project\\\\Git\\\\Git\\\\bin\\\\VGR\" -Recurse -File | Where-Object { \\($_.Extension -in '.js', '.html', '.css', '.json'\\) -and \\($_.FullName -notmatch 'node_modules'\\) } | Sort-Object FullName | ForEach-Object { $_.FullName -replace [regex]::Escape\\(\"C:\\\\Project\\\\Git\\\\Git\\\\bin\\\\VGR\\\\\"\\), \"\" })",
+      "Bash(node_modules\\\\.bin\\\\vite build *)",
+      "Bash(node node_modules/vite/bin/vite.js build --mode development)",
+      "Bash(node node_modules/vite/bin/vite.js build)",
+      "Bash(node -e ' *)",
+      "Bash(node node_modules/vite/bin/vite.js --port 5200)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5200)",
+      "Bash(node --input-type=module)",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/utils/helpers.js\")",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/ui/components.js\")",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/pages/dashboard.js\")",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/pages/members.js\")",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/utils/forms.js\")",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/core/router.js\")",
+      "Bash(node --check \"C:/Project/Git/Git/bin/VGR/js/pages/finance.js\")",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('@supabase/supabase-js'\\)\")",
+      "Bash(node -e \"import\\('@supabase/supabase-js'\\).then\\(\\(\\)=>console.log\\('OK'\\)\\)\")"
+    ]
+  }
+}

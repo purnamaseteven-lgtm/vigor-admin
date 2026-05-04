@@ -1,0 +1,212 @@
+/* ─── DASHBOARD PAGE ─── */
+import { STATE, fmt, fmtCur } from '../core/state.js';
+import { pages } from '../core/router.js';
+
+// ── Enhancement 7: Drag & Reorder widget definitions ──
+function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMembers) {
+  return [
+    {
+      id: 'deposit',
+      html: `
+              <div class="stat-icon" style="background:rgba(16,185,129,.1);color:var(--green)"><i class="fa-solid fa-arrow-down-to-bracket"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Total Deposit</div>
+                <div class="stat-value">${fmtCur(totalDeposit)}</div>
+                <div class="stat-trend trend-up"><i class="fa-solid fa-caret-up"></i> 12.5% <span>vs last month</span></div>
+              </div>`
+    },
+    {
+      id: 'withdraw',
+      html: `
+              <div class="stat-icon" style="background:rgba(239,68,68,.1);color:var(--red)"><i class="fa-solid fa-arrow-up-from-bracket"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Total Withdrawal</div>
+                <div class="stat-value">${fmtCur(totalWithdraw)}</div>
+                <div class="stat-trend trend-down"><i class="fa-solid fa-caret-down"></i> 5.2% <span>vs last month</span></div>
+              </div>`
+    },
+    {
+      id: 'members',
+      html: `
+              <div class="stat-icon" style="background:rgba(14,165,233,.1);color:var(--acc)"><i class="fa-solid fa-users"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Total Members</div>
+                <div class="stat-value">${fmt(totalMembers)}</div>
+                <div class="stat-trend trend-up"><i class="fa-solid fa-caret-up"></i> 8.1% <span>new players</span></div>
+              </div>`
+    },
+    {
+      id: 'active',
+      html: `
+              <div class="stat-icon" style="background:rgba(245,158,11,.1);color:var(--yellow)"><i class="fa-solid fa-bolt"></i></div>
+              <div class="stat-info">
+                <div class="stat-label">Active Players</div>
+                <div class="stat-value">${fmt(activeMembers)}</div>
+                <div class="stat-trend"><span>Currently online: ${Math.round(activeMembers / 4)}</span></div>
+              </div>`
+    },
+  ];
+}
+
+pages['dashboard'] = () => {
+  const totalDeposit = STATE.deposits.filter(d => d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+  const totalWithdraw = STATE.withdrawals.filter(w => w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+  const totalMembers = STATE.members.length;
+  const activeMembers = STATE.members.filter(m => m.status === 'Active').length;
+
+  // Reorder by saved preference
+  const WIDGETS = getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMembers);
+  let savedOrder = null;
+  try { savedOrder = JSON.parse(localStorage.getItem('VGR_WIDGET_ORDER') || 'null'); } catch (e) { }
+  const ordered = savedOrder
+    ? savedOrder.map(id => WIDGETS.find(w => w.id === id)).filter(Boolean)
+      .concat(WIDGETS.filter(w => !savedOrder.includes(w.id)))
+    : WIDGETS;
+
+  const widgetsHTML = ordered.map(w => `
+      <div class="stat-card draggable" data-widget="${w.id}">
+        <div class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
+        ${w.html}
+      </div>`).join('');
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="breadcrumb"><span>Home</span><span class="sep">›</span><span>Dashboard</span></div>
+        <h2 class="page-title">Welcome back, ${STATE.profile.username}</h2>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="go('dashboard')"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        <button class="btn btn-export" onclick="window.exportTableCSV(null,'dashboard-report.csv')"><i class="fa-solid fa-file-csv"></i> Export</button>
+      </div>
+    </div>
+
+    <!-- STAT CARDS (draggable) -->
+    <div class="stat-grid" id="dashWidgetGrid">${widgetsHTML}</div>
+
+    <!-- CHARTS ROW 1 -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.25rem;margin-bottom:1.25rem">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Transaction Analysis (Last 10 Days)</span>
+        </div>
+        <div class="card-body"><div class="chart-container"><canvas id="chartDWValue"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">GGR by Company</span></div>
+        <div class="card-body"><div class="chart-container"><canvas id="chartGGR"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW 2 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Deposit vs Withdrawal Count</span></div>
+        <div class="card-body"><div class="chart-container"><canvas id="chartDWCount"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Member Growth</span></div>
+        <div class="card-body"><div class="chart-container"><canvas id="chartMembers"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Profit Distribution</span></div>
+        <div class="card-body"><div class="chart-container"><canvas id="chartAgentRatio"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- BUSINESS INTELLIGENCE & PRODUCTION READINESS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1.25rem">
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fa-solid fa-trophy" style="color:var(--yellow);margin-right:.5rem"></i>Top Performing Agencies</span></div>
+        <div class="card-body" style="padding:0">
+          <div class="table-wrapper" style="border:none">
+            <table style="font-size:.85rem">
+              <thead><tr><th>Agency Name</th><th>Active Players</th><th>Weekly GGR</th><th>Commission</th></tr></thead>
+              <tbody>
+                <tr><td><strong>HokiBet</strong></td><td>1,240</td><td style="color:var(--green)">+Rp 850.5M</td><td>10%</td></tr>
+                <tr><td><strong>MegaWin</strong></td><td>982</td><td style="color:var(--green)">+Rp 612.2M</td><td>8%</td></tr>
+                <tr><td><strong>Zenith88</strong></td><td>450</td><td style="color:var(--red)">-Rp 120.4M</td><td>10%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-shield-check" style="color:var(--acc);margin-right:.5rem"></i>Production Readiness Check</span>
+          <button class="btn btn-xs btn-primary" style="margin-left:auto" onclick="window.runProdCheck()">Run Check</button>
+        </div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem" id="prodCheckGrid">
+            <div class="check-item" style="padding:.75rem;background:var(--bg2);border-radius:10px;display:flex;align-items:center;gap:.75rem">
+                <i class="fa-solid fa-lock" style="color:var(--green)"></i>
+                <div style="font-size:.75rem">SSL Certificates<div style="color:var(--text3);font-size:.65rem">All domains valid</div></div>
+            </div>
+            <div class="check-item" style="padding:.75rem;background:var(--bg2);border-radius:10px;display:flex;align-items:center;gap:.75rem">
+                <i class="fa-solid fa-globe" style="color:var(--green)"></i>
+                <div style="font-size:.75rem">Global DNS Proxy<div style="color:var(--text3);font-size:.65rem">Cloudflare Connected</div></div>
+            </div>
+            <div class="check-item" style="padding:.75rem;background:var(--bg2);border-radius:10px;display:flex;align-items:center;gap:.75rem">
+                <i class="fa-solid fa-link" style="color:var(--green)"></i>
+                <div style="font-size:.75rem">Wallet API Gateway<div style="color:var(--text3);font-size:.65rem">Latency: 45ms</div></div>
+            </div>
+            <div class="check-item" style="padding:.75rem;background:var(--bg2);border-radius:10px;display:flex;align-items:center;gap:.75rem">
+                <i class="fa-solid fa-database" style="color:var(--green)"></i>
+                <div style="font-size:.75rem">Supabase Sync<div style="color:var(--text3);font-size:.65rem">Status: Healthy</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.runProdCheck = () => {
+  const btn = document.querySelector('[onclick="window.runProdCheck()"]');
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = 'Run Check';
+    btn.disabled = false;
+    import('../ui/components.js').then(m => m.toast('Production readiness check completed. All systems operational.', 'success'));
+  }, 2000);
+};
+
+// ── Enhancement 7: Dashboard DnD ──
+window.initDashboardDnd = function () {
+  const grid = document.getElementById('dashWidgetGrid');
+  if (!grid) return;
+  const items = () => [...grid.querySelectorAll('.stat-card[data-widget]')];
+  let dragged = null;
+
+  items().forEach(item => {
+    item.addEventListener('dragstart', e => {
+      dragged = item;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      items().forEach(c => c.classList.remove('drag-over'));
+      dragged = null;
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (item !== dragged) items().forEach(c => c.classList.toggle('drag-over', c === item));
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      if (!dragged || dragged === item) return;
+      const all = items();
+      const di = all.indexOf(dragged), ti = all.indexOf(item);
+      grid.insertBefore(dragged, di < ti ? item.nextSibling : item);
+      // Persist order
+      const order = items().map(c => c.dataset.widget);
+      localStorage.setItem('VGR_WIDGET_ORDER', JSON.stringify(order));
+      if (typeof window.toast === 'function') window.toast('Widget order saved ✓', 'success');
+    });
+  });
+};

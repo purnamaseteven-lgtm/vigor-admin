@@ -1,7 +1,7 @@
 /* ─── MEMBER LIST PAGES ─── */
-import { STATE, fmt, fmtCur } from '../core/state.js';
+import { STATE, fmt, fmtCur, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
-import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, exportBtn } from '../ui/components.js';
+import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, exportBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, COMPANIES, STATUSES, BANKS } from '../utils/helpers.js';
 
 pages['global-member-list'] = () => {
@@ -88,8 +88,6 @@ pages['global-member-list'] = () => {
 };
 
 // ── Member status toggle (Active ↔ Suspended) ──────────────────────
-import { saveState } from '../core/state.js';
-import { toast } from '../ui/components.js';
 window.toggleMemberStatus = async (id, newStatus, username) => {
   const label = newStatus === 'Active' ? 'activate' : 'suspend';
   if (!confirm(`Are you sure you want to ${label} member [${username}]?`)) return;

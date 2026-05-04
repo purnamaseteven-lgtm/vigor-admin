@@ -644,21 +644,33 @@ pages['promotion-release'] = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        ${members.slice(0, 20).map(m => `
+                        ${members.slice(0, 20).map(m => {
+                          const mBets = (STATE.lotteryBets || []).filter(b => b.member === m.username);
+                          const mTxs = (STATE.seamless?.transactions || []).filter(t => t.player === m.username);
+                          const totalTurnover = mBets.reduce((s, b) => s + (b.betAmount || 0), 0)
+                            + mTxs.reduce((s, t) => s + (t.betAmount || 0), 0);
+                          const totalWin = mBets.reduce((s, b) => s + (b.winAmount || 0), 0)
+                            + mTxs.reduce((s, t) => s + (t.winAmount || 0), 0);
+                          const totalBet = mBets.reduce((s, b) => s + (b.betAmount || 0), 0)
+                            + mTxs.reduce((s, t) => s + (t.betAmount || 0), 0);
+                          const winloss = totalWin - totalBet;
+                          const memberBonuses = (STATE.bonuses || []).filter(b => b.member === m.username && b.status === 'Approved');
+                          const totalBonus = memberBonuses.reduce((s, b) => s + (b.bonusAmount || 0), 0);
+                          return `
                             <tr>
                                 <td><input type="checkbox" class="pr-check" value="${m.username}" /></td>
                                 <td><strong>${m.username}</strong></td>
                                 <td style="font-size:.75rem">${m.company}</td>
-                                <td style="color:var(--green);font-weight:600">${fmtCur(rnd(50, 500) * 10000)}</td>
-                                <td style="color:var(--red);font-weight:600">${fmtCur(rnd(10, 400) * 10000)}</td>
-                                <td style="font-weight:700">${fmtCur(rnd(100, 2000) * 10000)}</td>
-                                <td><span style="color: ${m.winloss >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700">${fmtCur(m.winloss)}</span></td>
-                                <td style="color:var(--yellow);font-weight:700">${fmtCur(rnd(1, 50) * 10000)}</td>
+                                <td style="color:var(--green);font-weight:600">${fmtCur(totalTurnover)}</td>
+                                <td style="color:var(--red);font-weight:600">${fmtCur(totalBet)}</td>
+                                <td style="font-weight:700">${fmtCur(totalTurnover)}</td>
+                                <td><span style="color:${winloss >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700">${fmtCur(winloss)}</span></td>
+                                <td style="color:var(--yellow);font-weight:700">${fmtCur(totalBonus)}</td>
                                 <td style="text-align:right">
                                     <button class="btn btn-xs btn-primary" onclick="window.releaseBonusMember('${m.username}')">Release</button>
                                 </td>
-                            </tr>
-                        `).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             `)}
@@ -753,19 +765,26 @@ pages['promotion-rolling-release'] = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        ${members.slice(0, 20).map((m, i) => `
+                        ${members.slice(0, 20).map((m, i) => {
+                          const mBets = (STATE.lotteryBets || []).filter(b => b.member === m.username);
+                          const mTxs = (STATE.seamless?.transactions || []).filter(t => t.player === m.username);
+                          const totalTO = mBets.reduce((s, b) => s + (b.betAmount || 0), 0)
+                            + mTxs.reduce((s, t) => s + (t.betAmount || 0), 0);
+                          const memberBonuses = (STATE.bonuses || []).filter(b => b.member === m.username && b.status === 'Approved');
+                          const totalBonus = memberBonuses.reduce((s, b) => s + (b.bonusAmount || 0), 0);
+                          return `
                             <tr>
                                 <td><input type="checkbox" class="pr-check" value="${m.username}" /></td>
                                 <td><strong>${m.username}</strong></td>
                                 <td style="font-size:.75rem">${m.company}</td>
                                 <td>${badge(gameTypes[i % gameTypes.length], 'indigo')}</td>
-                                <td style="font-weight:700">${fmtCur(rnd(100, 2000) * 10000)}</td>
-                                <td style="color:#6366f1;font-weight:700">${fmtCur(rnd(1, 40) * 10000)}</td>
+                                <td style="font-weight:700">${fmtCur(totalTO)}</td>
+                                <td style="color:#6366f1;font-weight:700">${fmtCur(totalBonus)}</td>
                                 <td style="text-align:right">
                                     <button class="btn btn-xs btn-primary" onclick="window.releaseRollingMember('${m.username}')">Release</button>
                                 </td>
-                            </tr>
-                        `).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             `)}

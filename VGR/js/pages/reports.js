@@ -166,16 +166,29 @@ pages['statistics'] = () => {
 
 /* ─── PROVIDER ANALYTICS ─── */
 pages['provider-analytics'] = () => {
-  const providerData = PROVIDERS_LIST.map(p => ({
-    name: p,
-    bets: rnd(500, 8000),
-    turnover: rnd(50, 500) * 1000000,
-    payout: rnd(30, 400) * 1000000,
-    ggr: rnd(5, 80) * 1000000,
-    players: rnd(100, 2000),
-    sessions: rnd(1000, 10000),
-    rtp: rnd(94, 98) + '.' + rnd(0, 9) + '%'
-  }));
+  const txs = (STATE.seamless?.transactions || []);
+  // Aggregate per provider from real seamless transaction data
+  const providerMap = {};
+  txs.forEach(tx => {
+    const key = tx.provider || 'Unknown';
+    if (!providerMap[key]) providerMap[key] = { name: key, bets: 0, turnover: 0, payout: 0, players: new Set(), sessions: 0 };
+    const p = providerMap[key];
+    p.bets++;
+    p.turnover += tx.betAmount || 0;
+    p.payout += tx.winAmount || 0;
+    p.players.add(tx.player);
+    p.sessions++;
+  });
+  // Include known providers even with 0 data
+  PROVIDERS_LIST.forEach(name => {
+    if (!providerMap[name]) providerMap[name] = { name, bets: 0, turnover: 0, payout: 0, players: new Set(), sessions: 0 };
+  });
+  const providerData = Object.values(providerMap).map(p => {
+    const playerCount = p.players instanceof Set ? p.players.size : p.players;
+    const ggr = p.turnover - p.payout;
+    const rtpVal = p.turnover > 0 ? ((p.payout / p.turnover) * 100).toFixed(1) : '0.0';
+    return { name: p.name, bets: p.bets, turnover: p.turnover, payout: p.payout, ggr, players: playerCount, sessions: p.sessions, rtp: rtpVal + '%' };
+  });
   const totalGGR = providerData.reduce((s, p) => s + p.ggr, 0);
 
   return `
@@ -462,8 +475,6 @@ pages['reports-winloss'] = () => {
     </div>
   </div>`;
 };
-window.onProviderFilterChange = (val) => { setFilter('reports-winloss', 'provider', val); window.go('reports-winloss'); };
-
 /* ─── LIMIT CREDIT REPORT ─── */
 pages['reports-limit-credit'] = () => {
   // Real: use STATE.companies credit field as creditUsed
@@ -758,13 +769,13 @@ pages['device-report'] = () => {
     { platform: 'Android (Br.)', browser: 'Chrome Mobile', count: 1842, active: 89, trend: '+7%' },
   ];
 
-  const memberDevices = MEMBERS.slice(0, 20).map((m, i) => {
-    const platforms = ['Windows', 'macOS', 'iPhone', 'Android (APK)', 'Android (Br.)'];
+  const platforms = ['Windows', 'macOS', 'iPhone', 'Android (APK)', 'Android (Br.)'];
+  const memberDevices = (STATE.members || []).slice(0, 20).map((m, i) => {
     const plat = platforms[i % platforms.length];
     return {
-      username: m,
+      username: m.username,
       platform: plat,
-      lastLogin: rnd(1, 27) + '/04/2026 ' + rnd(10, 23) + ':' + rnd(10, 59),
+      lastLogin: m.joined || '-',
       appVersion: plat.includes('APK') ? 'v2.4.1' : '-',
       isApp: plat.includes('APK')
     };

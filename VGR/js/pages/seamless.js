@@ -304,10 +304,16 @@ window.pgTestConnection = () => {
     toast('Connection successful! API responded in 42ms', 'success');
 };
 
-window.pgSyncGames = () => {
+window.pgSyncGames = async () => {
+    toast('Syncing games from provider...', 'info');
+    if (window.db?.fetchSeamlessGames) {
+        const err = await window.db.fetchSeamlessGames();
+        if (err) { toast('Sync failed: ' + err, 'error'); return; }
+    }
     STATE.seamless.config.lastSync = new Date().toLocaleString('sv-SE');
     saveState();
-    toast(`Synced ${STATE.seamless.games.length} games successfully`, 'success');
+    go('seamless-games');
+    toast(`Synced ${STATE.seamless.games?.length || 0} games successfully`, 'success');
 };
 
 window.pgAddIP = () => {

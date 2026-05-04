@@ -23,6 +23,23 @@ function makeResults(n) {
 }
 
 function getResultsStore() {
+  // Use real DB data from STATE.lotteryResults if available
+  if (Array.isArray(STATE.lotteryResults) && STATE.lotteryResults.length > 0) {
+    return STATE.lotteryResults.map(r => ({
+      id: r.id,
+      pool: r.pool,
+      date: r.drawDate || r.draw_date || '',
+      period: r.id,
+      r1: r.r1 || r.result1st || '',
+      r2: r.r2 || r.result2nd || '',
+      r3: r.r3 || r.result3rd || '',
+      r4: Array.isArray(r.r4) ? r.r4.join(', ') : (r.r4 || ''),
+      r5: Array.isArray(r.r5) ? r.r5.join(', ') : (r.r5 || ''),
+      status: r.isSettled ? 'Published' : 'Pending',
+      publishedBy: r.isSettled ? 'system' : '',
+    }));
+  }
+  // Fallback to mock data
   if (!Array.isArray(STATE.results) || STATE.results.length === 0) {
     STATE.results = makeResults(50);
     saveState();
@@ -145,20 +162,26 @@ pages['results-scan'] = () => {
               <tr><th>Bet ID</th><th>Member</th><th>Pool</th><th>Number</th><th>Amount</th><th>Result</th><th>Payout</th><th>Scanned At</th></tr>
             </thead>
             <tbody>
-              ${Array.from({ length: 8 }, (_, i) => `
-                <tr>
-                  <td><strong>BET${10000 + i}</strong></td>
-                  <td>${MEMBERS[i % MEMBERS.length]}</td>
-                  <td>${POOLS[i % POOLS.length]}</td>
-                  <td style="font-weight:700">${rnd(1000, 9999)}</td>
-                  <td>${fmtCur(rnd(1, 20) * 50000)}</td>
-                  <td>${badge(i % 3 === 0 ? 'Win' : 'Lose', i % 3 === 0 ? 'success' : 'danger')}</td>
-                  <td style="color:${i % 3 === 0 ? 'var(--green)' : 'var(--text3)'}">
-                    ${i % 3 === 0 ? fmtCur(rnd(5, 50) * 100000) : '-'}
-                  </td>
-                  <td style="font-size:.75rem">${rnd(10, 23)}:${String(rnd(10, 59)).padStart(2, '0')}</td>
-                </tr>
-              `).join('')}
+              ${(() => {
+                const recentBets = (STATE.lotteryBets || []).slice(0, 8);
+                if (recentBets.length === 0) return `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:2rem">No recent bet data available</td></tr>`;
+                return recentBets.map(b => {
+                  const won = b.status === 'Won' || b.winAmount > 0;
+                  return `
+                  <tr>
+                    <td><strong>${b.id}</strong></td>
+                    <td>${b.member}</td>
+                    <td>${b.pool}</td>
+                    <td style="font-weight:700">${b.guess || '-'}</td>
+                    <td>${fmtCur(b.betAmount)}</td>
+                    <td>${badge(won ? 'Win' : 'Lose', won ? 'success' : 'danger')}</td>
+                    <td style="color:${won ? 'var(--green)' : 'var(--text3)'}">
+                      ${won ? fmtCur(b.winAmount) : '-'}
+                    </td>
+                    <td style="font-size:.75rem">${b.date || b.drawDate || '-'}</td>
+                  </tr>`;
+                }).join('');
+              })()}
             </tbody>
           </table>
         `)}
@@ -168,19 +191,37 @@ pages['results-scan'] = () => {
 
 /* ─── RESULTS ANALYZE ─── */
 pages['results-analyze'] = () => {
-  const poolStats = POOLS.map(pool => ({
-    pool,
-    totalBets: rnd(500, 3000),
-    totalPayout: rnd(10, 100) * 1000000,
-    winRate: rnd(20, 45),
-    profit: rnd(50, 500) * 1000000
-  }));
-  const topNumbers = Array.from({ length: 10 }, (_, i) => ({
-    number: String(rnd(1000, 9999)),
-    pool: POOLS[i % POOLS.length],
-    frequency: rnd(5, 30),
-    lastOut: `${rnd(20, 27)}/04/2026`
-  }));
+  const bets = STATE.lotteryBets || [];
+  const results = STATE.lotteryResults || [];
+
+  // Aggregate per pool from real bet data
+  const poolStats = POOLS.map(pool => {
+    const poolBets = bets.filter(b => b.pool === pool);
+    const totalBets = poolBets.length;
+    const totalPayout = poolBets.reduce((s, b) => s + (b.winAmount || 0), 0);
+    const totalBetAmt = poolBets.reduce((s, b) => s + (b.betAmount || 0), 0);
+    const winners = poolBets.filter(b => (b.winAmount || 0) > 0).length;
+    return {
+      pool,
+      totalBets,
+      totalPayout,
+      winRate: totalBets > 0 ? Math.round((winners / totalBets) * 100) : 0,
+      profit: totalBetAmt - totalPayout,
+    };
+  });
+
+  // Top numbers from real results
+  const numberFreq = {};
+  results.forEach(r => {
+    [r.r1, r.r2, r.r3].forEach(num => {
+      if (num) numberFreq[num] = (numberFreq[num] || { pool: r.pool, count: 0, lastOut: r.drawDate });
+      if (num) numberFreq[num].count++;
+    });
+  });
+  const topNumbers = Object.entries(numberFreq)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 10)
+    .map(([number, data]) => ({ number, pool: data.pool, frequency: data.count, lastOut: data.lastOut || '-' }));
 
   return `
     ${pageHeader('Results Analyze', '<span>Results</span><span class="sep">›</span><span>Analyze</span>', `

@@ -405,6 +405,7 @@ export function renderSidebar() {
                         <div class="nav-link" style="${check('customization', 'systemTheme') ? '' : 'display:none'}" onclick="go('custom-theme')"><i class="fa-solid fa-droplet nav-icon"></i><span class="nav-label">System Theme</span></div>
                         <div class="nav-link" style="${check('customization', 'globalBanner') ? '' : 'display:none'}" onclick="go('custom-global-banner')"><i class="fa-solid fa-images nav-icon"></i><span class="nav-label">Global Banner</span></div>
                         <div class="nav-link" style="${check('customization', 'appNotification') ? '' : 'display:none'}" onclick="go('custom-app-notification')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">App Notification</span></div>
+                        <div class="nav-link" style="${check('customization', 'announcements') ? '' : 'display:none'}" onclick="go('announcement-list')"><i class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Announcements</span></div>
                         <div class="nav-link" style="${check('customization', 'siteConfig') ? '' : 'display:none'}" onclick="go('custom-site-config')"><i class="fa-solid fa-sliders nav-icon"></i><span class="nav-label">Site Config</span></div>
                         <div class="nav-link" style="${check('customization', 'seoTools') ? '' : 'display:none'}" onclick="go('custom-seo')"><i class="fa-solid fa-magnifying-glass-chart nav-icon"></i><span class="nav-label">SEO Settings</span></div>
                     </div>
@@ -425,6 +426,7 @@ export function renderSidebar() {
                     <div class="nav-link" style="${check('settings', 'limitCreditOut') ? '' : 'display:none'}" onclick="go('settings-limit-credit-out')"><i class="fa-solid fa-gauge nav-icon"></i><span class="nav-label">Limit Credit Out</span></div>
                     <div class="nav-link" style="${check('settings', 'vipDesigner') ? '' : 'display:none'}" onclick="go('custom-vip')"><i class="fa-solid fa-crown nav-icon"></i><span class="nav-label">VIP Tiers</span></div>
                     <div class="nav-link" style="${check('settings', 'rebateCalc') ? '' : 'display:none'}" onclick="go('rebate-calc')"><i class="fa-solid fa-calculator nav-icon"></i><span class="nav-label">Weekly Rebate</span></div>
+                    <div class="nav-link" style="${check('settings', 'financeLimits') ? '' : 'display:none'}" onclick="go('settings-finance')"><i class="fa-solid fa-sliders nav-icon"></i><span class="nav-label">Finance Limits</span></div>
                 </div>
             </div>`;
         }

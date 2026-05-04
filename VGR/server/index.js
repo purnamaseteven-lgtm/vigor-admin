@@ -9,6 +9,7 @@ import cors from 'cors';
 import seamlessRouter from './routes/seamless.js';
 import paymentRouter from './routes/payment.js';
 import cloudflareRouter from './routes/cloudflare.js';
+import adminRouter from './routes/admin.js';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +48,7 @@ app.get('/health', (req, res) => {
 app.use('/api/seamless', seamlessRouter);
 app.use('/api/webhooks', paymentRouter);
 app.use('/api/cloudflare', cloudflareRouter);
+app.use('/api/admin', adminRouter);
 
 // ── 404 handler ─────────────────────────────────────────────────
 app.use((req, res) => {

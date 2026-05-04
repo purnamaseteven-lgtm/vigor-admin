@@ -1,9 +1,9 @@
 /* CUSTOMIZATION PAGES */
 import { STATE, stateAdd, stateDelete, saveState, applyTheme } from '../core/state.js';
 import { pages } from '../core/router.js';
-import { pageHeader, tableWrap, badge, actionBtns, toast, openModal, closeModalBtn, closeModal, confirmAction } from '../ui/components.js';
+import { pageHeader, filterCard, fsInput, fsSelect, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, toast, openModal, closeModalBtn, closeModal, confirmAction } from '../ui/components.js';
 import { WIDGET_DEFS, WIDGET_CATS } from '../widgets/definitions.js';
-import { rnd } from '../utils/helpers.js';
+import { rnd, filterData, paginate, getCurPage, getPerPage } from '../utils/helpers.js';
 import { LAYOUTS, builderState } from '../builder/engine.js';
 
 function ensureCustomizationState() {
@@ -749,7 +749,7 @@ window.openPromotionForm = (id = null) => {
     `);
 };
 
-window.savePromotion = (id) => {
+window.savePromotion = async (id) => {
     const title = document.getElementById('pm_title').value;
     const type = document.getElementById('pm_type').value;
     const amount = document.getElementById('pm_amount').value;
@@ -758,31 +758,44 @@ window.savePromotion = (id) => {
     const bannerMobile = document.getElementById('pm_banner_mobile').value;
 
     if (!title) { toast('Title is required', 'error'); return; }
-
     const payload = { title, type, amount, status, bannerDesktop, bannerMobile };
 
     if (id && id !== 'null') {
-        stateUpdate('promotions', id, payload);
+        if (window.db?.dbUpdatePromotion) {
+            const { error } = await window.db.dbUpdatePromotion(id, payload);
+            if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Promotion', id, `Updated promotion: ${title}`);
+        } else { stateUpdate('promotions', id, payload); }
         toast('Promotion updated', 'success');
     } else {
-        const newId = 'PM' + Date.now();
-        stateAdd('promotions', { id: newId, ...payload, members: 0 });
+        if (window.db?.dbAddPromotion) {
+            const { error } = await window.db.dbAddPromotion(payload);
+            if (error) { toast('Failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Promotion', 'new', `Created promotion: ${title}`);
+        } else { stateAdd('promotions', { id: 'PM' + Date.now(), ...payload, members: 0 }); }
         toast('Promotion created', 'success');
     }
     closeModalBtn();
-    go('customization-promotions');
+    go('custom-promotion-list');
 };
 
 window.deletePromotion = (id) => {
-    confirmAction('Delete Promotion', 'Are you sure you want to delete this promotion? This cannot be undone.', () => {
-        stateDelete('promotions', id);
+    confirmAction('Delete Promotion', 'Are you sure you want to delete this promotion? This cannot be undone.', async () => {
+        if (window.db?.dbDeletePromotion) {
+            const { error } = await window.db.dbDeletePromotion(id);
+            if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Promotion', id, `Deleted promotion`);
+        } else { stateDelete('promotions', id); }
         toast('Promotion deleted', 'success');
-        go('customization-promotions');
+        go('custom-promotion-list');
     });
 };
 
-window.togglePromotion = (id, checked) => {
-    stateUpdate('promotions', id, { status: checked ? 'Active' : 'Inactive' });
+window.togglePromotion = async (id, checked) => {
+    const status = checked ? 'Active' : 'Inactive';
+    if (window.db?.dbUpdatePromotion) {
+        await window.db.dbUpdatePromotion(id, { status });
+    } else { stateUpdate('promotions', id, { status }); }
     toast(`Promotion ${checked ? 'activated' : 'deactivated'}`, 'info');
 };
 
@@ -1719,3 +1732,148 @@ window.updateLiveTheme = (key, val) => {
         mock.style.fontFamily = `${val}, sans-serif`;
     }
 };
+
+// ─────────────────────────────────────────────
+//  ANNOUNCEMENT LIST + CRUD
+// ─────────────────────────────────────────────
+pages['announcement-list'] = () => {
+    const PG = 'announcement-list';
+    const anns = STATE.announcements || [];
+    const filtered = filterData(anns, PG);
+    const total = filtered.length;
+    const pp = getPerPage(PG);
+    const cp = getCurPage(PG);
+    const rows = paginate(filtered, cp, pp);
+    const TYPE_COLORS = { info: 'blue', success: 'success', warning: 'warning', danger: 'danger', error: 'danger' };
+
+    return `
+    ${pageHeader('Announcements', '<span>Customization</span><span class="sep">›</span><span>Announcements</span>', `
+        <button class="btn btn-primary" onclick="window.openAnnouncementForm()"><i class="fa-solid fa-plus"></i> Add Announcement</button>`)}
+
+    ${filterCard(`
+        ${fsInput(PG, 'title', 'Title', 'Search title...')}
+        ${fsSelect(PG, 'type', 'Type', ['All', 'info', 'success', 'warning', 'danger'])}
+        ${fsActions(PG)}
+    `)}
+
+    ${tableWrap(`
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th><th>Title</th><th>Content</th><th>Type</th>
+                    <th>Priority</th><th>Status</th><th>Company</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text3)">No announcements found. Click Add Announcement to create one.</td></tr>' : ''}
+                ${rows.map((a, i) => `
+                    <tr>
+                        <td style="color:var(--text3)">${i + 1 + (cp - 1) * pp}</td>
+                        <td><div style="font-weight:700;color:var(--acc)">${a.title || '-'}</div></td>
+                        <td style="max-width:260px;font-size:.78rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.content || '-'}</td>
+                        <td>${badge(a.type || 'info', TYPE_COLORS[a.type] || 'blue')}</td>
+                        <td style="font-weight:700">${a.priority || 0}</td>
+                        <td>
+                            <label class="toggle">
+                                <input type="checkbox" ${(a.isActive !== false && a.is_active !== false) ? 'checked' : ''} onchange="window.toggleAnnouncement('${a.id}', this.checked)"/>
+                                <div class="toggle-slider"></div>
+                            </label>
+                        </td>
+                        <td style="font-size:.75rem;color:var(--text3)">${a.company || '<span style="opacity:.5">Global</span>'}</td>
+                        <td>${actionBtns(
+                            `window.openAnnouncementForm('${a.id}')`,
+                            `confirmAction('Delete Announcement','Delete this announcement? Cannot be undone.',()=>window.deleteAnnouncement('${a.id}'),'Delete','danger')`
+                        )}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `)}
+    ${renderPagerHTML(PG, total, pp, cp)}
+    `;
+};
+
+window.openAnnouncementForm = (id = null) => {
+    const a = id ? (STATE.announcements || []).find(x => x.id === id) : null;
+    openModal(a ? 'Edit Announcement' : 'Add Announcement', `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1"><label>Title</label><input id="an2_title" value="${a?.title || ''}" placeholder="Announcement title..."/></div>
+            <div class="form-field" style="grid-column:1/-1"><label>Content</label><textarea id="an2_content" rows="4" placeholder="Announcement content...">${a?.content || ''}</textarea></div>
+            <div class="form-field"><label>Type</label>
+                <select id="an2_type">
+                    ${['info','success','warning','danger'].map(t => `<option value="${t}" ${(a?.type||'info')===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-field"><label>Priority (higher = shown first)</label><input type="number" id="an2_priority" value="${a?.priority || 0}" min="0" max="100"/></div>
+            <div class="form-field"><label>Company (blank = Global)</label><input id="an2_company" value="${a?.company || ''}" placeholder="Leave blank for all companies"/></div>
+            <div class="form-field" style="display:flex;align-items:center;gap:.75rem;padding-top:1.2rem">
+                <label class="toggle"><input type="checkbox" id="an2_active" ${(a?.isActive!==false&&a?.is_active!==false)?'checked':''}/><div class="toggle-slider"></div></label>
+                <span style="font-size:.85rem">Active (visible to users)</span>
+            </div>
+        </div>
+    `, `
+        <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+        <button class="btn btn-primary" onclick="window.saveAnnouncement('${id||''}')">Save Announcement</button>
+    `);
+};
+
+window.saveAnnouncement = async (id) => {
+    const title    = document.getElementById('an2_title')?.value?.trim();
+    const content  = document.getElementById('an2_content')?.value?.trim();
+    const type     = document.getElementById('an2_type')?.value;
+    const priority = parseInt(document.getElementById('an2_priority')?.value) || 0;
+    const company  = document.getElementById('an2_company')?.value?.trim() || null;
+    const isActive = document.getElementById('an2_active')?.checked;
+    if (!title) { toast('Title is required', 'error'); return; }
+    const payload = { title, content, type, priority, company, isActive };
+
+    if (id && id !== 'null') {
+        if (window.db?.dbUpdateAnnouncement) {
+            const { error } = await window.db.dbUpdateAnnouncement(id, payload);
+            if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Announcement', id, `Updated: ${title}`);
+        } else {
+            const i = (STATE.announcements||[]).findIndex(x => x.id === id);
+            if (i !== -1) STATE.announcements[i] = { ...STATE.announcements[i], ...payload };
+            saveState();
+        }
+        toast('Announcement updated', 'success');
+    } else {
+        if (window.db?.dbAddAnnouncement) {
+            const { error } = await window.db.dbAddAnnouncement(payload);
+            if (error) { toast('Failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Announcement', 'new', `Created: ${title}`);
+        } else {
+            STATE.announcements = STATE.announcements || [];
+            STATE.announcements.unshift({ id: 'ANN' + Date.now(), ...payload });
+            saveState();
+        }
+        toast('Announcement created', 'success');
+    }
+    closeModalBtn();
+    go('announcement-list');
+};
+
+window.deleteAnnouncement = async (id) => {
+    if (window.db?.dbDeleteAnnouncement) {
+        const { error } = await window.db.dbDeleteAnnouncement(id);
+        if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Announcement', id, 'Deleted announcement');
+    } else {
+        STATE.announcements = (STATE.announcements || []).filter(x => x.id !== id);
+        saveState();
+    }
+    toast('Announcement deleted', 'success');
+    go('announcement-list');
+};
+
+window.toggleAnnouncement = async (id, checked) => {
+    if (window.db?.dbUpdateAnnouncement) {
+        await window.db.dbUpdateAnnouncement(id, { isActive: checked });
+    } else {
+        const a = (STATE.announcements || []).find(x => x.id === id);
+        if (a) { a.isActive = checked; saveState(); }
+    }
+    toast(`Announcement ${checked ? 'activated' : 'deactivated'}`, 'info');
+};
+

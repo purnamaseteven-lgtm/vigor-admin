@@ -746,14 +746,45 @@ export async function dbAddAdmin(adminData, password = null) {
         saveState();
         return { error: null };
     }
+
+    // Prefer server-side creation (has service_role key to create Auth users)
+    const API_BASE    = import.meta.env.VITE_API_SERVER_URL || '';
+    const ADMIN_KEY   = import.meta.env.VITE_ADMIN_API_KEY  || 'vigor-internal-admin-key';
+    if (API_BASE && password) {
+        try {
+            const res = await fetch(`${API_BASE}/api/admin/create-user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type':       'application/json',
+                    'x-vigor-admin-key':  ADMIN_KEY,
+                },
+                body: JSON.stringify({ ...adminData, password }),
+            });
+            const result = await res.json();
+            if (!res.ok && res.status !== 207) {
+                return { error: { message: result.error || 'Server: admin creation failed' } };
+            }
+            // Use the real Supabase user ID returned by server
+            adminData.id = result.id || adminData.id;
+            STATE.admins = STATE.admins || [];
+            STATE.admins.unshift(adminData);
+            saveState();
+            if (result.warning) console.warn('[dbAddAdmin] Warning:', result.warning);
+            return { error: null };
+        } catch (e) {
+            console.error('[dbAddAdmin] Server call failed, falling back to direct insert:', e.message);
+        }
+    }
+
+    // Fallback: direct profile insert only (no Auth user — admin won't be able to log in)
     const { error } = await supabase.from('admin_profiles').insert({
-        id: adminData.id,
+        id:       adminData.id,
         username: adminData.username,
-        name: adminData.name,
-        role: adminData.role,
-        company: adminData.company || null,
-        shop: adminData.shop || null,
-        status: adminData.status || 'Active',
+        name:     adminData.name,
+        role:     adminData.role,
+        company:  adminData.company || null,
+        shop:     adminData.shop    || null,
+        status:   adminData.status  || 'Active',
     });
     if (!error) {
         STATE.admins = STATE.admins || [];
@@ -786,6 +817,23 @@ export async function dbDeleteAdmin(id) {
         saveState();
         return { error: null };
     }
+
+    // Try server-side auth user deletion first
+    const API_BASE  = import.meta.env.VITE_API_SERVER_URL || '';
+    const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY  || 'vigor-internal-admin-key';
+    if (API_BASE) {
+        try {
+            await fetch(`${API_BASE}/api/admin/delete-user`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-vigor-admin-key': ADMIN_KEY },
+                body: JSON.stringify({ userId: id }),
+            });
+            // Auth delete also cascades profile via FK — but do it explicitly too
+        } catch (e) {
+            console.warn('[dbDeleteAdmin] Server delete failed, deleting profile only:', e.message);
+        }
+    }
+
     const { error } = await supabase.from('admin_profiles').delete().eq('id', id);
     if (!error) { stateDelete('admins', id); saveState(); }
     return { error };

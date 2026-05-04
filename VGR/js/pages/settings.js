@@ -408,6 +408,107 @@ pages['settings-togel-commission'] = () => {
     </div>`;
 };
 
+/* ─── FINANCE LIMITS PAGE ─── */
+pages['settings-finance'] = () => {
+  const s = STATE.settings;
+  return `
+    ${pageHeader('Finance Limits & System', '<span>Settings</span><span class="sep">›</span><span>Finance Limits</span>', `
+      <button class="btn btn-primary" onclick="window.saveFinanceSettings()"><i class="fa-solid fa-check"></i> Save Settings</button>`)}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fa-solid fa-money-bill-wave" style="color:var(--green)"></i> Deposit Limits</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:1rem">
+          ${[
+            ['Minimum Deposit', 'sf_min_dep', s.minDeposit, 'Rp', 'Minimum amount per deposit transaction'],
+            ['Maximum Deposit', 'sf_max_dep', s.maxDeposit, 'Rp', 'Maximum amount per deposit transaction'],
+          ].map(([label, id, val, unit, note]) => `
+            <div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:1rem;padding:.75rem 0;border-bottom:1px solid var(--border)">
+              <div>
+                <div style="font-weight:600;font-size:.85rem">${label}</div>
+                <div style="font-size:.72rem;color:var(--text3)">${note}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span style="color:var(--text3);font-size:.8rem">${unit}</span>
+                <input type="number" id="${id}" value="${val}" min="0" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.9rem;outline:none;background:var(--bg2);color:var(--text)"/>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fa-solid fa-money-bill-transfer" style="color:var(--yellow)"></i> Withdrawal Limits</span></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:1rem">
+          ${[
+            ['Maximum Withdrawal', 'sf_max_wd', s.maxWithdraw, 'Rp', 'Maximum amount per withdrawal transaction'],
+            ['Daily Withdrawal Limit', 'sf_daily_wd', s.dailyWithdrawLimit || s.maxWithdraw * 2, 'Rp', 'Maximum total withdrawal per day per member'],
+          ].map(([label, id, val, unit, note]) => `
+            <div style="display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:1rem;padding:.75rem 0;border-bottom:1px solid var(--border)">
+              <div>
+                <div style="font-weight:600;font-size:.85rem">${label}</div>
+                <div style="font-size:.72rem;color:var(--text3)">${note}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span style="color:var(--text3);font-size:.8rem">${unit}</span>
+                <input type="number" id="${id}" value="${val}" min="0" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem;font-size:.9rem;outline:none;background:var(--bg2);color:var(--text)"/>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-header"><span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--acc)"></i> System Mode</span></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+              <div>
+                <div style="font-weight:700">Maintenance Mode</div>
+                <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">Block all player access to the platform</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="sf_maintenance" ${s.maintenanceMode ? 'checked' : ''}/>
+                <div class="toggle-slider"></div>
+              </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+              <div>
+                <div style="font-weight:700">Registration Open</div>
+                <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">Allow new member registrations</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="sf_registration" ${s.registrationOpen !== false ? 'checked' : ''}/>
+                <div class="toggle-slider"></div>
+              </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+              <div>
+                <div style="font-weight:700">Auto-Approve Deposits</div>
+                <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">Automatically approve matching deposits</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="sf_auto_dep" ${s.autoApproveDeposit ? 'checked' : ''}/>
+                <div class="toggle-slider"></div>
+              </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+              <div>
+                <div style="font-weight:700">Manual Withdrawal Review</div>
+                <div style="font-size:.75rem;color:var(--text3);margin-top:.2rem">All withdrawals require manual approval</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="sf_manual_wd" ${s.manualWithdrawReview !== false ? 'checked' : ''}/>
+                <div class="toggle-slider"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
 /* ─── ACTIONS ─── */
 export function saveSettingsCommission() {
   const v = parseInt(document.getElementById('settCommission')?.value);
@@ -434,4 +535,40 @@ window.toggleCompanyReferrer = (company, checked) => {
   addLog('Update Settings', `Referral: ${company}`, `${company} referral switched ${checked ? 'ON' : 'OFF'}`);
   if (window.db?.dbSaveSetting) window.db.dbSaveSetting(`referral_company_${company}`, checked ? '1' : '0');
   toast(`${company} referral system ${checked ? 'Activated' : 'Deactivated'}`, checked ? 'success' : 'warning');
+};
+
+window.saveFinanceSettings = async () => {
+  const minDep   = parseInt(document.getElementById('sf_min_dep')?.value);
+  const maxDep   = parseInt(document.getElementById('sf_max_dep')?.value);
+  const maxWd    = parseInt(document.getElementById('sf_max_wd')?.value);
+  const dailyWd  = parseInt(document.getElementById('sf_daily_wd')?.value);
+  const maint    = document.getElementById('sf_maintenance')?.checked;
+  const regOpen  = document.getElementById('sf_registration')?.checked;
+  const autoDep  = document.getElementById('sf_auto_dep')?.checked;
+  const manualWd = document.getElementById('sf_manual_wd')?.checked;
+
+  if (!isNaN(minDep)) STATE.settings.minDeposit = minDep;
+  if (!isNaN(maxDep)) STATE.settings.maxDeposit = maxDep;
+  if (!isNaN(maxWd))  STATE.settings.maxWithdraw = maxWd;
+  if (!isNaN(dailyWd)) STATE.settings.dailyWithdrawLimit = dailyWd;
+  STATE.settings.maintenanceMode  = maint;
+  STATE.settings.registrationOpen = regOpen;
+  STATE.settings.autoApproveDeposit  = autoDep;
+  STATE.settings.manualWithdrawReview = manualWd;
+
+  if (window.db?.dbSaveSetting) {
+    await Promise.all([
+      window.db.dbSaveSetting('min_deposit',    minDep),
+      window.db.dbSaveSetting('max_deposit',    maxDep),
+      window.db.dbSaveSetting('max_withdraw',   maxWd),
+      window.db.dbSaveSetting('daily_withdraw_limit', dailyWd),
+      window.db.dbSaveSetting('maintenance_mode', maint ? 'true' : 'false'),
+      window.db.dbSaveSetting('registration_open', regOpen ? 'true' : 'false'),
+      window.db.dbSaveSetting('auto_approve_deposit', autoDep ? 'true' : 'false'),
+      window.db.dbSaveSetting('manual_withdraw_review', manualWd ? 'true' : 'false'),
+    ]);
+  }
+
+  addLog('Update Settings', 'finance', `Finance limits updated — min:${minDep} max_dep:${maxDep} max_wd:${maxWd}`);
+  toast('Finance settings saved!', 'success');
 };

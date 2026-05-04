@@ -53,6 +53,25 @@ function makeCampaigns(n) {
 }
 
 function getFreebets() {
+  // Prefer real Freebet records from STATE.bonuses (DB-backed)
+  if (Array.isArray(STATE.bonuses) && STATE.bonuses.some(b => b.type === 'Freebet')) {
+    return STATE.bonuses
+      .filter(b => b.type === 'Freebet')
+      .map(b => ({
+        id:        b.id,
+        member:    b.member,
+        company:   b.company || '-',
+        provider:  'N/A',
+        game:      'Freebet',
+        amount:    b.bonusAmount || 0,
+        rounds:    0,
+        used:      0,
+        expiry:    b.expiresAt ? new Date(b.expiresAt).toLocaleDateString('id-ID') : '-',
+        status:    b.status === 'Claimed' ? 'Used' : b.status === 'Cancelled' ? 'Expired' : 'Active',
+        createdAt: b.claimedAt || '-',
+      }));
+  }
+  // Fallback: mock data for demo / empty DB
   if (!Array.isArray(STATE.freebets) || STATE.freebets.length === 0) {
     STATE.freebets = makeFreebets(40);
     saveState();
@@ -61,6 +80,21 @@ function getFreebets() {
 }
 
 function getBonusRows() {
+  // Prefer real DB data from STATE.bonuses (fetched via fetchBonuses)
+  if (Array.isArray(STATE.bonuses) && STATE.bonuses.length > 0) {
+    return STATE.bonuses.map(b => ({
+      id:         b.id,
+      member:     b.member,
+      company:    b.company || '-',
+      type:       b.type || 'Bonus',
+      depositAmt: b.depositAmount || 0,
+      bonusAmt:   b.bonusAmount   || 0,
+      turnover:   b.turnoverAchieved || 0,
+      status:     b.status,
+      claimedAt:  b.claimedAt || b.expiresAt || '-',
+    }));
+  }
+  // Fallback: mock data for demo / empty DB
   if (!Array.isArray(STATE.bonusReports) || STATE.bonusReports.length === 0) {
     STATE.bonusReports = makeBonusReport(50);
     saveState();

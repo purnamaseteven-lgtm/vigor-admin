@@ -2,8 +2,35 @@
 import { STATE, fmt, fmtCur } from '../core/state.js';
 import { pages } from '../core/router.js';
 
+// ── Registration KPI helpers ──
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+}
+function getTodayISO() { return new Date().toISOString().slice(0,10); }
+
+function computeRegKPIs() {
+  const members = STATE.members || [];
+  const todayISO = getTodayISO();
+  const todayStr = getTodayStr();
+  // Today's new registrations: joinDate matches today (various formats)
+  const todayRegs = members.filter(m => {
+    const j = m.joinDate || m.createdAt || m.joined || '';
+    return j.startsWith(todayISO) || j.startsWith(todayStr);
+  }).length;
+  // Total registered (all members)
+  const totalRegs = members.length;
+  // Reg + Deposit (conversion): members who have at least one approved deposit
+  const depositorSet = new Set(
+    (STATE.deposits || []).filter(d => d.status === 'Approved').map(d => d.member)
+  );
+  const converted = members.filter(m => depositorSet.has(m.username)).length;
+  return { todayRegs, totalRegs, converted };
+}
+
 // ── Enhancement 7: Drag & Reorder widget definitions ──
-function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMembers, newRegs, converted) {
+function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMembers, todayRegs, converted, totalRegs) {
+  const convRate = totalMembers > 0 ? Math.round((converted / totalMembers) * 100) : 0;
   return [
     {
       id: 'deposit',
@@ -12,7 +39,7 @@ function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMe
               <div class="stat-info">
                 <div class="stat-label">Total Deposit</div>
                 <div class="stat-value">${fmtCur(totalDeposit)}</div>
-                <div class="stat-trend trend-up"><i class="fa-solid fa-caret-up"></i> 12.5% <span>vs yesterday</span></div>
+                <div class="stat-trend trend-up"><i class="fa-solid fa-caret-up"></i> ${STATE.deposits.filter(d=>d.status==='Approved').length} txn <span>approved</span></div>
               </div>`
     },
     {
@@ -22,7 +49,7 @@ function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMe
               <div class="stat-info">
                 <div class="stat-label">Total Withdrawal</div>
                 <div class="stat-value">${fmtCur(totalWithdraw)}</div>
-                <div class="stat-trend trend-down"><i class="fa-solid fa-caret-down"></i> 5.2% <span>vs yesterday</span></div>
+                <div class="stat-trend trend-down"><i class="fa-solid fa-caret-down"></i> ${STATE.withdrawals.filter(w=>w.status==='Approved').length} txn <span>approved</span></div>
               </div>`
     },
     {
@@ -32,17 +59,17 @@ function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMe
               <div class="stat-info">
                 <div class="stat-label">Total Members</div>
                 <div class="stat-value">${fmt(totalMembers)}</div>
-                <div class="stat-trend"><span>Global across all agents</span></div>
+                <div class="stat-trend"><span>Active: ${activeMembers} | Suspended: ${STATE.members.filter(m=>m.status==='Suspended').length}</span></div>
               </div>`
     },
     {
-      id: 'new_regs',
+      id: 'today_regs',
       html: `
               <div class="stat-icon" style="background:rgba(139,92,246,.1);color:#8b5cf6"><i class="fa-solid fa-user-plus"></i></div>
               <div class="stat-info">
-                <div class="stat-label">New Registrations</div>
-                <div class="stat-value">${fmt(newRegs)}</div>
-                <div class="stat-trend trend-up"><i class="fa-solid fa-caret-up"></i> +${Math.round(newRegs * 0.1)} <span>today</span></div>
+                <div class="stat-label">Registrasi Hari Ini</div>
+                <div class="stat-value">${fmt(todayRegs)}</div>
+                <div class="stat-trend trend-up"><i class="fa-solid fa-caret-up"></i> Total: ${fmt(totalRegs)} <span>all time</span></div>
               </div>`
     },
     {
@@ -50,9 +77,9 @@ function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMe
       html: `
               <div class="stat-icon" style="background:rgba(16,185,129,.1);color:var(--green)"><i class="fa-solid fa-user-check"></i></div>
               <div class="stat-info">
-                <div class="stat-label">Converted (Reg+Dep)</div>
+                <div class="stat-label">Reg + Deposit (Converted)</div>
                 <div class="stat-value">${fmt(converted)}</div>
-                <div class="stat-trend"><span>Conversion: ${totalMembers > 0 ? Math.round((converted / totalMembers) * 100) : 0}%</span></div>
+                <div class="stat-trend ${convRate >= 50 ? 'trend-up' : 'trend-down'}"><i class="fa-solid fa-caret-${convRate >= 50 ? 'up' : 'down'}"></i> ${convRate}% <span>conversion rate</span></div>
               </div>`
     },
     {
@@ -62,7 +89,7 @@ function getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMe
               <div class="stat-info">
                 <div class="stat-label">Active Players</div>
                 <div class="stat-value">${fmt(activeMembers)}</div>
-                <div class="stat-trend"><span>Live: ${Math.round(activeMembers / 4)} online</span></div>
+                <div class="stat-trend"><span>Pending dep: ${STATE.deposits.filter(d=>d.status==='Pending').length} | Pending wd: ${STATE.withdrawals.filter(w=>w.status==='Pending').length}</span></div>
               </div>`
     },
   ];
@@ -73,11 +100,10 @@ pages['dashboard'] = () => {
   const totalWithdraw = STATE.withdrawals.filter(w => w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
   const totalMembers = STATE.members.length;
   const activeMembers = STATE.members.filter(m => m.status === 'Active').length;
-  const newRegs = Math.round(totalMembers * 0.15); // Mocked for display
-  const converted = Math.round(totalMembers * 0.65); // Mocked for display
+  const { todayRegs, totalRegs, converted } = computeRegKPIs();
 
   // Reorder by saved preference
-  const WIDGETS = getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMembers, newRegs, converted);
+  const WIDGETS = getDashboardWidgets(totalDeposit, totalWithdraw, totalMembers, activeMembers, todayRegs, converted, totalRegs);
   let savedOrder = null;
   try { savedOrder = JSON.parse(localStorage.getItem('VGR_WIDGET_ORDER') || 'null'); } catch (e) { }
   const ordered = savedOrder
@@ -154,31 +180,46 @@ pages['dashboard'] = () => {
     <!-- BUSINESS INTELLIGENCE & PRODUCTION READINESS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1.25rem">
       <div class="card">
-        <div class="card-header"><span class="card-title"><i class="fa-solid fa-brain" style="color:var(--purple);margin-right:.5rem"></i>Smart Alerts / AI Insights</span></div>
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-brain" style="color:var(--purple);margin-right:.5rem"></i>Smart Alerts</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem">
+            <span style="font-size:.7rem;color:var(--text3)">Auto-refresh:</span>
+            <select id="dashRefreshSel" onchange="window.setDashRefresh(this.value)" style="font-size:.7rem;border:1px solid var(--border);border-radius:6px;padding:.15rem .4rem;background:var(--bg2);color:var(--text);outline:none">
+              <option value="0" ${(STATE.refreshSettings?.interval||0)===0?'selected':''}>Off</option>
+              <option value="30" ${(STATE.refreshSettings?.interval||0)===30?'selected':''}>30s</option>
+              <option value="60" ${(STATE.refreshSettings?.interval||0)===60?'selected':''}>1m</option>
+              <option value="120" ${(STATE.refreshSettings?.interval||0)===120?'selected':''}>2m</option>
+              <option value="300" ${(STATE.refreshSettings?.interval||0)===300?'selected':''}>5m</option>
+            </select>
+            <span id="lastRefreshTime" style="font-size:.65rem;color:var(--text3)" title="Last refreshed">${STATE.refreshSettings?.lastRefresh ? new Date(STATE.refreshSettings.lastRefresh).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '--:--:--'}</span>
+          </div>
+        </div>
         <div class="card-body" style="padding:1.5rem">
-          <div style="display:flex;flex-direction:column;gap:1rem">
-            <div style="padding:1rem;background:rgba(239,68,68,0.05);border-radius:12px;border-left:4px solid var(--red);display:flex;gap:1rem;align-items:center">
-                <i class="fa-solid fa-triangle-exclamation" style="color:var(--red);font-size:1.2rem"></i>
-                <div>
-                    <div style="font-weight:700;font-size:.85rem">Agency Limit Warning</div>
-                    <div style="font-size:.78rem;color:var(--text2)">Whitelabel <b>Sunwi</b> has reached 98% of credit limit. Auto-blocking in 2%.</div>
-                </div>
-                <button class="btn btn-xs btn-danger" style="margin-left:auto" onclick="go('whitelabel-list')">Top Up</button>
-            </div>
-            <div style="padding:1rem;background:rgba(16,185,129,0.05);border-radius:12px;border-left:4px solid var(--green);display:flex;gap:1rem;align-items:center">
-                <i class="fa-solid fa-chart-line" style="color:var(--green);font-size:1.2rem"></i>
-                <div>
-                    <div style="font-weight:700;font-size:.85rem">Revenue Surge Detected</div>
-                    <div style="font-size:.78rem;color:var(--text2)">GGR is up 24% compared to this time yesterday. Top contributor: <b>HokiBet</b>.</div>
-                </div>
-            </div>
-            <div style="padding:1rem;background:rgba(14,165,233,0.05);border-radius:12px;border-left:4px solid var(--acc);display:flex;gap:1rem;align-items:center">
-                <i class="fa-solid fa-user-shield" style="color:var(--acc);font-size:1.2rem"></i>
-                <div>
-                    <div style="font-weight:700;font-size:.85rem">Security Recommendation</div>
-                    <div style="font-size:.78rem;color:var(--text2)">3 admins are using weak passwords. Force password reset in <b>Settings</b>.</div>
-                </div>
-            </div>
+          <div style="display:flex;flex-direction:column;gap:1rem" id="smartAlertsBox">
+            ${(()=>{
+              const alerts = [];
+              // Real alert: pending deposits
+              const pendDep = STATE.deposits.filter(d=>d.status==='Pending').length;
+              if (pendDep > 0) alerts.push({ color:'var(--yellow)', icon:'fa-clock', title:`${pendDep} Pending Deposit${pendDep>1?'s':''}`, msg:`${pendDep} deposit transaction${pendDep>1?'s':''} waiting for approval. <b>Process now to avoid delays.</b>`, action:`go('deposit-list')`, actionLabel:'Review' });
+              // Real alert: pending withdrawals
+              const pendWd = STATE.withdrawals.filter(w=>w.status==='Pending').length;
+              if (pendWd > 0) alerts.push({ color:'var(--red)', icon:'fa-triangle-exclamation', title:`${pendWd} Pending Withdrawal${pendWd>1?'s':''}`, msg:`${pendWd} withdrawal request${pendWd>1?'s':''} need approval.`, action:`go('withdrawal-list')`, actionLabel:'Review' });
+              // Real alert: conversion rate
+              const convPct = totalMembers > 0 ? Math.round((converted/totalMembers)*100) : 0;
+              if (convPct < 30 && totalMembers > 10) alerts.push({ color:'var(--acc)', icon:'fa-chart-line', title:'Low Conversion Rate', msg:`Only <b>${convPct}%</b> of registered members have deposited. Consider running a welcome bonus campaign.`, action:`go('crm-push')`, actionLabel:'Create Campaign' });
+              // Today's registration
+              if (todayRegs > 0) alerts.push({ color:'var(--green)', icon:'fa-user-plus', title:`${todayRegs} New Registration${todayRegs>1?'s':''} Today`, msg:`${todayRegs} new member${todayRegs>1?'s':''} joined today. Follow up with welcome CRM push.`, action:`go('crm-push')`, actionLabel:'Send Welcome' });
+              // System notification
+              const sysNotifs = (STATE.systemNotifications||[]).filter(n=>!n.read).slice(0,2);
+              sysNotifs.forEach(n => alerts.push({ color:'var(--purple)', icon:'fa-bell', title:n.title, msg:n.message, action:'', actionLabel:'' }));
+              if (alerts.length === 0) alerts.push({ color:'var(--green)', icon:'fa-circle-check', title:'All Clear', msg:'No urgent alerts. All systems are operating normally.', action:'', actionLabel:'' });
+              return alerts.slice(0,4).map(a => `
+                <div style="padding:1rem;background:${a.color}11;border-radius:12px;border-left:4px solid ${a.color};display:flex;gap:1rem;align-items:center">
+                  <i class="fa-solid ${a.icon}" style="color:${a.color};font-size:1.2rem;flex-shrink:0"></i>
+                  <div style="flex:1"><div style="font-weight:700;font-size:.85rem">${a.title}</div><div style="font-size:.78rem;color:var(--text2)">${a.msg}</div></div>
+                  ${a.action ? `<button class="btn btn-xs" style="background:${a.color};color:#fff;border:none;margin-left:auto;white-space:nowrap" onclick="${a.action}">${a.actionLabel}</button>` : ''}
+                </div>`).join('');
+            })()}
           </div>
         </div>
       </div>
@@ -210,6 +251,26 @@ pages['dashboard'] = () => {
       </div>
     </div>
   `;
+};
+
+// ── Refresh rate control ──
+let _dashRefreshTimer = null;
+window.setDashRefresh = (val) => {
+  const secs = parseInt(val, 10);
+  if (!STATE.refreshSettings) STATE.refreshSettings = {};
+  STATE.refreshSettings.interval = secs;
+  if (_dashRefreshTimer) { clearInterval(_dashRefreshTimer); _dashRefreshTimer = null; }
+  if (secs > 0) {
+    _dashRefreshTimer = setInterval(() => {
+      STATE.refreshSettings.lastRefresh = Date.now();
+      import('../ui/components.js').then(m => {
+        if (window.go) window.go('dashboard');
+      });
+    }, secs * 1000);
+    import('../ui/components.js').then(m => m.toast(`Auto-refresh: every ${secs}s`, 'info'));
+  } else {
+    import('../ui/components.js').then(m => m.toast('Auto-refresh disabled', 'info'));
+  }
 };
 
 window.runProdCheck = () => {

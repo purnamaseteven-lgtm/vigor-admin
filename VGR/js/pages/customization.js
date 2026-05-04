@@ -232,48 +232,167 @@ window.applyPreset = (id) => {
 
 // --- VIP DESIGNER ---
 pages['custom-vip'] = () => {
+    const calcMethod = STATE.settings?.vipCalcMethod || 'turnover';
+    const crmSync = STATE.settings?.vipCrmSync !== false;
+    const methodLabel = calcMethod === 'turnover' ? 'Min Turnover (TO)' : 'Min Deposit (Kumulatif)';
+    const methodField = calcMethod === 'turnover' ? 'turnover' : 'minDeposit';
+
+    // Calculate current member VIP levels
+    const members = STATE.members || [];
+    const memberVipCounts = {};
+    STATE.vipTiers.forEach(t => { memberVipCounts[t.id] = 0; });
+    members.forEach(m => {
+        const val = calcMethod === 'turnover'
+            ? (STATE.lotteryBets||[]).filter(b=>b.member===m.username).reduce((s,b)=>s+(b.betAmount||0),0)
+              + (STATE.seamless?.transactions||[]).filter(t=>t.player===m.username).reduce((s,t)=>s+(t.betAmount||0),0)
+            : (STATE.deposits||[]).filter(d=>d.member===m.username&&d.status==='Approved').reduce((s,d)=>s+(d.amount||0),0);
+        const tier = [...STATE.vipTiers].reverse().find(t => val >= (t[methodField]||t.turnover||0));
+        if (tier) memberVipCounts[tier.id] = (memberVipCounts[tier.id]||0) + 1;
+    });
+
     return `
-    ${pageHeader('VIP Tier Designer', '<span>Management</span><span class="sep">›</span><span>VIP Tiers</span>')}
+    ${pageHeader('VIP Tier Designer', '<span>Management</span><span class="sep">›</span><span>VIP Tiers</span>', `
+        <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="window.openAddVIPTier()"><i class="fa-solid fa-plus"></i> Add Tier</button>
+            <button class="btn btn-secondary btn-sm" onclick="go('rebate-calc')"><i class="fa-solid fa-calculator"></i> Rebate Calc</button>
+        </div>`)}
+
+    <!-- VIP Config Bar -->
+    <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-body" style="display:flex;gap:2rem;align-items:center;flex-wrap:wrap">
+            <div>
+                <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">Metode Kalkulasi VIP</div>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-sm ${calcMethod==='turnover'?'btn-primary':'btn-secondary'}" onclick="window.setVipCalcMethod('turnover')"><i class="fa-solid fa-rotate"></i> Turnover (TO)</button>
+                    <button class="btn btn-sm ${calcMethod==='deposit'?'btn-primary':'btn-secondary'}" onclick="window.setVipCalcMethod('deposit')"><i class="fa-solid fa-arrow-down-to-bracket"></i> Total Deposit</button>
+                </div>
+            </div>
+            <div style="border-left:1px solid var(--border);padding-left:2rem">
+                <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">CRM Segment Auto-Sync</div>
+                <label class="toggle" style="transform:scale(.9)">
+                    <input type="checkbox" ${crmSync?'checked':''} onchange="window.setVipCrmSync(this.checked)"/>
+                    <div class="toggle-slider"></div>
+                </label>
+                <span style="font-size:.78rem;color:var(--text2);margin-left:.5rem">${crmSync?'On — VIP tiers create CRM segments automatically':'Off'}</span>
+            </div>
+            <div style="border-left:1px solid var(--border);padding-left:2rem;flex:1">
+                <div style="font-size:.75rem;color:var(--text3);margin-bottom:.5rem">Member Distribution</div>
+                <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+                    ${STATE.vipTiers.map(t=>`
+                        <div style="display:flex;align-items:center;gap:.3rem">
+                            <div style="width:10px;height:10px;border-radius:50%;background:${t.color}"></div>
+                            <span style="font-size:.72rem;color:var(--text2)">${t.name}: <strong>${memberVipCounts[t.id]||0}</strong></span>
+                        </div>`).join('')}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
-        <div class="card-header"><span class="card-title">Membership Hierarchy</span></div>
+        <div class="card-header"><span class="card-title">VIP Tier Hierarchy</span><span style="margin-left:.5rem;font-size:.72rem;color:var(--text3)">Kalkulasi berdasarkan: <strong>${calcMethod==='turnover'?'Total Turnover':'Total Deposit'}</strong></span></div>
         <div class="card-body">
             ${tableWrap(`
                 <table>
                     <thead>
                         <tr>
-                            <th>Level</th>
-                            <th>Name</th>
-                            <th>Min Turnover</th>
-                            <th>Rebate (%)</th>
-                            <th>Referral (%)</th>
+                            <th>Level</th><th>Name</th><th>${methodLabel}</th><th>Rebate (%)</th><th>Referral (%)</th><th>Members</th>${crmSync?'<th>CRM Segment</th>':''}
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${STATE.vipTiers.map(t => `
+                        ${STATE.vipTiers.map((t, idx) => {
+                            const thresholdVal = t[methodField] || t.turnover || 0;
+                            const crmSeg = (STATE.crm?.segments||[]).find(s=>s.name?.toLowerCase().includes(t.name.toLowerCase()));
+                            return `
                             <tr>
-                                <td><div style="width:20px;height:20px;border-radius:50%;background:${t.color}"></div></td>
-                                <td><strong>${t.name}</strong></td>
-                                <td>${(t.turnover / 1000000).toFixed(0)}M</td>
+                                <td>
+                                  <div style="display:flex;align-items:center;gap:.5rem">
+                                    <div style="width:24px;height:24px;border-radius:50%;background:${t.color};box-shadow:0 0 8px ${t.color}66"></div>
+                                    <span style="font-size:.7rem;color:var(--text3)">L${idx+1}</span>
+                                  </div>
+                                </td>
+                                <td><strong style="color:${t.color}">${t.name}</strong></td>
+                                <td>${thresholdVal === 0 ? '<span style="color:var(--text3)">Start</span>' : (thresholdVal/1000000).toFixed(0)+'M'}</td>
                                 <td><span class="badge badge-success">${t.rebate}%</span></td>
                                 <td><span class="badge badge-primary">${t.referral}%</span></td>
+                                <td><span style="font-weight:700">${memberVipCounts[t.id]||0}</span> <span style="font-size:.7rem;color:var(--text3)">members</span></td>
+                                ${crmSync?`<td>${crmSeg?`<span class="badge badge-secondary" style="font-size:.65rem">${crmSeg.name}</span>`:'<button class="btn btn-xs btn-secondary" onclick="window.createVipCrmSegment(\''+t.id+'\')" style="font-size:.65rem">Create Segment</button>'}</td>`:''}
                                 <td>${actionBtns(`window.editVIP('${t.id}')`, `window.deleteVIP('${t.id}')`)}</td>
-                            </tr>
-                        `).join('')}
+                            </tr>`;
+                        }).join('')}
                     </tbody>
                 </table>
             `)}
         </div>
-    </div>
-    <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
-        <div class="card">
-            <div class="card-header"><span class="card-title">Rebate Rules</span></div>
-            <div class="card-body">
-                <div style="font-size:.85rem;color:var(--text2);margin-bottom:1rem">Calculations occur every Monday at 00:00.</div>
-                <button class="btn btn-secondary w-100" onclick="go('rebate-calc')"><i class="fa-solid fa-calculator"></i> Open Rebate Calculator</button>
-            </div>
-        </div>
     </div>`;
+};
+
+window.setVipCalcMethod = (method) => {
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings.vipCalcMethod = method;
+    saveState();
+    go('custom-vip');
+    toast(`VIP calculation: ${method === 'turnover' ? 'Turnover (TO)' : 'Total Deposit'}`, 'success');
+};
+
+window.setVipCrmSync = (val) => {
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings.vipCrmSync = val;
+    saveState();
+};
+
+window.createVipCrmSegment = (tierId) => {
+    const tier = STATE.vipTiers.find(t => t.id === tierId);
+    if (!tier) return;
+    if (!Array.isArray(STATE.crm.segments)) STATE.crm.segments = [];
+    const seg = {
+        id: 'SEG_VIP_' + tierId,
+        name: `VIP ${tier.name}`,
+        description: `Auto-segment for VIP tier: ${tier.name}`,
+        criteria: { vipTier: tier.name },
+        company: '',
+        status: 'Active',
+        memberCount: 0,
+        createdBy: STATE.profile.username,
+        createdAt: new Date().toISOString(),
+    };
+    const existing = STATE.crm.segments.findIndex(s => s.id === seg.id);
+    if (existing >= 0) { toast('Segment already exists', 'warning'); return; }
+    STATE.crm.segments.push(seg);
+    saveState();
+    go('custom-vip');
+    toast(`CRM segment created: VIP ${tier.name}`, 'success');
+};
+
+window.openAddVIPTier = () => {
+    openModal('Add VIP Tier', `
+        <div class="form-grid">
+            <div class="form-field"><label>Tier Name</label><input id="vt_name" placeholder="e.g. Emerald"/></div>
+            <div class="form-field"><label>Color</label><input id="vt_color" type="color" value="#22c55e" style="height:40px;width:100%"/></div>
+            <div class="form-field"><label>Min Turnover (Rp)</label><input id="vt_to" type="number" value="0" min="0"/></div>
+            <div class="form-field"><label>Min Deposit (Rp)</label><input id="vt_dep" type="number" value="0" min="0"/></div>
+            <div class="form-field"><label>Rebate (%)</label><input id="vt_rebate" type="number" step="0.1" value="0.5" min="0" max="10"/></div>
+            <div class="form-field"><label>Referral (%)</label><input id="vt_referral" type="number" step="0.1" value="0.2" min="0" max="10"/></div>
+        </div>`,
+        `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+         <button class="btn btn-primary" onclick="window.saveNewVIPTier()">Add Tier</button>`);
+};
+
+window.saveNewVIPTier = () => {
+    const name = document.getElementById('vt_name')?.value?.trim();
+    if (!name) { toast('Tier name required', 'error'); return; }
+    const tier = {
+        id: 'VIP' + (STATE.vipTiers.length + 1),
+        name,
+        color: document.getElementById('vt_color')?.value || '#22c55e',
+        turnover: parseInt(document.getElementById('vt_to')?.value || '0', 10),
+        minDeposit: parseInt(document.getElementById('vt_dep')?.value || '0', 10),
+        rebate: parseFloat(document.getElementById('vt_rebate')?.value || '0'),
+        referral: parseFloat(document.getElementById('vt_referral')?.value || '0'),
+    };
+    STATE.vipTiers.push(tier);
+    saveState();
+    closeModalBtn(); go('custom-vip'); toast('VIP tier added', 'success');
 };
 
 // --- SEO SETTINGS ---
@@ -1587,18 +1706,168 @@ function renderTemplateMockup(id, data) {
 // Global Banner Page
 pages['custom-global-banner'] = () => {
     ensureBannerLayoutState();
+    if (!Array.isArray(STATE.popupBanners)) STATE.popupBanners = [];
+    const banners = STATE.popupBanners;
+    const TRIGGER_OPTS = ['On Login', 'On Deposit Success', 'On First Visit', 'Timed (Every X Hours)', 'Manual'];
+    const TARGET_OPTS  = ['All Players', 'New Members Only', 'VIP Members', 'By Company', 'By Agent'];
+
     return `
-    ${pageHeader('Global Banner', '<span>Customization</span><span class="sep">›</span><span>Global Banner</span>')}
+    ${pageHeader('Global Banner & Popup Manager', '<span>Customization</span><span class="sep">›</span><span>Global Banner</span>', `
+        <button class="btn btn-primary btn-sm" onclick="window.openPopupBannerModal()"><i class="fa-solid fa-plus"></i> Add Popup Banner</button>`)}
+
+    <!-- Section tabs -->
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem">
+        ${BANNER_SECTIONS.map((s, i) => `<button class="btn btn-sm ${i===0?'btn-primary':'btn-secondary'}" onclick="window.selectBannerSection('${s}', this)">${s}</button>`).join('')}
+        <button class="btn btn-sm btn-secondary" style="margin-left:auto;border-color:var(--purple);color:var(--purple)" onclick="window.openPopupBannerModal()"><i class="fa-solid fa-window-restore"></i> Popup Banners (${banners.length})</button>
+    </div>
+
+    <!-- Popup Banners Table -->
+    <div class="card" style="margin-bottom:1.25rem">
+        <div class="card-header">
+            <span class="card-title"><i class="fa-solid fa-window-restore" style="color:var(--purple);margin-right:.5rem"></i>Popup Banner List</span>
+            <span style="margin-left:auto;font-size:.75rem;color:var(--text3)">${banners.filter(b=>b.active).length} active</span>
+        </div>
+        <div class="card-body" style="padding:0">
+            ${tableWrap(`
+                <table>
+                    <thead><tr><th>Title</th><th>Trigger</th><th>Target</th><th>Priority</th><th>Start</th><th>End</th><th>Status</th><th>Action</th></tr></thead>
+                    <tbody>
+                        ${banners.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:2rem">No popup banners. Click + Add to create one.</td></tr>' :
+                          banners.map(b => `
+                            <tr>
+                                <td>
+                                  <div style="display:flex;align-items:center;gap:.5rem">
+                                    ${b.imageUrl ? `<img src="${b.imageUrl}" style="width:40px;height:28px;object-fit:cover;border-radius:4px;border:1px solid var(--border)" onerror="this.style.display='none'"/>` : '<div style="width:40px;height:28px;background:var(--bg2);border-radius:4px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-image" style="font-size:.6rem;color:var(--text3)"></i></div>'}
+                                    <strong>${b.title}</strong>
+                                  </div>
+                                </td>
+                                <td><span class="badge badge-indigo">${b.trigger || 'On Login'}</span></td>
+                                <td style="font-size:.78rem">${b.target || 'All Players'}</td>
+                                <td><span style="background:var(--acc)22;color:var(--acc);border-radius:4px;padding:.1rem .4rem;font-size:.75rem;font-weight:700">${b.priority || 1}</span></td>
+                                <td style="font-size:.75rem">${b.startDate || '-'}</td>
+                                <td style="font-size:.75rem">${b.endDate || '-'}</td>
+                                <td>
+                                  <label class="toggle" style="transform:scale(.8)">
+                                    <input type="checkbox" ${b.active ? 'checked' : ''} onchange="window.togglePopupBanner('${b.id}', this.checked)"/>
+                                    <div class="toggle-slider"></div>
+                                  </label>
+                                </td>
+                                <td>
+                                  <div style="display:flex;gap:.25rem">
+                                    <button class="btn btn-xs btn-primary" onclick="window.openPopupBannerModal('${b.id}')"><i class="fa-solid fa-pen"></i></button>
+                                    <button class="btn btn-xs btn-secondary" onclick="window.previewPopupBanner('${b.id}')"><i class="fa-solid fa-eye"></i></button>
+                                    <button class="btn btn-xs btn-danger" onclick="window.deletePopupBanner('${b.id}')"><i class="fa-solid fa-trash"></i></button>
+                                  </div>
+                                </td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+            `)}
+        </div>
+    </div>
+
+    <!-- Section Banner Area -->
     <div class="card">
+        <div class="card-header"><span class="card-title" id="sectionBannerTitle">Homepage Section Banners</span></div>
         <div class="card-body">
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem">
-                ${BANNER_SECTIONS.map(s => `<button class="btn btn-sm btn-secondary" onclick="toast('${s} Section Selected','info')">${s}</button>`).join('')}
-            </div>
-            <div style="border:2px dashed var(--border);border-radius:12px;padding:3rem;text-align:center;color:var(--text3)">
-                Manage banners for the selected section here.
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem" id="sectionBannerGrid">
+                ${BANNER_SECTIONS.slice(0,6).map((s,i) => `
+                    <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer" onclick="window.selectBannerSection('${s}', null)">
+                        <div style="height:70px;background:linear-gradient(135deg,var(--acc)22,var(--bg2));display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--text2)">${s}</div>
+                        <div style="padding:.5rem .75rem;font-size:.7rem;color:var(--text3);border-top:1px solid var(--border)">${Math.floor(Math.random()*3)} banner(s)</div>
+                    </div>`).join('')}
             </div>
         </div>
     </div>`;
+};
+
+// ── Popup Banner Actions ──
+window.openPopupBannerModal = (id = null) => {
+    if (!Array.isArray(STATE.popupBanners)) STATE.popupBanners = [];
+    const b = id ? STATE.popupBanners.find(x => x.id === id) : null;
+    const TRIGGER_OPTS = ['On Login', 'On Deposit Success', 'On First Visit', 'Timed (Every X Hours)', 'Manual'];
+    const TARGET_OPTS  = ['All Players', 'New Members Only', 'VIP Members', 'By Company', 'By Agent'];
+    openModal(b ? 'Edit Popup Banner' : 'Add Popup Banner', `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1"><label>Title</label><input id="pb_title" value="${b?.title||''}" placeholder="e.g. Welcome Bonus Popup"/></div>
+            <div class="form-field" style="grid-column:1/-1"><label>Image URL</label><input id="pb_image" value="${b?.imageUrl||''}" placeholder="https://cdn.example.com/popup.jpg" oninput="document.getElementById('pb_img_prev').src=this.value"/></div>
+            <div class="form-field" style="grid-column:1/-1;text-align:center"><img id="pb_img_prev" src="${b?.imageUrl||''}" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid var(--border);${b?.imageUrl?'':'display:none'}" onerror="this.style.display='none'" onload="this.style.display='block'"/></div>
+            <div class="form-field"><label>Link URL</label><input id="pb_link" value="${b?.linkUrl||''}" placeholder="https://... or /promo"/></div>
+            <div class="form-field"><label>Button Text</label><input id="pb_btn" value="${b?.buttonText||'Claim Now'}" /></div>
+            <div class="form-field"><label>Trigger</label><select id="pb_trigger">${TRIGGER_OPTS.map(o=>`<option ${b?.trigger===o?'selected':''}>${o}</option>`).join('')}</select></div>
+            <div class="form-field"><label>Target Audience</label><select id="pb_target">${TARGET_OPTS.map(o=>`<option ${b?.target===o?'selected':''}>${o}</option>`).join('')}</select></div>
+            <div class="form-field"><label>Company Filter (blank = all)</label><input id="pb_company" value="${b?.company||''}" placeholder="Leave blank for all"/></div>
+            <div class="form-field"><label>Priority (1=highest)</label><input id="pb_priority" type="number" min="1" max="99" value="${b?.priority||1}"/></div>
+            <div class="form-field"><label>Start Date</label><input id="pb_start" type="date" value="${b?.startDate||''}"/></div>
+            <div class="form-field"><label>End Date</label><input id="pb_end" type="date" value="${b?.endDate||''}"/></div>
+            <div class="form-field"><label>Show Close Button</label><select id="pb_closeable"><option ${b?.closeable!==false?'selected':''}>Yes</option><option ${b?.closeable===false?'selected':''}>No</option></select></div>
+        </div>`,
+        `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+         <button class="btn btn-primary" onclick="window.savePopupBanner('${b?.id||''}')"><i class="fa-solid fa-check"></i> Save</button>`
+    );
+};
+
+window.savePopupBanner = (id) => {
+    if (!Array.isArray(STATE.popupBanners)) STATE.popupBanners = [];
+    const obj = {
+        id: id || 'PB' + Date.now().toString().slice(-6),
+        title: document.getElementById('pb_title')?.value?.trim() || 'Popup',
+        imageUrl: document.getElementById('pb_image')?.value?.trim() || '',
+        linkUrl: document.getElementById('pb_link')?.value?.trim() || '',
+        buttonText: document.getElementById('pb_btn')?.value?.trim() || 'Claim Now',
+        trigger: document.getElementById('pb_trigger')?.value || 'On Login',
+        target: document.getElementById('pb_target')?.value || 'All Players',
+        company: document.getElementById('pb_company')?.value?.trim() || '',
+        priority: parseInt(document.getElementById('pb_priority')?.value || '1', 10),
+        startDate: document.getElementById('pb_start')?.value || '',
+        endDate: document.getElementById('pb_end')?.value || '',
+        closeable: document.getElementById('pb_closeable')?.value !== 'No',
+        active: true,
+        createdAt: id ? undefined : new Date().toISOString(),
+    };
+    if (!obj.title) { toast('Title required', 'error'); return; }
+    if (id) {
+        const idx = STATE.popupBanners.findIndex(b => b.id === id);
+        if (idx >= 0) STATE.popupBanners[idx] = { ...STATE.popupBanners[idx], ...obj };
+    } else {
+        STATE.popupBanners.unshift(obj);
+    }
+    saveState();
+    closeModalBtn();
+    go('custom-global-banner');
+    toast('Popup banner saved', 'success');
+};
+
+window.togglePopupBanner = (id, val) => {
+    const b = (STATE.popupBanners||[]).find(x=>x.id===id);
+    if (b) { b.active = val; saveState(); }
+};
+
+window.deletePopupBanner = (id) => {
+    STATE.popupBanners = (STATE.popupBanners||[]).filter(x=>x.id!==id);
+    saveState(); go('custom-global-banner'); toast('Deleted', 'success');
+};
+
+window.previewPopupBanner = (id) => {
+    const b = (STATE.popupBanners||[]).find(x=>x.id===id);
+    if (!b) return;
+    openModal('Preview: ' + b.title, `
+        <div style="background:#0f172a;border-radius:16px;overflow:hidden;max-width:400px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+            ${b.imageUrl ? `<img src="${b.imageUrl}" style="width:100%;display:block" onerror="this.style.display='none'"/>` : '<div style="height:120px;background:linear-gradient(135deg,var(--acc),#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:2rem">🎰</div>'}
+            <div style="padding:1.5rem;text-align:center">
+                <div style="font-size:1.2rem;font-weight:800;margin-bottom:.75rem;color:#fff">${b.title}</div>
+                ${b.linkUrl ? `<a href="${b.linkUrl}" style="display:inline-block;background:var(--acc);color:#fff;border-radius:10px;padding:.6rem 2rem;font-weight:700;text-decoration:none">${b.buttonText}</a>` : ''}
+                ${b.closeable!==false ? '<div style="font-size:.7rem;color:rgba(255,255,255,.3);margin-top:.75rem;cursor:pointer">✕ Close</div>' : ''}
+            </div>
+        </div>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`);
+};
+
+window.selectBannerSection = (section, btn) => {
+    document.querySelectorAll('.tpl-filter-btn').forEach(b => b?.classList?.remove('active'));
+    if (btn) btn.classList?.add('active');
+    const title = document.getElementById('sectionBannerTitle');
+    if (title) title.textContent = section + ' Section Banners';
+    toast('Section: ' + section, 'info');
 };
 // ─── BRANDING & THEME (LIVE PREVIEW) ───
 pages['custom-theme'] = () => {

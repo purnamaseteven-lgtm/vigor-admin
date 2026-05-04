@@ -1,6 +1,6 @@
 /* ─── UI COMPONENTS ─── */
 import { fmt, getFilter, goToPage, setPerPage, setFilter } from '../utils/helpers.js';
-import { STATE, fmtCur } from '../core/state.js';
+import { STATE, fmtCur, saveState } from '../core/state.js';
 
 export function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
@@ -458,6 +458,8 @@ export function renderSidebar() {
                 <div class="nav-link" style="${check('crm', 'tournaments') ? '' : 'display:none'}" onclick="go('crm-tournaments')"><i class="fa-solid fa-trophy nav-icon"></i><span class="nav-label">Tournaments</span></div>
                 <div class="nav-link" style="${check('crm', 'automation') ? '' : 'display:none'}" onclick="go('crm-automation')"><i class="fa-solid fa-robot nav-icon"></i><span class="nav-label">Automation</span></div>
                 <div class="nav-link" style="${check('crm', 'push') ? '' : 'display:none'}" onclick="go('crm-push')"><i class="fa-solid fa-bell nav-icon"></i><span class="nav-label">Push Campaigns</span></div>
+                <div class="nav-link" style="${check('crm', 'dormancy') ? '' : 'display:none'}" onclick="go('crm-dormancy')"><i class="fa-solid fa-moon nav-icon"></i><span class="nav-label">Dormancy</span></div>
+                <div class="nav-link" style="${check('crm', 'loyalty') ? '' : 'display:none'}" onclick="go('crm-loyalty')"><i class="fa-solid fa-star nav-icon"></i><span class="nav-label">Loyalty Points</span></div>
             </div>
         </div>`;
     }
@@ -518,6 +520,12 @@ export function renderSidebar() {
         </div>`;
     }
 
+    // 14. Manual Book
+    html += `
+    <div class="nav-item">
+        <div class="nav-link" onclick="go('manual')"><i class="fa-solid fa-book-open nav-icon"></i><span class="nav-label">Manual Book</span></div>
+    </div>`;
+
     // Session Control
     html += `<div class="sidebar-menu-label">Session Control</div>
         <div class="nav-item"><div class="nav-link" onclick="logout()"><i class="fa-solid fa-right-from-bracket nav-icon"></i><span class="nav-label">Logout Account</span></div></div>`;
@@ -538,38 +546,125 @@ export function renderProfileDisplay() {
     // Update Header Badges
     const memoBadge = document.querySelector('.header-icon-btn[onclick*="memo-list"] .badge');
     const bellBadge = document.querySelector('.header-icon-btn[onclick*="showNotifications"] .badge');
-    if (memoBadge) memoBadge.textContent = '3'; // Dummy count
-    if (bellBadge) bellBadge.textContent = '5'; // Dummy count
+    if (memoBadge) memoBadge.textContent = (STATE.memos?.inbox?.filter(m=>!m.read)?.length || 0) || '';
+    // Notification count: unread systemNotifications + pending deposits + pending withdrawals
+    const unreadNotifs = (STATE.systemNotifications||[]).filter(n=>!n.read).length;
+    const pendingFinance = (STATE.deposits||[]).filter(d=>d.status==='Pending').length + (STATE.withdrawals||[]).filter(w=>w.status==='Pending').length;
+    const totalBell = unreadNotifs + pendingFinance;
+    if (bellBadge) {
+        bellBadge.textContent = totalBell > 0 ? String(Math.min(totalBell, 99)) : '';
+        bellBadge.style.display = totalBell > 0 ? '' : 'none';
+    }
 }
 
 export function showNotifications() {
-    const alerts = [
-        { icon: 'fa-arrow-down-to-bracket', color: 'var(--green)', msg: 'New Deposit: Rp 1,500,000 from @user123', time: '2m ago' },
-        { icon: 'fa-triangle-exclamation', color: 'var(--red)', msg: 'Company [Sunwi] reached 100% credit limit', time: '10m ago' },
-        { icon: 'fa-user-plus', color: 'var(--acc)', msg: 'New Whitelabel Request: Zenith88', time: '1h ago' },
-        { icon: 'fa-shield-halved', color: 'var(--yellow)', msg: 'Failed Login attempt from IP 103.21.32.4', time: '3h ago' }
-    ];
+    // Build live notification list from real STATE data
+    const alerts = [];
+
+    // System notifications (broadcast)
+    (STATE.systemNotifications || []).slice(0, 5).forEach(n => {
+        alerts.push({
+            icon: n.type === 'maintenance' ? 'fa-wrench' : n.type === 'warning' ? 'fa-triangle-exclamation' : 'fa-bell',
+            color: n.type === 'maintenance' ? 'var(--yellow)' : n.type === 'warning' ? 'var(--red)' : 'var(--acc)',
+            msg: `<strong>[${n.type?.toUpperCase()||'INFO'}]</strong> ${n.message || n.title}`,
+            time: n.createdAt ? new Date(n.createdAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : 'now',
+            id: n.id,
+        });
+    });
+
+    // Pending deposits
+    const pendDep = (STATE.deposits||[]).filter(d=>d.status==='Pending');
+    if (pendDep.length > 0) {
+        alerts.push({ icon: 'fa-arrow-down-to-bracket', color: 'var(--green)', msg: `<strong>${pendDep.length} deposit pending</strong> — latest: ${fmtCur(pendDep[0]?.amount||0)} dari @${pendDep[0]?.member||'?'}`, time: pendDep[0]?.date?.slice(-8)||'now', id: null });
+    }
+
+    // Pending withdrawals
+    const pendWd = (STATE.withdrawals||[]).filter(w=>w.status==='Pending');
+    if (pendWd.length > 0) {
+        alerts.push({ icon: 'fa-arrow-up-from-bracket', color: 'var(--yellow)', msg: `<strong>${pendWd.length} withdrawal pending</strong> — ${fmtCur(pendWd[0]?.amount||0)} dari @${pendWd[0]?.member||'?'}`, time: pendWd[0]?.date?.slice(-8)||'now', id: null });
+    }
+
+    if (alerts.length === 0) {
+        alerts.push({ icon: 'fa-circle-check', color: 'var(--green)', msg: 'No new notifications. All caught up!', time: 'just now', id: null });
+    }
 
     const body = `
-        <div style = "display:flex;flex-direction:column;gap:.5rem" >
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+            <span style="font-size:.75rem;color:var(--text3)">${alerts.length} notification${alerts.length!==1?'s':''}</span>
+            <div style="display:flex;gap:.5rem">
+                <button class="btn btn-xs btn-secondary" onclick="window.go('deposit-list');closeModalBtn()"><i class="fa-solid fa-arrow-down-to-bracket"></i> Deposits</button>
+                <button class="btn btn-xs btn-secondary" onclick="window.broadcastNotification ? window.go('system-notifications') : toast('Notifications','info');closeModalBtn()"><i class="fa-solid fa-plus"></i> Broadcast</button>
+            </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:.5rem;max-height:360px;overflow-y:auto">
             ${alerts.map(a => `
-                <div style="padding:.75rem;background:var(--bg2);border-radius:10px;display:flex;gap:1rem;align-items:center;cursor:pointer">
-                    <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;color:${a.color}">
+                <div style="padding:.75rem;background:var(--bg2);border-radius:10px;display:flex;gap:1rem;align-items:center;cursor:pointer;border-left:3px solid ${a.color}"
+                     onclick="${a.id ? `window.markNotifRead('${a.id}')` : ''}">
+                    <div style="width:36px;height:36px;border-radius:50%;background:${a.color}22;display:flex;align-items:center;justify-content:center;color:${a.color};flex-shrink:0">
                         <i class="fa-solid ${a.icon}"></i>
                     </div>
                     <div style="flex:1">
-                        <div style="font-size:.82rem;font-weight:600;margin-bottom:.15rem">${a.msg}</div>
+                        <div style="font-size:.82rem;line-height:1.4;margin-bottom:.15rem">${a.msg}</div>
                         <div style="font-size:.68rem;color:var(--text3)">${a.time}</div>
                     </div>
                 </div>
-            `).join('')
-        }
-        </div>
-        `;
+            `).join('')}
+        </div>`;
 
-    openModal('<i class="fa-regular fa-bell"></i> System Notifications', body, '<button class="btn btn-secondary btn-sm" onclick="closeModalBtn()">Mark all as read</button>');
+    openModal('<i class="fa-regular fa-bell"></i> Notifications', body,
+        `<button class="btn btn-secondary btn-sm" onclick="window.markAllNotifsRead();closeModalBtn()"><i class="fa-solid fa-check-double"></i> Mark all read</button>
+         <button class="btn btn-primary btn-sm" onclick="window.openBroadcastNotifModal();closeModalBtn()"><i class="fa-solid fa-bullhorn"></i> Broadcast</button>`);
 }
 window.showNotifications = showNotifications;
+
+// ── Notification helpers (Feature #15) ──
+window.markNotifRead = (id) => {
+    const n = (STATE.systemNotifications||[]).find(x=>x.id===id);
+    if (n) { n.read = true; saveState(); }
+};
+
+window.markAllNotifsRead = () => {
+    (STATE.systemNotifications||[]).forEach(n => { n.read = true; });
+    saveState();
+    renderProfileDisplay();
+};
+
+window.openBroadcastNotifModal = () => {
+    openModal('Broadcast Notification', `
+        <div class="form-grid">
+            <div class="form-field" style="grid-column:1/-1"><label>Title</label><input id="bn_title" placeholder="e.g. Maintenance Notice"/></div>
+            <div class="form-field" style="grid-column:1/-1"><label>Message</label><textarea id="bn_msg" rows="3" placeholder="Full notification message..."></textarea></div>
+            <div class="form-field"><label>Type</label><select id="bn_type"><option>info</option><option>maintenance</option><option>warning</option><option>success</option></select></div>
+            <div class="form-field"><label>Target Role</label><select id="bn_role"><option>All</option><option>Master</option><option>Company</option><option>Shop</option><option>Agent</option></select></div>
+        </div>`,
+        `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+         <button class="btn btn-primary" onclick="window.sendBroadcastNotif()"><i class="fa-solid fa-paper-plane"></i> Broadcast</button>`
+    );
+};
+
+window.sendBroadcastNotif = () => {
+    const title = document.getElementById('bn_title')?.value?.trim();
+    const message = document.getElementById('bn_msg')?.value?.trim();
+    if (!title || !message) { toast('Title and message required', 'error'); return; }
+    const notif = {
+        id: 'NOTIF' + Date.now().toString().slice(-6),
+        title,
+        message,
+        type: document.getElementById('bn_type')?.value || 'info',
+        targetRole: document.getElementById('bn_role')?.value || 'All',
+        createdAt: new Date().toISOString(),
+        createdBy: STATE.profile.username,
+        read: false,
+    };
+    if (!Array.isArray(STATE.systemNotifications)) STATE.systemNotifications = [];
+    STATE.systemNotifications.unshift(notif);
+    saveState();
+    closeModalBtn();
+    renderProfileDisplay(); // Update bell badge
+    toast(`Notification broadcast to ${notif.targetRole}`, 'success');
+    // Play alert sound if available
+    if (window.playAlertSound) window.playAlertSound();
+};
 
 export function showInbox() {
     const messages = [

@@ -46,13 +46,20 @@ pages['global-member-list'] = () => {
             <th>Phone</th>
             <th>Bank Info</th>
             <th>Balance</th>
+            <th>Referral By</th>
+            <th>Referred Users</th>
             <th>Status</th>
             <th>Joined</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map(m => `
+          ${rows.map(m => {
+            // Feature #14: Referral per username
+            const referredByMember = m.referredBy ? STATE.members.find(x=>x.username===m.referredBy) : null;
+            const referredUsers = STATE.members.filter(x=>x.referredBy===m.username);
+            const refEarnings = (STATE.bonuses||[]).filter(b=>b.member===m.username&&b.type==='Referral'&&b.status==='Approved').reduce((s,b)=>s+(b.bonusAmount||0),0);
+            return `
             <tr>
               <td>
                 <div style="font-weight:600;color:var(--acc);cursor:pointer" onclick="window.showMember('${m.username}')" title="View Detail">
@@ -66,6 +73,22 @@ pages['global-member-list'] = () => {
               <td><div style="font-weight:500">${m.bank}</div><div style="font-size:.7rem;color:var(--text3)">${m.bankAccount}</div></td>
               <td style="font-weight:600">${fmtCur(m.balance)}</td>
               <td>
+                ${m.referredBy
+                  ? `<div style="display:flex;align-items:center;gap:.3rem">
+                      <div style="width:8px;height:8px;border-radius:50%;background:var(--green)"></div>
+                      <span style="font-size:.78rem;color:var(--acc);cursor:pointer;font-weight:600" onclick="window.showMember('${m.referredBy}')">${m.referredBy}</span>
+                     </div>`
+                  : '<span style="color:var(--text3);font-size:.75rem">—</span>'}
+              </td>
+              <td>
+                ${referredUsers.length > 0
+                  ? `<button class="btn btn-xs btn-secondary" onclick="window.showReferralTree('${m.username}')" style="font-size:.7rem">
+                      <i class="fa-solid fa-sitemap"></i> ${referredUsers.length} referral${referredUsers.length>1?'s':''}
+                     </button>`
+                  : '<span style="color:var(--text3);font-size:.75rem">—</span>'}
+                ${refEarnings > 0 ? `<div style="font-size:.65rem;color:var(--green);margin-top:.1rem">${fmtCur(refEarnings)}</div>` : ''}
+              </td>
+              <td>
                 <button onclick="window.toggleMemberStatus('${m.id}','${m.status === 'Active' ? 'Suspended' : 'Active'}','${m.username}')"
                   class="btn btn-sm" title="${m.status === 'Active' ? 'Suspend' : 'Activate'}"
                   style="background:${m.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${m.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${m.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700">
@@ -78,13 +101,40 @@ pages['global-member-list'] = () => {
     `confirmAction('Delete Member','Delete member [${m.username}]? This action cannot be undone.',()=>window.deleteMember('${m.id}','${m.username}'),'Delete','danger')`,
     `<button class="btn btn-sm btn-icon" style="background:var(--acc);color:#fff" title="View Detail" onclick="window.showMember('${m.username}')"><i class="fa-solid fa-eye"></i></button>`
   )}</td>
-            </tr>
-          `).join('')}
+            </tr>`; }).join('')}
         </tbody>
       </table>
     `)}
     ${renderPagerHTML(PG, total, pp, cp)}
   `;
+};
+
+// ── Referral Tree (Feature #14) ─────────────────────────────────────
+window.showReferralTree = (username) => {
+  function buildTree(uname, depth = 0, maxDepth = 3) {
+    if (depth > maxDepth) return '';
+    const m = STATE.members.find(x => x.username === uname);
+    const children = STATE.members.filter(x => x.referredBy === uname);
+    const earnings = (STATE.bonuses||[]).filter(b=>b.member===uname&&b.type==='Referral'&&b.status==='Approved').reduce((s,b)=>s+(b.bonusAmount||0),0);
+    const depColor = ['var(--acc)','var(--green)','var(--yellow)','#8b5cf6'][depth] || 'var(--text3)';
+    return `
+      <div style="padding-left:${depth*20}px;margin:.2rem 0">
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:${depth===0?'var(--acc)11':'var(--bg2)'};border-radius:8px;border-left:3px solid ${depColor}">
+          <i class="fa-solid fa-user" style="color:${depColor};font-size:.75rem"></i>
+          <strong style="color:${depColor};font-size:.85rem">${uname}</strong>
+          ${m ? `<span style="font-size:.72rem;color:var(--text3)">${m.company}</span>` : ''}
+          ${earnings > 0 ? `<span style="margin-left:auto;font-size:.72rem;color:var(--green);font-weight:600">${fmtCur(earnings)}</span>` : ''}
+          <span style="font-size:.68rem;color:var(--text3);${earnings>0?'':'margin-left:auto'}">→ ${children.length} downline</span>
+        </div>
+        ${children.map(c => buildTree(c.username, depth + 1, maxDepth)).join('')}
+      </div>`;
+  }
+  import('../ui/components.js').then(m => {
+    m.openModal(`Referral Tree: ${username}`,
+      `<div style="max-height:420px;overflow-y:auto">${buildTree(username)}</div>`,
+      `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`
+    );
+  });
 };
 
 // ── Member status toggle (Active ↔ Suspended) ──────────────────────

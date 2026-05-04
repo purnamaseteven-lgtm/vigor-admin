@@ -108,7 +108,11 @@ export const STATE = {
         transactions: [], games: [], apiLogs: []
     },
     profile: { username: 'adminsub40', name: 'SUBSTAG', language: 'English' },
-    settings: { commission: 80, referral: 2, referralSlot: 0.5, minDeposit: 25000, maxDeposit: 50000000, maxWithdraw: 25000000, maintenanceMode: false, companyReferralStatus: {} },
+    settings: { commission: 80, referral: 2, referralSlot: 0.5, minDeposit: 25000, maxDeposit: 50000000, maxWithdraw: 25000000, maintenanceMode: false, companyReferralStatus: {}, vipCalcMethod: 'turnover', vipCrmSync: true },
+    systemNotifications: [], // Broadcast notifications: maintenance, update, info
+    notifPreferences: { sound: true, depositAlert: true, withdrawalAlert: true, maintenanceAlert: true },
+    refreshSettings: { interval: 0, lastRefresh: null }, // interval in seconds; 0 = off
+    popupBanners: [], // Popup banners for frontend player sites
     campaignUsage: {}, // Tracks one-time campaign triggers per member
     adjustments: [
         { id: 'ADJ10045', member: 'player_jackpot', type: 'deposit', amount: 500000, notes: 'Bonus Special Event', date: '01/05/2026, 14:20:01', processedBy: 'admin' },

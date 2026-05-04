@@ -961,3 +961,376 @@ window.deleteCrmPush = async (id, title) => {
   window.go('crm-push');
   toast('Campaign deleted', 'success');
 };
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   LOTTERY BUSINESS CRM ENHANCEMENTS (Feature #1)
+   Segment templates, mission templates, dormancy analysis, game-type insights
+══════════════════════════════════════════════════════════════════════════════ */
+
+// ── Lottery Segment Templates ──
+const LOTTERY_SEGMENT_TEMPLATES = [
+  {
+    name: 'Togel Lovers', icon: 'fa-hashtag', color: '#6366f1',
+    description: 'Members who primarily bet on lottery pools (Togel)',
+    criteria: { gameType: 'togel', minBetCount: 5 },
+  },
+  {
+    name: 'Slot High Rollers', icon: 'fa-slot-machine', color: '#f59e0b',
+    description: 'High-value slot players with significant turnover',
+    criteria: { gameType: 'slot', minTurnover: 5000000 },
+  },
+  {
+    name: 'Deposit Streak (3+)', icon: 'fa-fire', color: '#ef4444',
+    description: 'Members who have deposited on 3+ consecutive days',
+    criteria: { depositStreakDays: 3 },
+  },
+  {
+    name: 'Dormant 7 Days', icon: 'fa-moon', color: '#64748b',
+    description: 'Members inactive for 7+ days — reactivation targets',
+    criteria: { inactiveDays: 7 },
+  },
+  {
+    name: 'Dormant 30 Days', icon: 'fa-bed', color: '#475569',
+    description: 'Members inactive for 30+ days — at risk of churn',
+    criteria: { inactiveDays: 30 },
+  },
+  {
+    name: 'First Deposit Pending', icon: 'fa-user-clock', color: '#0ea5e9',
+    description: 'Registered but haven\'t deposited yet',
+    criteria: { neverDeposited: true },
+  },
+  {
+    name: 'VIP Diamond', icon: 'fa-gem', color: '#b9f2ff',
+    description: 'Highest VIP tier members — premium treatment',
+    criteria: { vipTier: 'Diamond' },
+  },
+  {
+    name: 'Referral Champions', icon: 'fa-user-group', color: '#22c55e',
+    description: 'Members who have referred 3+ people',
+    criteria: { minReferrals: 3 },
+  },
+];
+
+// ── Lottery Mission Templates ──
+const LOTTERY_MISSION_TEMPLATES = [
+  { name: 'Pasang 10x Togel', type: 'Bet', targetValue: 10, rewardType: 'Bonus', rewardAmount: 50000, description: 'Bet on any togel pool 10 times' },
+  { name: 'Deposit 3 Hari Berturut', type: 'Deposit', targetValue: 3, rewardType: 'Freebet', rewardAmount: 1, description: 'Deposit on 3 consecutive days' },
+  { name: 'Login 7 Hari', type: 'Login', targetValue: 7, rewardType: 'Points', rewardAmount: 100, description: 'Login every day for 7 days' },
+  { name: 'Ajak 3 Teman', type: 'Referral', targetValue: 3, rewardType: 'Cash', rewardAmount: 150000, description: 'Refer 3 new members who deposit' },
+  { name: 'TO Rp 5 Juta', type: 'Turnover', targetValue: 5000000, rewardType: 'Bonus', rewardAmount: 100000, description: 'Achieve Rp 5M turnover' },
+  { name: 'Slot 20 Round', type: 'Bet', targetValue: 20, rewardType: 'Freebet', rewardAmount: 5, description: 'Spin slots 20 times' },
+];
+
+// ── Dormancy Analysis ──
+function computeDormancy() {
+  const members = STATE.members || [];
+  const now = Date.now();
+  const DAY = 86400000;
+
+  return members.map(m => {
+    // Last activity: last bet or last deposit
+    const lastBetDate = [...(STATE.lotteryBets||[]).filter(b=>b.member===m.username)]
+      .map(b => new Date(b.date||b.drawDate||0).getTime()).reduce((a,b)=>Math.max(a,b), 0);
+    const lastDepDate = [...(STATE.deposits||[]).filter(d=>d.member===m.username&&d.status==='Approved')]
+      .map(d => new Date(d.date||0).getTime()).reduce((a,b)=>Math.max(a,b), 0);
+    const lastActivity = Math.max(lastBetDate, lastDepDate, new Date(m.joinDate||m.joined||0).getTime());
+    const inactiveDays = lastActivity > 0 ? Math.floor((now - lastActivity) / DAY) : null;
+
+    // Favorite game type from bets
+    const bets = (STATE.lotteryBets||[]).filter(b=>b.member===m.username);
+    const slotBets = (STATE.seamless?.transactions||[]).filter(t=>t.player===m.username).length;
+    const favoriteGame = bets.length >= slotBets ? 'Togel' : 'Slot';
+
+    // Deposit streak
+    const depDates = [...new Set((STATE.deposits||[])
+      .filter(d=>d.member===m.username&&d.status==='Approved')
+      .map(d=>d.date?.slice(0,10)||''))].filter(Boolean).sort().reverse();
+    let streak = 0;
+    const todayISO = new Date().toISOString().slice(0,10);
+    depDates.forEach((d, i) => {
+      const expectedDate = new Date(Date.now() - i * DAY).toISOString().slice(0,10);
+      if (d === expectedDate) streak++;
+    });
+
+    return { ...m, inactiveDays, favoriteGame, depositStreak: streak };
+  });
+}
+
+// ── Loyalty Points Calculator ──
+function getMemberLoyaltyPoints(username) {
+  const bets = (STATE.lotteryBets||[]).filter(b=>b.member===username);
+  const txs = (STATE.seamless?.transactions||[]).filter(t=>t.player===username);
+  const totalTO = bets.reduce((s,b)=>s+(b.betAmount||0),0) + txs.reduce((s,t)=>s+(t.betAmount||0),0);
+  const dbPoints = (STATE.crm?.loyaltyPoints||[]).filter(p=>p.member===username).reduce((s,p)=>s+(p.points||0),0);
+  // 1 point per Rp 10,000 turnover + DB points
+  return dbPoints + Math.floor(totalTO / 10000);
+}
+
+// ── Quick Actions: Lottery CRM ──
+window.createLotterySegment = (templateIdx) => {
+  const tpl = LOTTERY_SEGMENT_TEMPLATES[templateIdx];
+  if (!tpl) return;
+  ensureCrm();
+  const existing = STATE.crm.segments.find(s => s.name === tpl.name);
+  if (existing) { toast('Segment already exists: ' + tpl.name, 'warning'); return; }
+
+  // Compute member count
+  const members = computeDormancy();
+  let count = 0;
+  const crit = tpl.criteria;
+  members.forEach(m => {
+    if (crit.inactiveDays && m.inactiveDays >= crit.inactiveDays) { count++; return; }
+    if (crit.neverDeposited) {
+      const hasDep = (STATE.deposits||[]).some(d=>d.member===m.username&&d.status==='Approved');
+      if (!hasDep) { count++; return; }
+    }
+    if (crit.depositStreakDays && m.depositStreak >= crit.depositStreakDays) { count++; return; }
+    if (crit.vipTier && m.vipLevel === crit.vipTier) { count++; return; }
+    if (crit.minReferrals) {
+      const refs = (STATE.members||[]).filter(x=>x.referredBy===m.username).length;
+      if (refs >= crit.minReferrals) { count++; return; }
+    }
+    if (crit.gameType === 'togel') {
+      if ((STATE.lotteryBets||[]).filter(b=>b.member===m.username).length >= (crit.minBetCount||1)) { count++; return; }
+    }
+    if (crit.gameType === 'slot') {
+      const to = (STATE.seamless?.transactions||[]).filter(t=>t.player===m.username).reduce((s,t)=>s+(t.betAmount||0),0);
+      if (to >= (crit.minTurnover||0)) { count++; return; }
+    }
+  });
+
+  const seg = {
+    id: 'SEG_LTR_' + Date.now().toString().slice(-6),
+    name: tpl.name,
+    description: tpl.description,
+    criteria: crit,
+    company: '',
+    status: 'Active',
+    memberCount: count,
+    createdBy: STATE.profile.username,
+    createdAt: new Date().toISOString(),
+  };
+  STATE.crm.segments.push(seg);
+  if (window.db?.dbSaveCrmSegment) window.db.dbSaveCrmSegment(seg);
+  saveState();
+  go('crm-segments');
+  toast(`Segment "${tpl.name}" created with ${count} members`, 'success');
+};
+
+window.createLotteryMission = (tplIdx) => {
+  const tpl = LOTTERY_MISSION_TEMPLATES[tplIdx];
+  if (!tpl) return;
+  ensureCrm();
+  const mission = {
+    id: 'MSN_LTR_' + Date.now().toString().slice(-6),
+    name: tpl.name,
+    type: tpl.type,
+    targetValue: tpl.targetValue,
+    rewardType: tpl.rewardType,
+    rewardAmount: tpl.rewardAmount,
+    segmentId: '',
+    company: STATE.currentAdmin.company || '',
+    status: 'Active',
+    startDate: new Date().toISOString().slice(0,10),
+    endDate: new Date(Date.now() + 30*86400000).toISOString().slice(0,10),
+    participants: 0,
+    completions: 0,
+  };
+  STATE.crm.missions.push(mission);
+  if (window.db?.dbSaveCrmMission) window.db.dbSaveCrmMission(mission);
+  saveState();
+  go('crm-missions');
+  toast(`Mission "${tpl.name}" created`, 'success');
+};
+
+// ── Dormancy Report Page ──
+pages['crm-dormancy'] = () => {
+  const members = computeDormancy().filter(m => m.inactiveDays !== null && m.inactiveDays >= 3)
+    .sort((a,b) => b.inactiveDays - a.inactiveDays).slice(0, 50);
+
+  return `
+  ${pageHeader('Dormancy Report', '<span>CRM</span><span class="sep">›</span><span>Dormancy</span>', `
+    <div style="display:flex;gap:.5rem">
+      <button class="btn btn-primary btn-sm" onclick="window.createDormancyPush()"><i class="fa-solid fa-bell"></i> Push to Dormant</button>
+      <button class="btn btn-secondary btn-sm" onclick="window.go('crm-segments')"><i class="fa-solid fa-layer-group"></i> Create Segment</button>
+    </div>`)}
+
+  <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.25rem">
+    ${[
+      ['7+ Days Inactive', computeDormancy().filter(m=>m.inactiveDays>=7).length, '#64748b', 'fa-moon'],
+      ['30+ Days Inactive', computeDormancy().filter(m=>m.inactiveDays>=30).length, '#ef4444', 'fa-bed'],
+      ['Never Deposited', (STATE.members||[]).filter(m=>!(STATE.deposits||[]).some(d=>d.member===m.username&&d.status==='Approved')).length, '#f59e0b', 'fa-user-clock'],
+      ['Active (Last 7d)', computeDormancy().filter(m=>m.inactiveDays!==null&&m.inactiveDays<7).length, '#22c55e', 'fa-bolt'],
+    ].map(([label, val, color, icon]) => `
+      <div class="stat-card">
+        <div class="stat-icon" style="background:${color}22;color:${color}"><i class="fa-solid ${icon}"></i></div>
+        <div class="stat-info"><div class="stat-label">${label}</div><div class="stat-value">${fmt(val)}</div></div>
+      </div>`).join('')}
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-moon" style="color:var(--text3);margin-right:.5rem"></i>Dormant Members</span></div>
+    <div class="card-body" style="padding:0">
+      ${tableWrap(`
+        <table>
+          <thead><tr><th>Username</th><th>Company</th><th>Inactive (Days)</th><th>Favorite Game</th><th>Deposit Streak</th><th>Last TO</th><th>Action</th></tr></thead>
+          <tbody>
+            ${members.map(m => {
+              const totalTO = (STATE.lotteryBets||[]).filter(b=>b.member===m.username).reduce((s,b)=>s+(b.betAmount||0),0)
+                + (STATE.seamless?.transactions||[]).filter(t=>t.player===m.username).reduce((s,t)=>s+(t.betAmount||0),0);
+              const risk = m.inactiveDays >= 30 ? 'danger' : m.inactiveDays >= 14 ? 'warning' : 'secondary';
+              return `
+                <tr>
+                  <td><strong>${m.username}</strong></td>
+                  <td style="font-size:.78rem">${m.company}</td>
+                  <td>${badge(m.inactiveDays + 'd', risk)}</td>
+                  <td><span class="badge badge-indigo">${m.favoriteGame}</span></td>
+                  <td>${m.depositStreak > 0 ? `<span style="color:var(--green);font-weight:700">${m.depositStreak} days</span>` : '—'}</td>
+                  <td>${fmtCur(totalTO)}</td>
+                  <td>
+                    <button class="btn btn-xs btn-primary" onclick="window.pushToDormantMember('${m.username}','${m.favoriteGame}')">
+                      <i class="fa-solid fa-bell"></i> Push
+                    </button>
+                  </td>
+                </tr>`; }).join('')}
+          </tbody>
+        </table>
+      `)}
+    </div>
+  </div>`;
+};
+
+window.pushToDormantMember = (username, favoriteGame) => {
+  openModal('Quick Push: ' + username, `
+    <div class="form-grid">
+      <div class="form-field" style="grid-column:1/-1"><label>Message (personalized)</label>
+        <textarea id="dormant_push_msg" rows="3">Hai ${username}! Kami kangen kamu 😊 Yuk balik dan coba keberuntunganmu di ${favoriteGame}. Ada bonus spesial menunggumu! 🎰</textarea>
+      </div>
+    </div>`,
+    `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+     <button class="btn btn-primary" onclick="window.sendDormantPush('${username}')">Send Push</button>`);
+};
+
+window.sendDormantPush = (username) => {
+  const msg = document.getElementById('dormant_push_msg')?.value?.trim();
+  if (!msg) { toast('Message required', 'error'); return; }
+  ensureCrm();
+  const push = {
+    id: 'PUSH_D_' + Date.now().toString().slice(-6),
+    title: 'Kami Kangen Kamu! 🎰',
+    message: msg,
+    segmentId: null,
+    targetMember: username,
+    status: 'Sent',
+    sentAt: new Date().toISOString(),
+    sentCount: 1,
+    openCount: 0,
+    clickCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  STATE.crm.pushCampaigns.unshift(push);
+  if (window.db?.dbSaveCrmPush) window.db.dbSaveCrmPush(push);
+  saveState();
+  closeModalBtn();
+  toast(`Push sent to ${username}`, 'success');
+};
+
+window.createDormancyPush = () => {
+  ensureCrm();
+  const dormant = computeDormancy().filter(m=>m.inactiveDays>=7);
+  const push = {
+    id: 'PUSH_DRMT_' + Date.now().toString().slice(-6),
+    title: 'Kami Kangen Kamu! Yuk Kembali 🎰',
+    message: 'Lama nggak main? Ada bonus comeback spesial buat kamu. Klaim sekarang sebelum kedaluwarsa!',
+    segmentId: null,
+    status: 'Sent',
+    sentAt: new Date().toISOString(),
+    sentCount: dormant.length,
+    openCount: 0,
+    clickCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  STATE.crm.pushCampaigns.unshift(push);
+  if (window.db?.dbSaveCrmPush) window.db.dbSaveCrmPush(push);
+  saveState();
+  go('crm-push');
+  toast(`Dormancy push sent to ${dormant.length} members`, 'success');
+};
+
+// ── Loyalty Points Page ──
+pages['crm-loyalty'] = () => {
+  const members = (STATE.members || []).map(m => ({
+    ...m,
+    points: getMemberLoyaltyPoints(m.username),
+    totalTO: (STATE.lotteryBets||[]).filter(b=>b.member===m.username).reduce((s,b)=>s+(b.betAmount||0),0)
+      + (STATE.seamless?.transactions||[]).filter(t=>t.player===m.username).reduce((s,t)=>s+(t.betAmount||0),0),
+  })).sort((a,b) => b.points - a.points).slice(0, 30);
+
+  return `
+  ${pageHeader('Loyalty Points', '<span>CRM</span><span class="sep">›</span><span>Loyalty</span>', `
+    <button class="btn btn-primary btn-sm" onclick="window.awardBonusPoints()"><i class="fa-solid fa-plus"></i> Award Points</button>`)}
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-star" style="color:var(--yellow)"></i> Member Points Leaderboard</span>
+      <span style="font-size:.72rem;color:var(--text3);margin-left:auto">1 point = Rp 10,000 turnover</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      ${tableWrap(`
+        <table>
+          <thead><tr><th>Rank</th><th>Member</th><th>Company</th><th>Points</th><th>Turnover</th><th>DB Bonus Pts</th><th>Action</th></tr></thead>
+          <tbody>
+            ${members.map((m, i) => {
+              const dbPts = (STATE.crm?.loyaltyPoints||[]).filter(p=>p.member===m.username).reduce((s,p)=>s+(p.points||0),0);
+              return `
+                <tr>
+                  <td><strong style="color:${i<3?'var(--yellow)':'var(--text)'}">#${i+1}</strong></td>
+                  <td><strong>${m.username}</strong></td>
+                  <td style="font-size:.78rem">${m.company}</td>
+                  <td><span style="font-size:1rem;font-weight:800;color:var(--yellow)">${fmt(m.points)}</span> pts</td>
+                  <td>${fmtCur(m.totalTO)}</td>
+                  <td style="color:var(--acc)">${fmt(dbPts)}</td>
+                  <td>
+                    <button class="btn btn-xs btn-primary" onclick="window.awardBonusPoints('${m.username}')">
+                      <i class="fa-solid fa-gift"></i> Award
+                    </button>
+                  </td>
+                </tr>`; }).join('')}
+          </tbody>
+        </table>
+      `)}
+    </div>
+  </div>`;
+};
+
+window.awardBonusPoints = (username = '') => {
+  openModal('Award Bonus Points', `
+    <div class="form-grid">
+      <div class="form-field"><label>Member</label><input id="ap_user" value="${username}" placeholder="username"/></div>
+      <div class="form-field"><label>Points</label><input id="ap_pts" type="number" value="100" min="1"/></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Reason</label><input id="ap_reason" value="Bonus Points Award" placeholder="e.g. Birthday reward"/></div>
+    </div>`,
+    `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+     <button class="btn btn-primary" onclick="window.saveAwardPoints()">Award</button>`
+  );
+};
+
+window.saveAwardPoints = async () => {
+  const user = document.getElementById('ap_user')?.value?.trim();
+  const pts = parseInt(document.getElementById('ap_pts')?.value || '0', 10);
+  const reason = document.getElementById('ap_reason')?.value || 'Award';
+  if (!user || !pts) { toast('Member and points required', 'error'); return; }
+  if (window.db?.dbAddLoyaltyPoints) {
+    await window.db.dbAddLoyaltyPoints(user, pts, 'award', reason);
+  } else {
+    ensureCrm();
+    STATE.crm.loyaltyPoints.push({ id: 'LP'+Date.now(), member: user, points: pts, event: 'award', note: reason, source: 'manual', createdAt: new Date().toISOString() });
+    saveState();
+  }
+  closeModalBtn(); go('crm-loyalty'); toast(`${pts} points awarded to ${user}`, 'success');
+};
+
+// ── Expose lottery template data ──
+window.LOTTERY_SEGMENT_TEMPLATES = LOTTERY_SEGMENT_TEMPLATES;
+window.LOTTERY_MISSION_TEMPLATES = LOTTERY_MISSION_TEMPLATES;
+window.computeDormancy = computeDormancy;
+window.getMemberLoyaltyPoints = getMemberLoyaltyPoints;

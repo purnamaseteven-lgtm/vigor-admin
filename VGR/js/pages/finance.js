@@ -20,6 +20,7 @@ pages['deposit-list'] = () => {
         <span style="background:rgba(234,179,8,.15);color:#ca8a04;border:1px solid rgba(234,179,8,.3);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;font-weight:600"><i class="fa-solid fa-clock"></i> Pending: ${pending}</span>
         <span style="background:rgba(16,185,129,.15);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;font-weight:600"><i class="fa-solid fa-check"></i> Total Approved: ${fmtCur(totalApprovedAmt)}</span>
         <button class="btn btn-export btn-sm" onclick="window.exportTableCSV(null,'deposits.csv')"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+        <button class="btn btn-secondary btn-sm btn-icon" onclick="window.toggleFinanceSound()" title="Toggle sound notifications"><i id="soundToggleIcon" class="fa-solid ${(STATE.notifPreferences?.sound!==false)?'fa-volume-high':'fa-volume-xmark'}"></i></button>
       </div>`
   )}
 
@@ -491,3 +492,80 @@ window.submitAdjustment = async () => {
 
 /* ─── ADJUSTMENT LOGS (Redirected) ─── */
 pages['finance-adjustment-logs'] = pages['finance-adjustment'];
+
+// ══════════════════════════════════════════════════════════════════
+//  SOUND NOTIFICATION SYSTEM (Feature #16)
+//  Plays distinct tones for new deposits and withdrawals
+// ══════════════════════════════════════════════════════════════════
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  return _audioCtx;
+}
+
+function playTone(freq1, freq2, duration = 0.18, type = 'sine') {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq1, now);
+  if (freq2) osc.frequency.linearRampToValueAtTime(freq2, now + duration);
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration + 0.05);
+  osc.start(now);
+  osc.stop(now + duration + 0.06);
+}
+
+export function playDepositSound() {
+  if (STATE.notifPreferences?.sound === false) return;
+  // Rising happy chime: C5 → E5 → G5
+  playTone(523, 659, 0.15);
+  setTimeout(() => playTone(659, 784, 0.15), 150);
+  setTimeout(() => playTone(784, 1047, 0.2), 300);
+}
+
+export function playWithdrawalSound() {
+  if (STATE.notifPreferences?.sound === false) return;
+  // Neutral double-beep
+  playTone(440, 440, 0.12, 'square');
+  setTimeout(() => playTone(380, 380, 0.12, 'square'), 180);
+}
+
+export function playAlertSound() {
+  if (STATE.notifPreferences?.sound === false) return;
+  // Urgent triple beep
+  [0, 200, 400].forEach(delay => setTimeout(() => playTone(880, 880, 0.1, 'square'), delay));
+}
+
+// Expose globally
+window.playDepositSound = playDepositSound;
+window.playWithdrawalSound = playWithdrawalSound;
+window.playAlertSound = playAlertSound;
+
+// Sound settings toggle in finance pages
+window.toggleFinanceSound = () => {
+  if (!STATE.notifPreferences) STATE.notifPreferences = { sound: true };
+  STATE.notifPreferences.sound = !STATE.notifPreferences.sound;
+  const icon = document.getElementById('soundToggleIcon');
+  if (icon) icon.className = STATE.notifPreferences.sound ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark';
+  import('../ui/components.js').then(m => m.toast(
+    'Sound notifications ' + (STATE.notifPreferences.sound ? 'enabled 🔊' : 'disabled 🔇'), 'info'
+  ));
+};
+
+// ── Patch handleFinance to play sounds ──
+const _origHandleFinance = window.handleFinance;
+window.handleFinance = async (type, id, action, ...rest) => {
+  const result = _origHandleFinance ? await _origHandleFinance(type, id, action, ...rest) : null;
+  if (action === 'approve') {
+    if (type === 'deposit') playDepositSound();
+    else if (type === 'withdrawal') playWithdrawalSound();
+  }
+  return result;
+};

@@ -128,32 +128,47 @@ pages['statistics'] = () => {
     </div>
 
     <div class="card">
-      <div class="card-header"><span class="card-title">Company Performance Summary</span></div>
+      <div class="card-header">
+        <span class="card-title">Agent / Company Performance</span>
+        ${(()=>{
+          const r = STATE.currentAdmin.role;
+          if (r === 'Company' || r === 'Master') return `<span style="margin-left:.5rem;font-size:.72rem;background:var(--acc)22;color:var(--acc);padding:.2rem .6rem;border-radius:6px">${r} View — Your agents shown below</span>`;
+          return '';
+        })()}
+      </div>
       <div class="card-body">
         ${tableWrap(`
           <table>
             <thead>
-              <tr><th>#</th><th>Company</th><th>Total Deposit</th><th>Total Withdraw</th><th>GGR</th><th>Members</th><th>GGR/Member</th><th>Margin</th></tr>
+              <tr><th>#</th><th>Company/Agent</th><th>Total Deposit</th><th>Total Withdraw</th><th>GGR</th><th>Members</th><th>GGR/Member</th><th>Margin</th><th>Detail</th></tr>
             </thead>
             <tbody>
               ${companyStats.map((c, i) => {
-      const margin = Math.round((c.ggr / c.deposit) * 100);
+      const margin = c.deposit > 0 ? Math.round((c.ggr / c.deposit) * 100) : 0;
       return `
                   <tr>
                     <td>${i + 1}</td>
-                    <td><strong>${c.company}</strong></td>
+                    <td>
+                      <strong>${c.company}</strong>
+                      <div style="font-size:.65rem;color:var(--text3)">${c.members} members</div>
+                    </td>
                     <td style="color:var(--green);font-weight:600">${fmtCur(c.deposit)}</td>
                     <td style="color:var(--red)">${fmtCur(c.withdraw)}</td>
                     <td style="color:var(--acc);font-weight:700">${fmtCur(c.ggr)}</td>
                     <td>${fmt(c.members)}</td>
-                    <td style="font-size:.78rem">${fmtCur(Math.round(c.ggr / c.members))}</td>
+                    <td style="font-size:.78rem">${c.members > 0 ? fmtCur(Math.round(c.ggr / c.members)) : '-'}</td>
                     <td>
                       <div style="display:flex;align-items:center;gap:.5rem">
                         <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px">
-                          <div style="width:${Math.min(100, margin)}%;height:100%;background:${margin > 30 ? 'var(--green)' : margin > 15 ? 'var(--yellow)' : 'var(--red)'};border-radius:4px"></div>
+                          <div style="width:${Math.min(100, Math.max(0, margin))}%;height:100%;background:${margin > 30 ? 'var(--green)' : margin > 15 ? 'var(--yellow)' : 'var(--red)'};border-radius:4px"></div>
                         </div>
                         <span style="font-size:.75rem;font-weight:600">${margin}%</span>
                       </div>
+                    </td>
+                    <td>
+                      <button class="btn btn-xs btn-primary" onclick="window.showAgentStatDetail('${c.company}')">
+                        <i class="fa-solid fa-chart-bar"></i> Detail
+                      </button>
                     </td>
                   </tr>`;
     }).join('')}
@@ -162,6 +177,61 @@ pages['statistics'] = () => {
         `)}
       </div>
     </div>`;
+};
+
+// ── Feature #12: Agent Statistics Drill-down ──
+window.showAgentStatDetail = (companyKey) => {
+  const compMembers = STATE.members.filter(m => m.company === companyKey);
+  const compDeps = STATE.deposits.filter(d => d.company === companyKey && d.status === 'Approved');
+  const compWds  = STATE.withdrawals.filter(w => w.company === companyKey && w.status === 'Approved');
+  const totalDep = compDeps.reduce((s, d) => s + d.amount, 0);
+  const totalWd  = compWds.reduce((s, w) => s + w.amount, 0);
+  const totalBets = (STATE.lotteryBets || []).filter(b => b.company === companyKey);
+  const totalTO = totalBets.reduce((s, b) => s + (b.betAmount || 0), 0);
+  const ggr = totalDep - totalWd;
+
+  // Top players by deposit
+  const memberStats = compMembers.map(m => {
+    const mDep = compDeps.filter(d => d.member === m.username).reduce((s,d)=>s+d.amount,0);
+    const mWd  = compWds.filter(w => w.member === m.username).reduce((s,w)=>s+w.amount,0);
+    const mTO  = totalBets.filter(b => b.member === m.username).reduce((s,b)=>s+(b.betAmount||0),0);
+    return { username: m.username, deposit: mDep, withdraw: mWd, turnover: mTO, ggr: mDep - mWd };
+  }).sort((a, b) => b.deposit - a.deposit).slice(0, 10);
+
+  import('../ui/components.js').then(m => {
+    m.openModal(`Agent Detail: ${companyKey}`, `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem">
+        ${[
+          ['Members', fmt(compMembers.length), 'fa-users', 'var(--acc)'],
+          ['Deposit', fmtCur(totalDep), 'fa-arrow-down-to-bracket', 'var(--green)'],
+          ['Withdraw', fmtCur(totalWd), 'fa-arrow-up-from-bracket', 'var(--red)'],
+          ['GGR', fmtCur(ggr), 'fa-chart-line', ggr>=0?'var(--green)':'var(--red)'],
+        ].map(([label, val, icon, color]) => `
+          <div style="background:var(--bg2);border-radius:10px;padding:.75rem;text-align:center;border:1px solid var(--border)">
+            <i class="fa-solid ${icon}" style="color:${color};font-size:1.1rem;margin-bottom:.4rem"></i>
+            <div style="font-size:.7rem;color:var(--text3)">${label}</div>
+            <div style="font-size:.95rem;font-weight:800;color:${color}">${val}</div>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--text3);margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">Top Members by Deposit</div>
+      <div style="max-height:260px;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead><tr style="background:var(--bg2)"><th style="padding:.4rem .6rem;text-align:left">Username</th><th style="padding:.4rem .6rem;text-align:right">Deposit</th><th style="padding:.4rem .6rem;text-align:right">Withdraw</th><th style="padding:.4rem .6rem;text-align:right">Turnover</th><th style="padding:.4rem .6rem;text-align:right">GGR</th></tr></thead>
+          <tbody>
+            ${memberStats.map(ms => `
+              <tr style="border-bottom:1px solid var(--border)44">
+                <td style="padding:.4rem .6rem;color:var(--acc);font-weight:600">${ms.username}</td>
+                <td style="padding:.4rem .6rem;text-align:right;color:var(--green)">${fmtCur(ms.deposit)}</td>
+                <td style="padding:.4rem .6rem;text-align:right;color:var(--red)">${fmtCur(ms.withdraw)}</td>
+                <td style="padding:.4rem .6rem;text-align:right">${fmtCur(ms.turnover)}</td>
+                <td style="padding:.4rem .6rem;text-align:right;font-weight:700;color:${ms.ggr>=0?'var(--green)':'var(--red)'}">${fmtCur(ms.ggr)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`,
+      `<button class="btn btn-primary" onclick="window.go('global-member-list')"><i class="fa-solid fa-users"></i> View Members</button><button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`
+    );
+  });
 };
 
 /* ─── PROVIDER ANALYTICS ─── */

@@ -112,12 +112,26 @@ function getCampaigns() {
 
 pages['bonus-agent-freebet'] = () => {
   const PG = 'bonus-agent-freebet';
-  const all = filterData(getFreebets(), PG);
+  const allFreebets = getFreebets();
+  const all = filterData(allFreebets, PG);
   const pp = getPerPage(PG);
   const cp = getCurPage(PG);
   const rows = paginate(all, cp, pp);
-  const active = getFreebets().filter(f => f.status === 'Active').length;
-  const totalAmt = getFreebets().reduce((s, f) => s + f.amount, 0);
+  const active = allFreebets.filter(f => f.status === 'Active').length;
+  const totalAmt = allFreebets.reduce((s, f) => s + f.amount, 0);
+
+  // ── Feature #8: Sum per company ──
+  const allCompanies = [...new Set(allFreebets.map(f => f.company))].filter(Boolean);
+  const compSummary = allCompanies.map(c => {
+    const cFBs = allFreebets.filter(f => f.company === c);
+    return {
+      company: c,
+      total: cFBs.length,
+      active: cFBs.filter(f => f.status === 'Active').length,
+      totalAmt: cFBs.reduce((s, f) => s + f.amount, 0),
+      usedAmt: cFBs.filter(f => f.status === 'Used').reduce((s, f) => s + f.amount, 0),
+    };
+  }).sort((a, b) => b.totalAmt - a.totalAmt);
 
   return `
     ${pageHeader('Agent Freebet', '<span>Bonus</span><span class="sep">›</span><span>Agent Freebet</span>', `
@@ -126,6 +140,40 @@ pages['bonus-agent-freebet'] = () => {
         <span style="background:rgba(14,165,233,.15);color:var(--acc);border:1px solid rgba(14,165,233,.3);border-radius:20px;padding:.25rem .75rem;font-size:.8rem;font-weight:600"><i class="fa-solid fa-coins"></i> Total: ${fmtCur(totalAmt)}</span>
         <button class="btn btn-primary" onclick="window.openFreebetModal()"><i class="fa-solid fa-plus"></i> Issue Freebet</button>
       </div>`)}
+
+    <!-- Per-Company Freebet Summary -->
+    <div class="card" style="margin-bottom:1.25rem">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-building" style="color:var(--acc);margin-right:.5rem"></i>Sum per Agent / Company</span>
+        <span style="margin-left:auto;font-size:.75rem;color:var(--text3)">${allCompanies.length} agents with freebets</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        ${tableWrap(`
+          <table>
+            <thead><tr><th>#</th><th>Company/Agent</th><th>Total Issued</th><th>Active</th><th>Total Value</th><th>Used Value</th><th>Utilization</th></tr></thead>
+            <tbody>
+              ${compSummary.slice(0,10).map((c, i) => `
+                <tr>
+                  <td>${i+1}</td>
+                  <td><strong>${c.company}</strong></td>
+                  <td>${c.total}</td>
+                  <td><span style="color:var(--green);font-weight:700">${c.active}</span></td>
+                  <td style="font-weight:700">${fmtCur(c.totalAmt)}</td>
+                  <td style="color:var(--acc)">${fmtCur(c.usedAmt)}</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:.5rem">
+                      <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+                        <div style="width:${c.totalAmt>0?Math.round((c.usedAmt/c.totalAmt)*100):0}%;height:100%;background:var(--acc);border-radius:3px"></div>
+                      </div>
+                      <span style="font-size:.7rem;color:var(--text3)">${c.totalAmt>0?Math.round((c.usedAmt/c.totalAmt)*100):0}%</span>
+                    </div>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        `)}
+      </div>
+    </div>
 
     ${filterCard(`
       ${fsInput(PG, 'member', 'Member', 'Search member...')}
@@ -750,6 +798,10 @@ pages['promotion-rolling-release'] = () => {
     </div>
 
     <div class="card">
+        <div class="card-header">
+          <span class="card-title">Rolling Progress Per Member</span>
+          <span style="margin-left:auto;font-size:.72rem;color:var(--text3)">${members.length} members</span>
+        </div>
         <div class="card-body" style="padding:0">
             ${tableWrap(`
                 <table style="margin-bottom:0">
@@ -759,29 +811,57 @@ pages['promotion-rolling-release'] = () => {
                             <th>Username</th>
                             <th>Company</th>
                             <th>Type Game</th>
-                            <th>TO</th>
-                            <th>Total Bonus</th>
+                            <th>TO Achieved</th>
+                            <th>TO Required</th>
+                            <th>Progress</th>
+                            <th>Rolling Bonus</th>
+                            <th>Adjustment</th>
                             <th style="text-align:right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${members.slice(0, 20).map((m, i) => {
+                        ${members.slice(0, 30).map((m, i) => {
                           const mBets = (STATE.lotteryBets || []).filter(b => b.member === m.username);
                           const mTxs = (STATE.seamless?.transactions || []).filter(t => t.player === m.username);
                           const totalTO = mBets.reduce((s, b) => s + (b.betAmount || 0), 0)
                             + mTxs.reduce((s, t) => s + (t.betAmount || 0), 0);
                           const memberBonuses = (STATE.bonuses || []).filter(b => b.member === m.username && b.status === 'Approved');
                           const totalBonus = memberBonuses.reduce((s, b) => s + (b.bonusAmount || 0), 0);
+                          // Rolling required = bonus × turnover multiplier (e.g. 5x)
+                          const rollingMultiplier = STATE.settings?.rollingMultiplier || 5;
+                          const toRequired = totalBonus * rollingMultiplier;
+                          const pct = toRequired > 0 ? Math.min(100, Math.round((totalTO / toRequired) * 100)) : (totalTO > 0 ? 100 : 0);
+                          const adjKey = `rolling_adj_${m.username}`;
+                          const manualAdj = STATE.settings?.[adjKey] || 0;
+                          const effectivePct = Math.min(100, pct + manualAdj);
                           return `
                             <tr>
                                 <td><input type="checkbox" class="pr-check" value="${m.username}" /></td>
-                                <td><strong>${m.username}</strong></td>
+                                <td><strong>${m.username}</strong><br/><span style="font-size:.65rem;color:var(--text3)">VIP: ${m.vipLevel || 'Bronze'}</span></td>
                                 <td style="font-size:.75rem">${m.company}</td>
                                 <td>${badge(gameTypes[i % gameTypes.length], 'indigo')}</td>
                                 <td style="font-weight:700">${fmtCur(totalTO)}</td>
+                                <td style="color:var(--text3)">${toRequired > 0 ? fmtCur(toRequired) : '-'}</td>
+                                <td style="min-width:120px">
+                                  <div style="display:flex;align-items:center;gap:.4rem">
+                                    <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                                      <div style="width:${effectivePct}%;height:100%;background:${effectivePct>=100?'var(--green)':effectivePct>=50?'var(--acc)':'var(--yellow)'};border-radius:4px;transition:width .3s"></div>
+                                    </div>
+                                    <span style="font-size:.7rem;font-weight:700;color:${effectivePct>=100?'var(--green)':'var(--text2)'}">${effectivePct}%</span>
+                                  </div>
+                                </td>
                                 <td style="color:#6366f1;font-weight:700">${fmtCur(totalBonus)}</td>
+                                <td>
+                                  <div style="display:flex;align-items:center;gap:.25rem">
+                                    <input type="number" id="radj_${m.username}" value="${manualAdj}" min="-100" max="100" style="width:55px;border:1px solid var(--border);border-radius:6px;padding:.2rem .3rem;font-size:.75rem;background:var(--bg2);color:var(--text)"/>
+                                    <span style="font-size:.7rem;color:var(--text3)">%</span>
+                                    <button class="btn btn-xs btn-secondary" onclick="window.applyRollingAdj('${m.username}')"><i class="fa-solid fa-check"></i></button>
+                                  </div>
+                                </td>
                                 <td style="text-align:right">
-                                    <button class="btn btn-xs btn-primary" onclick="window.releaseRollingMember('${m.username}')">Release</button>
+                                  ${effectivePct >= 100
+                                    ? `<button class="btn btn-xs btn-success" onclick="window.releaseRollingMember('${m.username}')"><i class="fa-solid fa-check"></i> Release</button>`
+                                    : `<button class="btn btn-xs btn-secondary" onclick="window.releaseRollingMember('${m.username}')">Force</button>`}
                                 </td>
                             </tr>`;
                         }).join('')}
@@ -812,6 +892,18 @@ window.releaseRollingBulk = () => {
 window.executeRollingRelease = (u) => {
   closeModal();
   toast(`Rolling bonus released to ${u}`, 'success');
+};
+
+window.applyRollingAdj = (username) => {
+  const inp = document.getElementById(`radj_${username}`);
+  if (!inp) return;
+  const val = parseInt(inp.value, 10);
+  if (isNaN(val) || val < -100 || val > 100) { toast('Adjustment must be between -100 and 100', 'error'); return; }
+  if (!STATE.settings) STATE.settings = {};
+  STATE.settings[`rolling_adj_${username}`] = val;
+  saveState();
+  go('promotion-rolling-release');
+  toast(`Rolling adjustment ${val >= 0 ? '+' : ''}${val}% applied for ${username}`, 'success');
 };
 
 window.executeRollingReleaseBulk = () => {

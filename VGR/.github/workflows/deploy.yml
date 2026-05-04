@@ -140,7 +140,9 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service vigor-backend
+        run: |
+          cd server
+          railway up --service vigor-backend --project-id ${{ secrets.RAILWAY_PROJECT_ID }}
 
   # ─────────────────────────────────────────────────────────────
   # JOB 5: Run Supabase migrations (production only)

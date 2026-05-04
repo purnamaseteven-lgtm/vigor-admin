@@ -423,6 +423,9 @@ pages['master-whitelabel-list'] = () => {
     ${renderPagerHTML(PG, total, pp, cp)} `;
 };
 
+// Alias: nav uses 'master-wl-list'
+pages['master-wl-list'] = pages['master-whitelabel-list'];
+
 /* ─── WHITELABEL LIST ─── */
 pages['whitelabel-list'] = () => {
   const PG = 'whitelabel-list';

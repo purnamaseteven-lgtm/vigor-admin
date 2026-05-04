@@ -46,16 +46,6 @@ function ensureToolsState() {
       lastSync: '27 Apr 2026 08:14'
     };
   }
-  if (!Array.isArray(STATE.tools.smarticoCampaigns)) {
-    // Derive player counts from real STATE.members total per campaign type
-    const totalMembers = STATE.members?.length || 0;
-    STATE.tools.smarticoCampaigns = [
-      { id: 'SM1', name: 'Welcome Journey', type: 'Gamification', status: 'Active', players: Math.round(totalMembers * 0.6), completion: 65 },
-      { id: 'SM2', name: 'Level Up Challenge', type: 'Tournament', status: 'Active', players: Math.round(totalMembers * 0.3), completion: 45 },
-      { id: 'SM3', name: 'Deposit Streak', type: 'Mission', status: 'Paused', players: Math.round(totalMembers * 0.15), completion: 28 },
-      { id: 'SM4', name: 'VIP Loyalty', type: 'Points', status: 'Active', players: Math.round(totalMembers * 0.8), completion: 72 },
-    ];
-  }
   if (!Array.isArray(STATE.tools.hosts)) {
     STATE.tools.hosts = [
       { id: 'H1', host: 'komp36355.rich.com', ns: 'ram.ns.cloudflare.com, sue.ns.cloudflare.com', created: '18 Feb 2026 15:39:02', build: 'Built', isApp: true, redirect: '', code: '301', ssl: 'cloudflare', company: '001' },
@@ -199,27 +189,6 @@ pages['tools-sawala'] = () => {
         <div><strong>Last Sync</strong><div>${s.lastSync}</div></div>
       </div>
     </div></div>`;
-};
-
-pages['tools-smartico'] = () => {
-  const campaigns = STATE.tools.smarticoCampaigns;
-  return `
-    ${pageHeader('Smartico Gamification', '<span>Tools</span><span class="sep">›</span><span>Smartico</span>', `
-      <button class="btn btn-primary btn-sm" onclick="window.openSmarticoCampaign()"><i class="fa-solid fa-plus"></i> Add Campaign</button>`)}
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
-      ${campaigns.map(c => `
-        <div class="card">
-          <div class="card-body">
-            <div style="display:flex;justify-content:space-between;margin-bottom:.5rem"><strong>${c.name}</strong>${badge(c.status, c.status === 'Active' ? 'success' : c.status === 'Paused' ? 'warning' : 'secondary')}</div>
-            <div style="font-size:.78rem;color:var(--text3);margin-bottom:.5rem">${badge(c.type, 'indigo')} ${fmt(c.players)} players</div>
-            <div style="font-size:.78rem;margin-bottom:.75rem">Completion: ${c.completion}%</div>
-            <div style="display:flex;gap:.4rem">
-              <button class="btn btn-sm btn-primary" style="flex:1" onclick="window.viewSmarticoCampaign('${c.id}')"><i class="fa-solid fa-eye"></i> Detail</button>
-              <button class="btn btn-sm btn-secondary" onclick="window.toggleSmarticoCampaign('${c.id}')"><i class="fa-solid fa-rotate"></i></button>
-            </div>
-          </div>
-        </div>`).join('')}
-    </div>`;
 };
 
 pages['tools-host'] = () => {
@@ -475,17 +444,6 @@ window.saveSawala = async () => {
   }
   closeModalBtn(); go('tools-sawala'); toast('Settings saved', 'success');
 };
-window.openSmarticoCampaign = () => { openModal('Add Campaign', `<div class="form-grid"><div class="form-field"><label>Name</label><input id="sm_name" value="New Campaign" /></div><div class="form-field"><label>Type</label><input id="sm_type" value="Gamification" /></div></div>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.saveSmarticoCampaign()">Save</button>`); };
-window.saveSmarticoCampaign = () => {
-  const name = document.getElementById('sm_name')?.value || 'Campaign';
-  const type = document.getElementById('sm_type')?.value || 'Gamification';
-  STATE.tools.smarticoCampaigns.unshift({ id: 'SM' + Date.now().toString().slice(-4), name, type, status: 'Active', players: 0, completion: 0 });
-  saveState();
-  if (window.db?.dbWriteLog) window.db.dbWriteLog('Create Smartico Campaign', 'smartico', `Created campaign: ${name} [${type}]`);
-  closeModalBtn(); go('tools-smartico'); toast('Campaign added', 'success');
-};
-window.viewSmarticoCampaign = (id) => { const c = STATE.tools.smarticoCampaigns.find(x => x.id === id); if (!c) return; openModal('Campaign Detail', `<pre style="white-space:pre-wrap">${JSON.stringify(c, null, 2)}</pre>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`); };
-window.toggleSmarticoCampaign = (id) => { const c = STATE.tools.smarticoCampaigns.find(x => x.id === id); if (!c) return; c.status = c.status === 'Active' ? 'Paused' : 'Active'; saveState(); go('tools-smartico'); toast('Campaign updated', 'success'); };
 window.openHostForm = (id = null) => {
   const h = id ? STATE.tools.hosts.find(x => x.id === id) : { host: '', company: '001', redirect: '', code: '301', ssl: 'cloudflare', isApp: true };
   openModal(id ? 'Edit Host Configuration' : 'Provision New Host', `

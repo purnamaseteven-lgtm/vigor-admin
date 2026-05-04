@@ -261,6 +261,14 @@ export const fetchSettings = async () => {
                 case 'registration_open':      STATE.settings.registrationOpen      = s.value !== 'false'; break;
                 case 'auto_approve_deposit':   STATE.settings.autoApproveDeposit    = s.value === 'true'; break;
                 case 'manual_withdraw_review': STATE.settings.manualWithdrawReview  = s.value !== 'false'; break;
+                case 'rolling_multiplier':     STATE.settings.rollingMultiplier     = Number(s.value) || 5; break;
+                case 'vip_calc_method':        STATE.settings.vipCalcMethod         = s.value || 'turnover'; break;
+                case 'vip_crm_sync':           STATE.settings.vipCrmSync            = s.value !== 'false'; break;
+                case 'notif_sound':            if (!STATE.notifPreferences) STATE.notifPreferences = {}; STATE.notifPreferences.sound = s.value !== 'false'; break;
+                case 'rolling_adjustments': {
+                    try { const ra = JSON.parse(s.value); if (ra && typeof ra === 'object') STATE.rollingAdjustments = ra; } catch {}
+                    break;
+                }
                 case 'permission_matrix': {
                     try { const pm = JSON.parse(s.value); if (pm && typeof pm === 'object') Object.assign(STATE.permissionMatrix, pm); } catch {}
                     break;
@@ -269,6 +277,74 @@ export const fetchSettings = async () => {
         });
         saveState();
     }
+};
+
+export const fetchPopupBanners = async () => {
+    if (!SUPABASE_ENABLED || !supabase) return;
+    const { data } = await supabase.from('popup_banners').select('*').order('priority', { ascending: false });
+    if (data) {
+        STATE.popupBanners = data.map(r => ({
+            id: r.id, title: r.title, message: r.message, imageUrl: r.image_url || '',
+            btnLabel: r.btn_label || '', btnLink: r.btn_link || '',
+            trigger: r.trigger, target: r.target, priority: r.priority || 1,
+            active: r.active, company: r.company || 'All',
+        }));
+        saveState();
+    }
+};
+
+export const fetchSystemNotifications = async () => {
+    if (!SUPABASE_ENABLED || !supabase) return;
+    const { data } = await supabase.from('system_notifications').select('*').order('created_at', { ascending: false }).limit(50);
+    if (data) {
+        STATE.systemNotifications = data.map(r => ({
+            id: r.id, title: r.title, message: r.message, type: r.type,
+            targetRole: r.target_role, read: r.is_read || false,
+            createdBy: r.created_by, date: r.created_at,
+        }));
+        saveState();
+    }
+};
+
+export const dbSavePopupBanner = async (banner) => {
+    if (!SUPABASE_ENABLED || !supabase) {
+        if (!STATE.popupBanners) STATE.popupBanners = [];
+        const idx = STATE.popupBanners.findIndex(b => b.id === banner.id);
+        if (idx !== -1) STATE.popupBanners[idx] = banner;
+        else STATE.popupBanners.unshift(banner);
+        saveState(); return { error: null };
+    }
+    const row = { title: banner.title, message: banner.message, image_url: banner.imageUrl,
+        btn_label: banner.btnLabel, btn_link: banner.btnLink, trigger: banner.trigger,
+        target: banner.target, priority: banner.priority, active: banner.active, company: banner.company };
+    const { error } = banner.id
+        ? await supabase.from('popup_banners').update(row).eq('id', banner.id)
+        : await supabase.from('popup_banners').insert(row);
+    if (!error) await fetchPopupBanners();
+    return { error };
+};
+
+export const dbDeletePopupBanner = async (id) => {
+    STATE.popupBanners = (STATE.popupBanners || []).filter(b => b.id !== id);
+    if (SUPABASE_ENABLED && supabase) await supabase.from('popup_banners').delete().eq('id', id);
+    saveState(); return { error: null };
+};
+
+export const dbSaveSystemNotification = async (notif) => {
+    STATE.systemNotifications = [notif, ...(STATE.systemNotifications || [])];
+    if (SUPABASE_ENABLED && supabase) {
+        await supabase.from('system_notifications').insert({
+            title: notif.title, message: notif.message, type: notif.type,
+            target_role: notif.targetRole, created_by: notif.createdBy,
+        });
+    }
+    saveState(); return { error: null };
+};
+
+export const dbMarkSystemNotifRead = async (id) => {
+    const n = (STATE.systemNotifications || []).find(x => x.id === id);
+    if (n) { n.read = true; saveState(); }
+    if (SUPABASE_ENABLED && supabase) await supabase.from('system_notifications').update({ is_read: true }).eq('id', id);
 };
 
 // ── Map page → fetches ─────────────────────────────────────────
@@ -358,7 +434,7 @@ const PAGE_FETCHES = {
     'settings-pools':               [fetchSettings],
     'settings-togel-commission':    [fetchSettings],
     'settings-limit-credit-out':    [fetchSettings],
-    'settings-vip-designer':        [fetchSettings, fetchMembers],
+    'settings-vip-designer':        [fetchSettings, fetchMembers], // alias → custom-vip
     'settings-rebate-calc':         [fetchSettings],
     'rebate-calc':                  [fetchSettings],
     'dev-menu-config':              [fetchSettings],
@@ -371,6 +447,10 @@ const PAGE_FETCHES = {
     'custom-theme':                 [fetchSettings],
     'custom-seo':                   [fetchSettings],
     'custom-vip':                   [fetchSettings, fetchMembers],
+    'custom-global-banner':         [fetchPopupBanners],
+    'system-notifications':         [fetchSystemNotifications],
+    'crm-dormancy':                 [fetchMembers, fetchBonuses],
+    'crm-loyalty':                  [fetchMembers, fetchBonuses],
 
     // ── Statistics & Reports ──────────────────────────────────
     'statistics':                   [fetchDeposits, fetchWithdrawals, fetchMembers, fetchCompanies],
@@ -527,11 +607,14 @@ export async function dbApproveDeposit(id, adminUser = 'admin') {
     if (!SUPABASE_ENABLED || !supabase) {
         const i = STATE.deposits.findIndex(x => x.id === id);
         if (i !== -1) STATE.deposits[i] = { ...STATE.deposits[i], status: 'Approved', processedBy: adminUser };
-        saveState(); return { error: null };
+        saveState();
+        if (window.dispatchFinanceSound) window.dispatchFinanceSound('deposit', 'approve');
+        return { error: null };
     }
     const { error } = await runMoneyRpc('approve_deposit', { p_deposit_id: id, p_processed_by: adminUser });
     if (!error) {
         await Promise.all([fetchDeposits(), fetchMembers(), fetchLogs()]);
+        if (window.dispatchFinanceSound) window.dispatchFinanceSound('deposit', 'approve');
     }
     return { error };
 }
@@ -561,11 +644,14 @@ export async function dbApproveWithdrawal(id, adminUser = 'admin') {
     if (!SUPABASE_ENABLED || !supabase) {
         const i = STATE.withdrawals.findIndex(x => x.id === id);
         if (i !== -1) STATE.withdrawals[i] = { ...STATE.withdrawals[i], status: 'Approved', processedBy: adminUser };
-        saveState(); return { error: null };
+        saveState();
+        if (window.dispatchFinanceSound) window.dispatchFinanceSound('withdrawal', 'approve');
+        return { error: null };
     }
     const { error } = await runMoneyRpc('approve_withdrawal', { p_withdrawal_id: id, p_processed_by: adminUser });
     if (!error) {
         await Promise.all([fetchWithdrawals(), fetchMembers(), fetchLogs()]);
+        if (window.dispatchFinanceSound) window.dispatchFinanceSound('withdrawal', 'approve');
     }
     return { error };
 }
@@ -1333,4 +1419,8 @@ window.db = {
     dbSaveCrmAutomation, dbDeleteCrmAutomation,
     dbSaveCrmPush, dbDeleteCrmPush,
     dbAddLoyaltyPoints, dbRefreshSegmentCount,
+    // Popup Banners & System Notifications
+    fetchPopupBanners, fetchSystemNotifications,
+    dbSavePopupBanner, dbDeletePopupBanner,
+    dbSaveSystemNotification, dbMarkSystemNotifRead,
 };

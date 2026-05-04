@@ -113,8 +113,8 @@ function renderConfigTab(tab) {
     </div>`;
 }
 
-// --- THEME & BRANDING ---
-pages['custom-theme'] = () => {
+// --- THEME PRESETS (legacy quick-pick) ---
+pages['custom-theme-presets'] = () => {
     const t = STATE.theme;
     const presets = [
         { id: 'midnight', name: 'Midnight Blue', primary: '#0ea5e9', accent: '#8b5cf6', radius: '10px', font: 'Segoe UI' },

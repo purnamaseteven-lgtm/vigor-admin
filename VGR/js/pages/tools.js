@@ -307,29 +307,139 @@ pages['invoice-tournament'] = () => {
 };
 
 pages['invoice-monthly'] = () => {
-  const invoices = STATE.tools.monthlyInvoices;
+  // Month/Year selector state
+  const now = new Date();
+  const selYear  = STATE._invoiceYear  || now.getFullYear();
+  const selMonth = STATE._invoiceMonth !== undefined ? STATE._invoiceMonth : now.getMonth();
+  const periodLabel = new Date(selYear, selMonth, 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+
+  // Build month options (last 12 months)
+  const monthOpts = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear(), mo = d.getMonth();
+    const lbl = d.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+    const sel = (y === selYear && mo === selMonth) ? 'selected' : '';
+    return `<option value="${y}-${mo}" ${sel}>${lbl}</option>`;
+  }).join('');
+
+  // Compute invoices from real data for selected period
+  const allDeps = (STATE.deposits || []).filter(d => {
+    if (d.status !== 'Approved' || !d.date) return false;
+    const dd = new Date(d.date);
+    return dd.getFullYear() === selYear && dd.getMonth() === selMonth;
+  });
+  const allWds = (STATE.withdrawals || []).filter(w => {
+    if (w.status !== 'Approved' || !w.date) return false;
+    const dd = new Date(w.date);
+    return dd.getFullYear() === selYear && dd.getMonth() === selMonth;
+  });
+
+  const companies = STATE.companies?.length ? STATE.companies.map(c => c.name || c.username || c) : COMPANIES;
+  const dueDate = new Date(selYear, selMonth + 1, 5).toLocaleDateString('id-ID');
+
+  const invoices = companies.map((c, i) => {
+    const compDeps = allDeps.filter(d => d.company === c);
+    const compWds  = allWds.filter(w => w.company === c);
+    const depTotal = compDeps.reduce((s, d) => s + (d.amount || 0), 0);
+    const wdTotal  = compWds.reduce((s, w) => s + (w.amount || 0), 0);
+    const txCount  = compDeps.length + compWds.length;
+    if (depTotal === 0 && txCount === 0) return null;
+    const platformFee   = Math.round(depTotal * 0.02) || 0;
+    const licenseFee    = 500000;
+    const transactionFee = txCount * 2500;
+    const total = platformFee + licenseFee + transactionFee;
+    const existingInv = (STATE.tools.monthlyInvoices || []).find(x => x.company === c && x.period === periodLabel);
+    return {
+      id: existingInv?.id || `INV-${selYear}-${String(selMonth+1).padStart(2,'0')}-${String(i+1).padStart(3,'0')}`,
+      company: c, period: periodLabel, depTotal, wdTotal, txCount,
+      platformFee, licenseFee, transactionFee, total, dueDate,
+      status: existingInv?.status || (total === 0 ? 'N/A' : 'Unpaid'),
+    };
+  }).filter(Boolean);
+
+  const grandTotal = invoices.reduce((s, inv) => s + inv.total, 0);
+  const paidTotal  = invoices.filter(i => i.status === 'Paid').reduce((s, inv) => s + inv.total, 0);
+  const unpaidCount = invoices.filter(i => i.status === 'Unpaid' || i.status === 'Overdue').length;
+
   return `
     ${pageHeader('Monthly Invoice', '<span>Monthly Invoice</span><span class="sep">›</span><span>Invoices</span>', `
-      <div style="display:flex;gap:.5rem"><button class="btn btn-secondary btn-sm" onclick="window.exportTableCSV(null,'monthly_invoice.csv')"><i class="fa-solid fa-download"></i> Export</button><button class="btn btn-primary btn-sm" onclick="window.sendAllInvoices()"><i class="fa-solid fa-paper-plane"></i> Send All</button></div>`)}
-    <div class="card"><div class="card-body">
-      ${tableWrap(`
-        <table>
-          <thead><tr><th>Invoice ID</th><th>Company</th><th>Period</th><th>Total</th><th>Due Date</th><th>Status</th><th>Action</th></tr></thead>
-          <tbody>
-            ${invoices.map(inv => `
-              <tr>
-                <td><strong>${inv.id}</strong></td>
-                <td>${inv.company}</td>
-                <td>${inv.period}</td>
-                <td>${fmtCur(inv.total)}</td>
-                <td>${inv.dueDate}</td>
-                <td>${badge(inv.status, inv.status === 'Paid' ? 'success' : inv.status === 'Overdue' ? 'danger' : 'warning')}</td>
-                <td>${actionBtns(`window.viewInvoice('${inv.id}')`, inv.status !== 'Paid' ? `window.markInvoicePaid('${inv.id}')` : '')}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      `)}
-    </div></div>`;
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <select class="form-control" style="width:180px" onchange="(function(v){const p=v.split('-');STATE._invoiceYear=parseInt(p[0]);STATE._invoiceMonth=parseInt(p[1]);go('invoice-monthly');})(this.value)">${monthOpts}</select>
+        <button class="btn btn-secondary btn-sm" onclick="window.exportTableCSV(null,'invoice_${periodLabel.replace(/ /g,'_')}.csv')"><i class="fa-solid fa-download"></i> Export</button>
+        <button class="btn btn-primary btn-sm" onclick="window.sendAllInvoices()"><i class="fa-solid fa-paper-plane"></i> Send All</button>
+      </div>`)}
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
+      ${[
+        { label: 'Period', val: periodLabel, icon: 'fa-calendar', color: 'var(--acc)' },
+        { label: 'Total Invoices', val: invoices.length, icon: 'fa-file-invoice', color: '#8b5cf6' },
+        { label: 'Grand Total', val: fmtCur(grandTotal), icon: 'fa-money-bill', color: 'var(--green)' },
+        { label: 'Unpaid', val: unpaidCount + ' invoice' + (unpaidCount !== 1 ? 's' : ''), icon: 'fa-clock', color: 'var(--yellow)' },
+      ].map(s => `
+        <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:.75rem;padding:1rem">
+          <div style="width:38px;height:38px;border-radius:10px;background:${s.color}18;display:flex;align-items:center;justify-content:center;color:${s.color}"><i class="fa-solid ${s.icon}"></i></div>
+          <div><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">${s.label}</div><div style="font-weight:800;font-size:.95rem">${s.val}</div></div>
+        </div></div>`).join('')}
+    </div>
+
+    ${tableWrap(`
+      <table>
+        <thead><tr>
+          <th>Invoice ID</th><th>Company</th><th>Deposits</th><th>WD</th><th>Tx Count</th>
+          <th>Platform Fee (2%)</th><th>License</th><th>Tx Fee</th><th>Total</th><th>Due Date</th><th>Status</th><th>Action</th>
+        </tr></thead>
+        <tbody>
+          ${invoices.map(inv => `
+            <tr>
+              <td><strong style="font-size:.75rem;font-family:monospace">${inv.id}</strong></td>
+              <td style="font-weight:600">${inv.company}</td>
+              <td style="color:var(--green);font-size:.8rem">${fmtCur(inv.depTotal)}</td>
+              <td style="color:var(--red);font-size:.8rem">${fmtCur(inv.wdTotal)}</td>
+              <td style="text-align:center">${inv.txCount}</td>
+              <td style="font-size:.8rem">${fmtCur(inv.platformFee)}</td>
+              <td style="font-size:.8rem">${fmtCur(inv.licenseFee)}</td>
+              <td style="font-size:.8rem">${fmtCur(inv.transactionFee)}</td>
+              <td style="font-weight:700;color:var(--acc)">${fmtCur(inv.total)}</td>
+              <td style="font-size:.75rem">${inv.dueDate}</td>
+              <td>${badge(inv.status, inv.status==='Paid'?'success':inv.status==='Overdue'?'danger':inv.status==='N/A'?'secondary':'warning')}</td>
+              <td>
+                <div style="display:flex;gap:.25rem">
+                  <button class="btn btn-xs btn-secondary" onclick="window.viewInvoiceDetail('${inv.id}','${inv.company}','${inv.period}',${inv.total})" title="View"><i class="fa-solid fa-eye"></i></button>
+                  ${inv.status !== 'Paid' && inv.status !== 'N/A' ? `<button class="btn btn-xs btn-success" onclick="window.markInvoicePaid('${inv.id}')" title="Mark Paid"><i class="fa-solid fa-check"></i></button>` : ''}
+                </div>
+              </td>
+            </tr>`).join('')}
+          <tr style="background:var(--bg3);font-weight:800">
+            <td colspan="8" style="text-align:right;padding:.5rem .75rem">Grand Total</td>
+            <td style="color:var(--acc)">${fmtCur(grandTotal)}</td>
+            <td colspan="3"></td>
+          </tr>
+        </tbody>
+      </table>
+    `, `invoice_${periodLabel.replace(/ /g,'_')}.csv`)}`;
+};
+
+window.viewInvoiceDetail = (id, company, period, total) => {
+  const deps = (STATE.deposits||[]).filter(d=>d.company===company&&d.status==='Approved');
+  const wds  = (STATE.withdrawals||[]).filter(w=>w.company===company&&w.status==='Approved');
+  openModal(`Invoice Detail: ${company}`, `
+    <div style="font-size:.82rem">
+      <div style="display:flex;justify-content:space-between;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">
+        <div><strong style="font-size:1rem">${id}</strong><div style="color:var(--text3)">${period}</div></div>
+        <div style="text-align:right"><div style="font-size:.65rem;color:var(--text3)">Total Due</div><div style="font-size:1.2rem;font-weight:800;color:var(--acc)">${fmtCur(total)}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+        <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem"><div style="font-size:.65rem;color:var(--text3)">Deposits (${deps.length})</div><div style="font-weight:700;color:var(--green)">${fmtCur(deps.reduce((s,d)=>s+d.amount,0))}</div></div>
+        <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem"><div style="font-size:.65rem;color:var(--text3)">Withdrawals (${wds.length})</div><div style="font-weight:700;color:var(--red)">${fmtCur(wds.reduce((s,w)=>s+w.amount,0))}</div></div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem">
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>Platform Fee (2% of deposits)</span><span style="font-weight:600">${fmtCur(Math.round(deps.reduce((s,d)=>s+d.amount,0)*0.02))}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>License Fee</span><span style="font-weight:600">${fmtCur(500000)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>Transaction Fee (${deps.length+wds.length} × Rp 2,500)</span><span style="font-weight:600">${fmtCur((deps.length+wds.length)*2500)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-top:1px solid var(--border);margin-top:.25rem;font-weight:800;color:var(--acc)"><span>Total</span><span>${fmtCur(total)}</span></div>
+      </div>
+    </div>
+  `, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button><button class="btn btn-primary" onclick="window.markInvoicePaid('${id}');closeModalBtn()"><i class="fa-solid fa-check"></i> Mark Paid</button>`);
 };
 
 pages['invoice-file'] = () => {

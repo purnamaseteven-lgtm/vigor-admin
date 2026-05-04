@@ -91,8 +91,13 @@ export function initRealtime() {
     }
 
     // ── Deposits ──────────────────────────────────────────────────
-    const onNewDeposit = (d) => notifyBadge('warning',
-        `New deposit ${d.member} — Rp ${Number(d.amount).toLocaleString('id-ID')}`);
+    const onNewDeposit = (d) => {
+        notifyBadge('warning', `New deposit ${d.member} — Rp ${Number(d.amount).toLocaleString('id-ID')}`);
+        // Play deposit alert sound for new incoming deposit
+        if (window.playAlertSound) window.playAlertSound();
+        // Refresh bell badge live
+        if (typeof window.renderProfileDisplay === 'function') window.renderProfileDisplay();
+    };
     onNewDeposit._pages = ['deposit-list', 'dashboard'];
     const onDepositUpdate = (d) => { };
     onDepositUpdate._pages = ['deposit-list'];
@@ -105,8 +110,11 @@ export function initRealtime() {
     );
 
     // ── Withdrawals ───────────────────────────────────────────────
-    const onNewWithdrawal = (w) => notifyBadge('warning',
-        `Withdrawal request ${w.member} — Rp ${Number(w.amount).toLocaleString('id-ID')}`);
+    const onNewWithdrawal = (w) => {
+        notifyBadge('warning', `Withdrawal request ${w.member} — Rp ${Number(w.amount).toLocaleString('id-ID')}`);
+        if (window.playAlertSound) window.playAlertSound();
+        if (typeof window.renderProfileDisplay === 'function') window.renderProfileDisplay();
+    };
     onNewWithdrawal._pages = ['withdrawal-list', 'dashboard'];
     const onWithdrawalUpdate = (w) => { };
     onWithdrawalUpdate._pages = ['withdrawal-list'];
@@ -172,6 +180,29 @@ export function initRealtime() {
                     if (payload.new) {
                         if (window.currentPage === 'tools') reRenderIf('tools');
                     }
+                })
+            .subscribe()
+    );
+
+    // ── System Notifications ────────────────────────────────────
+    channels.push(
+        supabase.channel('rt-sysnotif')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'system_notifications' },
+                (payload) => {
+                    if (!payload.new) return;
+                    const r = payload.new;
+                    const notif = {
+                        id: r.id, title: r.title, message: r.message, type: r.type,
+                        targetRole: r.target_role, read: false,
+                        createdBy: r.created_by, date: r.created_at,
+                    };
+                    if (!STATE.systemNotifications) STATE.systemNotifications = [];
+                    STATE.systemNotifications.unshift(notif);
+                    saveState();
+                    notifyBadge('info', r.title || 'New system notification');
+                    if (window.playAlertSound) window.playAlertSound();
+                    if (typeof window.renderProfileDisplay === 'function') window.renderProfileDisplay();
+                    reRenderIf('system-notifications');
                 })
             .subscribe()
     );

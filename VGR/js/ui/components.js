@@ -73,43 +73,133 @@ window.confirmAction = confirmAction;
 window._confirmCb = null;
 
 // ── Enhancement 8: Member Detail Modal ──
-export function showMember(username) {
+export function showMember(username, _tab) {
     const m = STATE.members.find(x => x.username === username);
     if (!m) { toast('Member not found', 'error'); return; }
+    const activeTab = _tab || 'profile';
     const statusColors = { Active: 'success', Inactive: 'warning', Suspended: 'danger', Blocked: 'danger' };
     const sc = statusColors[m.status] || 'warning';
     const initials = (m.name || m.username).substring(0, 2).toUpperCase();
-    openModal(`Member Profile`, `
-        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)">
+
+    // ── Data for each tab ──
+    const memberDeps = (STATE.deposits || []).filter(d => d.member === m.username).slice(0, 20);
+    const memberWds  = (STATE.withdrawals || []).filter(w => w.member === m.username).slice(0, 20);
+    const memberBons = (STATE.bonuses || []).filter(b => b.member === m.username).slice(0, 20);
+    const memberBets = (STATE.lotteryBets || []).filter(b => b.member === m.username).slice(0, 20);
+    const totalDep   = memberDeps.filter(d => d.status === 'Approved').reduce((s, d) => s + (d.amount || 0), 0);
+    const totalWd    = memberWds.filter(w => w.status === 'Approved').reduce((s, w) => s + (w.amount || 0), 0);
+    const totalBonus = memberBons.filter(b => b.status === 'Approved').reduce((s, b) => s + (b.bonusAmount || 0), 0);
+
+    const tabs = [
+        { id: 'profile', icon: 'fa-user', label: 'Profile' },
+        { id: 'deposits', icon: 'fa-arrow-down-to-line', label: `Deposits (${memberDeps.length})` },
+        { id: 'withdrawals', icon: 'fa-arrow-up-from-line', label: `WD (${memberWds.length})` },
+        { id: 'bonuses', icon: 'fa-gift', label: `Bonuses (${memberBons.length})` },
+        { id: 'bets', icon: 'fa-dice', label: `Bets (${memberBets.length})` },
+    ];
+
+    const tabBar = `<div style="display:flex;gap:.25rem;margin-bottom:1rem;border-bottom:1px solid var(--border);padding-bottom:.5rem">
+        ${tabs.map(t => `<button onclick="window.showMember('${username}','${t.id}')" style="padding:.35rem .7rem;border-radius:7px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;background:${activeTab===t.id?'var(--acc)':'transparent'};color:${activeTab===t.id?'#fff':'var(--text3)'}"><i class="fa-solid ${t.icon}" style="margin-right:.3rem"></i>${t.label}</button>`).join('')}
+    </div>`;
+
+    const rowStyle = 'border-bottom:1px solid var(--border);padding:.5rem 0;font-size:.8rem;';
+    const emptyRow = (cols) => `<tr><td colspan="${cols}" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.8rem">No records found</td></tr>`;
+
+    let tabContent = '';
+    if (activeTab === 'profile') {
+        tabContent = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Phone</div><strong>${m.phone || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Bank</div><strong>${m.bank || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Account No.</div><strong>${m.bankAccount || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Company</div><strong>${m.company || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Joined</div><strong>${m.joined || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Last Login</div><strong>${m.lastLogin || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">IP Address</div><strong style="font-family:monospace;font-size:.75rem">${m.ip || '-'}</strong></div>
+            <div style="${rowStyle}"><div style="font-size:.65rem;text-transform:uppercase;color:var(--text3);margin-bottom:.15rem">Referred By</div><strong>${m.referredBy || m.referral || '-'}</strong></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-top:.75rem">
+            <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;text-align:center">
+                <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Total Deposit</div>
+                <div style="font-weight:700;color:var(--green);font-size:.9rem">${fmtCur(totalDep)}</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;text-align:center">
+                <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Total WD</div>
+                <div style="font-weight:700;color:var(--red);font-size:.9rem">${fmtCur(totalWd)}</div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem;text-align:center">
+                <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">Total Bonus</div>
+                <div style="font-weight:700;color:#f59e0b;font-size:.9rem">${fmtCur(totalBonus)}</div>
+            </div>
+        </div>`;
+    } else if (activeTab === 'deposits') {
+        tabContent = `<div style="max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">
+            <thead><tr style="background:var(--bg3)"><th style="padding:.4rem .5rem;text-align:left">ID</th><th style="padding:.4rem .5rem">Amount</th><th style="padding:.4rem .5rem">Bank</th><th style="padding:.4rem .5rem">Status</th><th style="padding:.4rem .5rem">Date</th></tr></thead>
+            <tbody>${memberDeps.length ? memberDeps.map(d => `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:.35rem .5rem;font-family:monospace;font-size:.7rem">${d.id}</td>
+                <td style="padding:.35rem .5rem;font-weight:700;color:var(--green)">${fmtCur(d.amount)}</td>
+                <td style="padding:.35rem .5rem">${d.bank || '-'}</td>
+                <td style="padding:.35rem .5rem"><span style="background:${d.status==='Approved'?'rgba(16,185,129,.15)':d.status==='Pending'?'rgba(245,158,11,.15)':'rgba(239,68,68,.12)'};color:${d.status==='Approved'?'var(--green)':d.status==='Pending'?'var(--yellow)':'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${d.status}</span></td>
+                <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${d.date || '-'}</td>
+            </tr>`).join('') : emptyRow(5)}</tbody>
+        </table></div>`;
+    } else if (activeTab === 'withdrawals') {
+        tabContent = `<div style="max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">
+            <thead><tr style="background:var(--bg3)"><th style="padding:.4rem .5rem;text-align:left">ID</th><th style="padding:.4rem .5rem">Amount</th><th style="padding:.4rem .5rem">Bank</th><th style="padding:.4rem .5rem">Status</th><th style="padding:.4rem .5rem">Date</th></tr></thead>
+            <tbody>${memberWds.length ? memberWds.map(w => `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:.35rem .5rem;font-family:monospace;font-size:.7rem">${w.id}</td>
+                <td style="padding:.35rem .5rem;font-weight:700;color:var(--red)">${fmtCur(w.amount)}</td>
+                <td style="padding:.35rem .5rem">${w.bank || '-'}</td>
+                <td style="padding:.35rem .5rem"><span style="background:${w.status==='Approved'?'rgba(16,185,129,.15)':w.status==='Pending'?'rgba(245,158,11,.15)':'rgba(239,68,68,.12)'};color:${w.status==='Approved'?'var(--green)':w.status==='Pending'?'var(--yellow)':'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${w.status}</span></td>
+                <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${w.date || '-'}</td>
+            </tr>`).join('') : emptyRow(5)}</tbody>
+        </table></div>`;
+    } else if (activeTab === 'bonuses') {
+        tabContent = `<div style="max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">
+            <thead><tr style="background:var(--bg3)"><th style="padding:.4rem .5rem;text-align:left">Type</th><th style="padding:.4rem .5rem">Amount</th><th style="padding:.4rem .5rem">Status</th><th style="padding:.4rem .5rem">Date</th></tr></thead>
+            <tbody>${memberBons.length ? memberBons.map(b => `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:.35rem .5rem;font-weight:600">${b.type || '-'}</td>
+                <td style="padding:.35rem .5rem;font-weight:700;color:#f59e0b">${fmtCur(b.bonusAmount || 0)}</td>
+                <td style="padding:.35rem .5rem"><span style="background:${b.status==='Approved'?'rgba(16,185,129,.15)':b.status==='Pending'?'rgba(245,158,11,.15)':'rgba(239,68,68,.12)'};color:${b.status==='Approved'?'var(--green)':b.status==='Pending'?'var(--yellow)':'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${b.status}</span></td>
+                <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${b.date || b.createdAt || '-'}</td>
+            </tr>`).join('') : emptyRow(4)}</tbody>
+        </table></div>`;
+    } else if (activeTab === 'bets') {
+        tabContent = `<div style="max-height:280px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">
+            <thead><tr style="background:var(--bg3)"><th style="padding:.4rem .5rem;text-align:left">Game</th><th style="padding:.4rem .5rem">Bet</th><th style="padding:.4rem .5rem">Win</th><th style="padding:.4rem .5rem">Status</th><th style="padding:.4rem .5rem">Date</th></tr></thead>
+            <tbody>${memberBets.length ? memberBets.map(b => `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:.35rem .5rem;font-weight:600">${b.gameType || b.game || '-'} ${b.betNumber || ''}</td>
+                <td style="padding:.35rem .5rem;color:var(--text2)">${fmtCur(b.betAmount || 0)}</td>
+                <td style="padding:.35rem .5rem;font-weight:700;color:${(b.winAmount||0)>0?'var(--green)':'var(--text3)'}">${fmtCur(b.winAmount || 0)}</td>
+                <td style="padding:.35rem .5rem"><span style="background:${b.status==='Won'?'rgba(16,185,129,.15)':b.status==='Lost'?'rgba(239,68,68,.12)':'rgba(245,158,11,.15)'};color:${b.status==='Won'?'var(--green)':b.status==='Lost'?'var(--red)':'var(--yellow)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${b.status||'-'}</span></td>
+                <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${b.date || '-'}</td>
+            </tr>`).join('') : emptyRow(5)}</tbody>
+        </table></div>`;
+    }
+
+    openModal(`Member: ${m.username}`, `
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--border)">
             <div class="member-avatar-lg">${initials}</div>
             <div>
-                <div style="font-size:1.05rem;font-weight:700;margin-bottom:.15rem">${m.name}</div>
-                <div style="font-size:.8rem;color:var(--text3)">@${m.username}</div>
-                <div style="margin-top:.4rem;display:flex;gap:.4rem;flex-wrap:wrap">
+                <div style="font-size:1rem;font-weight:700;margin-bottom:.1rem">${m.name}</div>
+                <div style="font-size:.78rem;color:var(--text3)">@${m.username} · ${m.id}</div>
+                <div style="margin-top:.35rem;display:flex;gap:.35rem;flex-wrap:wrap">
                     <span class="badge badge-${sc}">${m.status}</span>
                     ${m.tier ? `<span class="badge badge-indigo">${m.tier}</span>` : ''}
                     <span class="badge badge-blue">${m.company}</span>
                 </div>
             </div>
             <div style="margin-left:auto;text-align:right">
-                <div style="font-size:.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Balance</div>
-                <div style="font-size:1.15rem;font-weight:700;color:var(--green)">${fmtCur(m.balance || 0)}</div>
+                <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Balance</div>
+                <div style="font-size:1.1rem;font-weight:700;color:var(--green)">${fmtCur(m.balance || 0)}</div>
             </div>
         </div>
-        <div class="member-detail-grid">
-            <div class="member-detail-item"><label>Phone</label><span>${m.phone || '-'}</span></div>
-            <div class="member-detail-item"><label>Bank</label><span>${m.bank || '-'}</span></div>
-            <div class="member-detail-item"><label>Account Number</label><span>${m.bankAccount || '-'}</span></div>
-            <div class="member-detail-item"><label>Company</label><span>${m.company || '-'}</span></div>
-            <div class="member-detail-item"><label>Joined</label><span>${m.joined || '-'}</span></div>
-            <div class="member-detail-item"><label>Last Login</label><span>${m.lastLogin || '-'}</span></div>
-            <div class="member-detail-item"><label>IP Address</label><span style="font-size:.78rem;font-family:monospace">${m.ip || '-'}</span></div>
-            <div class="member-detail-item"><label>Referral</label><span>${m.referral || '-'}</span></div>
-        </div>
+        ${tabBar}
+        ${tabContent}
     `, `
         <button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>
         <button class="btn btn-primary" onclick="closeModalBtn();setTimeout(()=>openFormModal('member','${m.id}'),120)">
-            <i class="fa-solid fa-pen"></i> Edit Member
+            <i class="fa-solid fa-pen"></i> Edit
         </button>
         <button class="btn btn-danger" onclick="confirmAction('Delete Member','Delete member [${m.username}]? This action cannot be undone.',()=>{window.stateDelete('members','${m.id}');closeModalBtn();window.go('global-member-list');toast('Member deleted','success');},'Delete','danger')">
             <i class="fa-solid fa-trash"></i>
@@ -520,7 +610,15 @@ export function renderSidebar() {
         </div>`;
     }
 
-    // 14. Manual Book
+    // 14. System Notifications (visible to SuperAdmin + Master)
+    if (isSuper || role === 'Master') {
+        html += `
+        <div class="nav-item">
+            <div class="nav-link" onclick="go('system-notifications')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">Notifications</span></div>
+        </div>`;
+    }
+
+    // 15. Manual Book
     html += `
     <div class="nav-item">
         <div class="nav-link" onclick="go('manual')"><i class="fa-solid fa-book-open nav-icon"></i><span class="nav-label">Manual Book</span></div>
@@ -593,7 +691,8 @@ export function showNotifications() {
             <span style="font-size:.75rem;color:var(--text3)">${alerts.length} notification${alerts.length!==1?'s':''}</span>
             <div style="display:flex;gap:.5rem">
                 <button class="btn btn-xs btn-secondary" onclick="window.go('deposit-list');closeModalBtn()"><i class="fa-solid fa-arrow-down-to-bracket"></i> Deposits</button>
-                <button class="btn btn-xs btn-secondary" onclick="window.broadcastNotification ? window.go('system-notifications') : toast('Notifications','info');closeModalBtn()"><i class="fa-solid fa-plus"></i> Broadcast</button>
+                <button class="btn btn-xs btn-secondary" onclick="closeModalBtn();setTimeout(()=>window.openBroadcastNotifModal&&window.openBroadcastNotifModal(),120)"><i class="fa-solid fa-bullhorn"></i> Broadcast</button>
+                <button class="btn btn-xs btn-secondary" onclick="closeModalBtn();window.go('system-notifications')"><i class="fa-solid fa-list"></i> All</button>
             </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:.5rem;max-height:360px;overflow-y:auto">

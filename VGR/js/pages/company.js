@@ -486,54 +486,7 @@ pages['whitelabel-list'] = () => {
     ${renderPagerHTML(PG, total, pp, cp)} `;
 };
 
-/* ─── TIER HISTORY ─── */
-pages['tier-history'] = () => {
-  const PG = 'tier-history';
-  const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
-  const tierColors = { Bronze: '#cd7f32', Silver: '#c0c0c0', Gold: '#f59e0b', Platinum: '#60a5fa', Diamond: '#a78bfa' };
-  // Use real tier history from STATE.tierHistory if available, otherwise derive from members
-  const rows = (STATE.tierHistory?.length ? STATE.tierHistory : STATE.members.slice(0, 25).map((m, i) => ({
-    member: m.username, name: m.name, company: m.company,
-    prevTier: TIERS[Math.max(0, i % 5 - 1)], newTier: TIERS[i % 5],
-    changedAt: m.joined || '-',
-    reason: ['Turnover achieved', 'Manual upgrade', 'VIP promotion', 'Deposit threshold'][i % 4]
-  })));
-
-  return `
-    ${pageHeader('Tier History for Member', '<span>Global Member List</span><span class="sep">›</span><span>Tier History</span>')}
-
-    ${filterCard(`
-      ${fsInput(PG, 'member', 'Member', 'Search member...')}
-      ${fsSelect(PG, 'newTier', 'Tier', ['All', ...TIERS])}
-      ${fsActions(PG)}
-    `)
-    }
-
-<div class="card">
-  <div class="card-body">
-    ${tableWrap(`
-          <table>
-            <thead>
-              <tr><th>#</th><th>Member</th><th>Company</th><th>Previous Tier</th><th>New Tier</th><th>Reason</th><th>Changed At</th></tr>
-            </thead>
-            <tbody>
-              ${rows.map((r, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td><strong>${r.member}</strong><div style="font-size:.7rem;color:var(--text3)">${r.name}</div></td>
-                  <td>${r.company}</td>
-                  <td><span style="font-weight:600;color:${tierColors[r.prevTier]}">${r.prevTier}</span></td>
-                  <td><span style="font-weight:700;color:${tierColors[r.newTier]}">${r.newTier} <i class="fa-solid fa-arrow-up" style="font-size:.7rem"></i></span></td>
-                  <td style="font-size:.78rem">${r.reason}</td>
-                  <td style="font-size:.72rem;white-space:nowrap">${r.changedAt}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `)}
-  </div>
-</div>`;
-};
+// tier-history is defined in members.js (authoritative version)
 
 /* ─── BANK CREATE ─── */
 pages['bank-create'] = () => {

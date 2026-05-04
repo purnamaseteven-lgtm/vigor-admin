@@ -144,7 +144,7 @@ export function applyRBAC() {
         'results':            ['results-listing','result-scan','results-analyze'],
         'integrations':       ['provider-setup','pgsoft-api-logs','developer-docs'],
         'customization':      ['site-config','custom-template','template-preview','seo-tools','system-theme','global-banner','app-notification'],
-        'settings':           ['settings-commission','settings-referral-rate','settings-pools','settings-games','settings-agent-games','settings-togel-commission','settings-limit-credit-out','settings-vip-designer','settings-rebate-calc'],
+        'settings':           ['settings-commission','settings-referral-rate','settings-pools','settings-games','settings-agent-games','settings-togel-commission','settings-limit-credit-out','custom-vip','settings-rebate-calc'],
         'tools':              ['tools-coin2pay','tools-host','tools-sawala','tools-unopay'],
         'crm':                ['crm-dashboard','crm-segments','crm-missions','crm-tournaments','crm-automation','crm-push','crm-dormancy','crm-loyalty'],
         'memo':               ['memo-list','auto-memo'],

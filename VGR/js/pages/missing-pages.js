@@ -247,6 +247,63 @@ window.saveAppNotif = () => {
 window.delAppNotif = (id) => { STATE.notifications = (STATE.notifications || []).filter(x => x.id !== id); saveState(); go('custom-app-notification'); toast('Deleted', 'success'); };
 
 // ────────────────────────────────────────────────────
+// SYSTEM NOTIFICATIONS PAGE
+// ────────────────────────────────────────────────────
+pages['system-notifications'] = () => {
+    const notifs = STATE.systemNotifications || [];
+    const unread = notifs.filter(n => !n.read).length;
+    const typeIcon  = { info: 'fa-circle-info', success: 'fa-circle-check', warning: 'fa-triangle-exclamation', danger: 'fa-circle-xmark' };
+    const typeColor = { info: 'var(--acc)', success: 'var(--green)', warning: 'var(--yellow)', danger: 'var(--red)' };
+
+    return `
+    ${pageHeader('System Notifications', '<span>Notifications</span>', `
+        <div style="display:flex;gap:.5rem">
+            ${unread > 0 ? `<button class="btn btn-secondary btn-sm" onclick="window.markAllNotifsRead()"><i class="fa-solid fa-check-double"></i> Mark All Read</button>` : ''}
+            <button class="btn btn-primary btn-sm" onclick="window.openBroadcastNotifModal()"><i class="fa-solid fa-bullhorn"></i> Broadcast</button>
+        </div>
+    `)}
+
+    ${unread > 0 ? `<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:.65rem 1rem;margin-bottom:1rem;font-size:.82rem;color:var(--yellow)"><i class="fa-solid fa-circle-exclamation" style="margin-right:.4rem"></i>${unread} unread notification${unread>1?'s':''}</div>` : ''}
+
+    <div style="display:flex;flex-direction:column;gap:.6rem">
+    ${notifs.length ? notifs.map(n => `
+        <div style="background:var(--bg2);border:1px solid ${n.read ? 'var(--border)' : typeColor[n.type]||'var(--acc)'}44;border-left:3px solid ${typeColor[n.type]||'var(--acc)'};border-radius:10px;padding:.85rem 1rem;display:flex;align-items:flex-start;gap:.75rem;cursor:pointer;transition:opacity .15s;${n.read?'opacity:.7':''}">
+            <div style="width:32px;height:32px;border-radius:50%;background:${typeColor[n.type]||'var(--acc)'}18;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.1rem">
+                <i class="fa-solid ${typeIcon[n.type]||'fa-bell'}" style="color:${typeColor[n.type]||'var(--acc)'};font-size:.85rem"></i>
+            </div>
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.2rem">
+                    <strong style="font-size:.85rem;${n.read?'':'color:var(--text1)'}">${n.title || 'Notification'}</strong>
+                    ${!n.read ? '<span style="width:7px;height:7px;border-radius:50%;background:var(--acc);flex-shrink:0"></span>' : ''}
+                    ${n.targetRole ? `<span style="font-size:.65rem;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:.05rem .45rem;color:var(--text3)">${n.targetRole}</span>` : ''}
+                </div>
+                <div style="font-size:.8rem;color:var(--text2);margin-bottom:.3rem">${n.message || ''}</div>
+                <div style="display:flex;align-items:center;gap:.75rem">
+                    <span style="font-size:.68rem;color:var(--text3)">${n.date ? new Date(n.date).toLocaleString('id-ID') : ''}</span>
+                    ${n.createdBy ? `<span style="font-size:.68rem;color:var(--text3)">by ${n.createdBy}</span>` : ''}
+                </div>
+            </div>
+            <div style="display:flex;gap:.3rem;flex-shrink:0">
+                ${!n.read ? `<button class="btn btn-xs btn-secondary" onclick="window.markNotifRead('${n.id}')" title="Mark read"><i class="fa-solid fa-check"></i></button>` : ''}
+                <button class="btn btn-xs btn-danger" onclick="window.deleteSystemNotif('${n.id}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+    `).join('') : `
+        <div style="text-align:center;padding:3rem;color:var(--text3)">
+            <i class="fa-solid fa-bell-slash" style="font-size:2rem;opacity:.3;margin-bottom:.75rem"></i>
+            <div style="font-size:.85rem">No notifications</div>
+        </div>
+    `}
+    </div>`;
+};
+
+window.deleteSystemNotif = (id) => {
+    STATE.systemNotifications = (STATE.systemNotifications || []).filter(n => n.id !== id);
+    saveState();
+    go('system-notifications');
+};
+
+// ────────────────────────────────────────────────────
 // WIDGET LIBRARY
 // ────────────────────────────────────────────────────
 pages['widget-library'] = () => {

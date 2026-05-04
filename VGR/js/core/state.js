@@ -113,6 +113,7 @@ export const STATE = {
     notifPreferences: { sound: true, depositAlert: true, withdrawalAlert: true, maintenanceAlert: true },
     refreshSettings: { interval: 0, lastRefresh: null }, // interval in seconds; 0 = off
     popupBanners: [], // Popup banners for frontend player sites
+    rollingAdjustments: {}, // Per-member rolling multiplier overrides: { username: pct }
     campaignUsage: {}, // Tracks one-time campaign triggers per member
     adjustments: [
         { id: 'ADJ10045', member: 'player_jackpot', type: 'deposit', amount: 500000, notes: 'Bonus Special Event', date: '01/05/2026, 14:20:01', processedBy: 'admin' },

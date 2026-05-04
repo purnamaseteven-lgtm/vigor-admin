@@ -236,7 +236,12 @@ window.showAgentStatDetail = (companyKey) => {
 
 /* ─── PROVIDER ANALYTICS ─── */
 pages['provider-analytics'] = () => {
-  const txs = (STATE.seamless?.transactions || []);
+  const curAdmin = STATE.currentAdmin;
+  // Company-level admins only see their own data
+  let txs = (STATE.seamless?.transactions || []);
+  if (curAdmin.role === 'Company' || curAdmin.role === 'Shop') {
+    txs = txs.filter(t => t.company === curAdmin.company);
+  }
   // Aggregate per provider from real seamless transaction data
   const providerMap = {};
   txs.forEach(tx => {
@@ -831,21 +836,29 @@ pages['reports-top-turnover'] = () => {
 
 /* ─── DEVICE REPORT ─── */
 pages['device-report'] = () => {
+  const curAdmin = STATE.currentAdmin;
+  // Filter members by company for non-SuperAdmin roles
+  let scopedMembers = STATE.members || [];
+  if (curAdmin.role === 'Company' || curAdmin.role === 'Shop') {
+    scopedMembers = scopedMembers.filter(m => m.company === curAdmin.company);
+  }
+  const total = scopedMembers.length;
+
   const devices = [
-    { platform: 'Windows', browser: 'Chrome', count: 1245, active: 45, trend: '+5%' },
-    { platform: 'macOS', browser: 'Safari', count: 432, active: 12, trend: '-2%' },
-    { platform: 'iOS', browser: 'Mobile Safari', count: 2841, active: 156, trend: '+18%' },
-    { platform: 'Android (APK)', browser: 'App WebView', count: 5621, active: 432, trend: '+24%' },
-    { platform: 'Android (Br.)', browser: 'Chrome Mobile', count: 1842, active: 89, trend: '+7%' },
+    { platform: 'Windows', browser: 'Chrome', count: Math.round(total*0.1), active: Math.round(total*0.04), trend: '+5%' },
+    { platform: 'macOS', browser: 'Safari', count: Math.round(total*0.04), active: Math.round(total*0.01), trend: '-2%' },
+    { platform: 'iOS', browser: 'Mobile Safari', count: Math.round(total*0.23), active: Math.round(total*0.12), trend: '+18%' },
+    { platform: 'Android (APK)', browser: 'App WebView', count: Math.round(total*0.46), active: Math.round(total*0.35), trend: '+24%' },
+    { platform: 'Android (Br.)', browser: 'Chrome Mobile', count: Math.round(total*0.17), active: Math.round(total*0.07), trend: '+7%' },
   ];
 
   const platforms = ['Windows', 'macOS', 'iPhone', 'Android (APK)', 'Android (Br.)'];
-  const memberDevices = (STATE.members || []).slice(0, 20).map((m, i) => {
+  const memberDevices = scopedMembers.slice(0, 20).map((m, i) => {
     const plat = platforms[i % platforms.length];
     return {
-      username: m.username,
+      username: m.username, company: m.company,
       platform: plat,
-      lastLogin: m.joined || '-',
+      lastLogin: m.lastLogin || m.joined || '-',
       appVersion: plat.includes('APK') ? 'v2.4.1' : '-',
       isApp: plat.includes('APK')
     };

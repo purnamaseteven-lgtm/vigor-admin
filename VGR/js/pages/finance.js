@@ -559,13 +559,17 @@ window.toggleFinanceSound = () => {
   ));
 };
 
-// ── Patch handleFinance to play sounds ──
-const _origHandleFinance = window.handleFinance;
-window.handleFinance = async (type, id, action, ...rest) => {
-  const result = _origHandleFinance ? await _origHandleFinance(type, id, action, ...rest) : null;
+// ── Event-driven sound system (avoids timing issues with handleFinance patch) ──
+// Other modules dispatch 'vigor:finance' events; finance.js listens and plays sound
+document.addEventListener('vigor:finance', (e) => {
+  const { type, action } = e.detail || {};
   if (action === 'approve') {
     if (type === 'deposit') playDepositSound();
     else if (type === 'withdrawal') playWithdrawalSound();
   }
-  return result;
+});
+
+// Convenience dispatcher used by db.js approve functions
+window.dispatchFinanceSound = (type, action) => {
+  document.dispatchEvent(new CustomEvent('vigor:finance', { detail: { type, action } }));
 };

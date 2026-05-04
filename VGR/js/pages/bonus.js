@@ -831,8 +831,7 @@ pages['promotion-rolling-release'] = () => {
                           const rollingMultiplier = STATE.settings?.rollingMultiplier || 5;
                           const toRequired = totalBonus * rollingMultiplier;
                           const pct = toRequired > 0 ? Math.min(100, Math.round((totalTO / toRequired) * 100)) : (totalTO > 0 ? 100 : 0);
-                          const adjKey = `rolling_adj_${m.username}`;
-                          const manualAdj = STATE.settings?.[adjKey] || 0;
+                          const manualAdj = (STATE.rollingAdjustments || {})[m.username] || 0;
                           const effectivePct = Math.min(100, pct + manualAdj);
                           return `
                             <tr>
@@ -899,8 +898,8 @@ window.applyRollingAdj = (username) => {
   if (!inp) return;
   const val = parseInt(inp.value, 10);
   if (isNaN(val) || val < -100 || val > 100) { toast('Adjustment must be between -100 and 100', 'error'); return; }
-  if (!STATE.settings) STATE.settings = {};
-  STATE.settings[`rolling_adj_${username}`] = val;
+  if (!STATE.rollingAdjustments) STATE.rollingAdjustments = {};
+  STATE.rollingAdjustments[username] = val;
   saveState();
   go('promotion-rolling-release');
   toast(`Rolling adjustment ${val >= 0 ? '+' : ''}${val}% applied for ${username}`, 'success');

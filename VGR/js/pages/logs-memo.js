@@ -101,22 +101,40 @@ pages['memo-list'] = () => {
 
 /* ─── AUTO MEMO ─── */
 pages['memo-auto'] = () => {
+    // Load auto-memo rule config from STATE.settings, with defaults
+    const autoRuleConfigs = {
+      AM1: { active: true, count: null }, AM2: { active: true, count: null },
+      AM3: { active: false, count: null }, AM4: { active: true, count: null },
+      AM5: { active: true, count: null }, AM6: { active: true, count: null },
+      AM7: { active: true, count: null }, AM8: { active: false, count: null },
+    };
+    Object.keys(autoRuleConfigs).forEach(id => {
+      const cfg = STATE.settings['auto_memo_' + id];
+      if (cfg) Object.assign(autoRuleConfigs[id], cfg);
+    });
+
     const TRIGGER_TYPES = [
-        { id: 'AM1', name: 'First Deposit Confirmation', trigger: 'On first deposit approved', target: 'Member', template: 'Dear {member}, your first deposit of {amount} has been approved. Welcome to VIGOR!', active: true, count: rnd(100, 500) },
-        { id: 'AM2', name: 'Withdrawal Approved', trigger: 'On withdrawal approved', target: 'Member', template: 'Dear {member}, your withdrawal of {amount} has been processed. Please wait 1-3 business days.', active: true, count: rnd(50, 300) },
-        { id: 'AM3', name: 'Withdrawal Rejected', trigger: 'On withdrawal rejected', target: 'Member', template: 'Dear {member}, your withdrawal request has been rejected. Please contact support.', active: false, count: rnd(10, 50) },
-        { id: 'AM4', name: 'Account Suspended', trigger: 'On account suspended', target: 'Member', template: 'Your account {member} has been temporarily suspended. Contact admin for assistance.', active: true, count: rnd(5, 30) },
-        { id: 'AM5', name: 'Bonus Credited', trigger: 'On bonus approved', target: 'Member', template: 'Dear {member}, bonus of {amount} has been credited to your account!', active: true, count: rnd(80, 400) },
-        { id: 'AM6', name: 'VIP Tier Upgrade', trigger: 'On tier level up', target: 'Member', template: 'Congratulations {member}! You have been upgraded to {tier} tier!', active: true, count: rnd(20, 100) },
-        { id: 'AM7', name: 'Credit Limit Warning', trigger: 'When credit reaches 80%', target: 'Company', template: 'Warning: {company} has reached 80% of credit limit. Please top up.', active: true, count: rnd(5, 20) },
-        { id: 'AM8', name: 'Monthly Statement', trigger: 'Every 1st of month', target: 'Company', template: 'Monthly statement for {month} is ready. Total GGR: {amount}.', active: false, count: rnd(10, 30) },
+        { id: 'AM1', name: 'First Deposit Confirmation', trigger: 'On first deposit approved', target: 'Member', template: 'Dear {member}, your first deposit of {amount} has been approved. Welcome to VIGOR!', active: autoRuleConfigs.AM1.active, count: autoRuleConfigs.AM1.count ?? (STATE.deposits || []).filter(d => d.status === 'Approved').length },
+        { id: 'AM2', name: 'Withdrawal Approved', trigger: 'On withdrawal approved', target: 'Member', template: 'Dear {member}, your withdrawal of {amount} has been processed. Please wait 1-3 business days.', active: autoRuleConfigs.AM2.active, count: autoRuleConfigs.AM2.count ?? (STATE.withdrawals || []).filter(w => w.status === 'Approved').length },
+        { id: 'AM3', name: 'Withdrawal Rejected', trigger: 'On withdrawal rejected', target: 'Member', template: 'Dear {member}, your withdrawal request has been rejected. Please contact support.', active: autoRuleConfigs.AM3.active, count: autoRuleConfigs.AM3.count ?? (STATE.withdrawals || []).filter(w => w.status === 'Rejected').length },
+        { id: 'AM4', name: 'Account Suspended', trigger: 'On account suspended', target: 'Member', template: 'Your account {member} has been temporarily suspended. Contact admin for assistance.', active: autoRuleConfigs.AM4.active, count: autoRuleConfigs.AM4.count ?? (STATE.members || []).filter(m => m.status === 'Suspended').length },
+        { id: 'AM5', name: 'Bonus Credited', trigger: 'On bonus approved', target: 'Member', template: 'Dear {member}, bonus of {amount} has been credited to your account!', active: autoRuleConfigs.AM5.active, count: autoRuleConfigs.AM5.count ?? (STATE.bonuses || []).filter(b => b.status === 'Approved').length },
+        { id: 'AM6', name: 'VIP Tier Upgrade', trigger: 'On tier level up', target: 'Member', template: 'Congratulations {member}! You have been upgraded to {tier} tier!', active: autoRuleConfigs.AM6.active, count: autoRuleConfigs.AM6.count ?? 0 },
+        { id: 'AM7', name: 'Credit Limit Warning', trigger: 'When credit reaches 80%', target: 'Company', template: 'Warning: {company} has reached 80% of credit limit. Please top up.', active: autoRuleConfigs.AM7.active, count: autoRuleConfigs.AM7.count ?? 0 },
+        { id: 'AM8', name: 'Monthly Statement', trigger: 'Every 1st of month', target: 'Company', template: 'Monthly statement for {month} is ready. Total GGR: {amount}.', active: autoRuleConfigs.AM8.active, count: autoRuleConfigs.AM8.count ?? 0 },
     ];
 
-    const recentAuto = Array.from({length: 10}, (_, i) => ({
-        trigger: TRIGGER_TYPES[i % TRIGGER_TYPES.length].name,
-        member: MEMBERS[i % MEMBERS.length],
-        sentAt: `${rnd(20,27)}/04/2026 ${rnd(10,23)}:${String(rnd(10,59)).padStart(2,'0')}`,
-        status: i % 8 === 0 ? 'Failed' : 'Sent'
+    // Recent auto memos from STATE.memos.sent (system-generated) or fall back to recent logs
+    const allSentMemos = (STATE.memos?.sent || []);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const sentToday = allSentMemos.filter(m => (m.date || '').startsWith(todayStr)).length;
+    const failedToday = (STATE.logs || []).filter(l => l.action === 'Memo Failed' && (l.date || '').startsWith(todayStr)).length;
+
+    const recentAuto = allSentMemos.slice(0, 10).map(m => ({
+        trigger: m.subject || m.category || 'Automated',
+        member: m.to,
+        sentAt: m.date || '-',
+        status: 'Sent'
     }));
 
     return `
@@ -134,11 +152,11 @@ pages['memo-auto'] = () => {
       </div>
       <div class="stat-card">
         <div class="stat-icon" style="background:rgba(245,158,11,.1);color:var(--yellow)"><i class="fa-solid fa-paper-plane"></i></div>
-        <div class="stat-info"><div class="stat-label">Sent Today</div><div class="stat-value">${rnd(50, 200)}</div></div>
+        <div class="stat-info"><div class="stat-label">Sent Today</div><div class="stat-value">${sentToday}</div></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon" style="background:rgba(239,68,68,.1);color:var(--red)"><i class="fa-solid fa-circle-xmark"></i></div>
-        <div class="stat-info"><div class="stat-label">Failed</div><div class="stat-value">${rnd(0, 5)}</div></div>
+        <div class="stat-info"><div class="stat-label">Failed</div><div class="stat-value">${failedToday}</div></div>
       </div>
     </div>
 

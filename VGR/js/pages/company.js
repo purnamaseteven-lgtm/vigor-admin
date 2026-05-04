@@ -488,12 +488,13 @@ pages['tier-history'] = () => {
   const PG = 'tier-history';
   const TIERS = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'];
   const tierColors = { Bronze: '#cd7f32', Silver: '#c0c0c0', Gold: '#f59e0b', Platinum: '#60a5fa', Diamond: '#a78bfa' };
-  const rows = STATE.members.slice(0, 25).map((m, i) => ({
+  // Use real tier history from STATE.tierHistory if available, otherwise derive from members
+  const rows = (STATE.tierHistory?.length ? STATE.tierHistory : STATE.members.slice(0, 25).map((m, i) => ({
     member: m.username, name: m.name, company: m.company,
     prevTier: TIERS[Math.max(0, i % 5 - 1)], newTier: TIERS[i % 5],
-    changedAt: `${rnd(20, 27)} /04/2026 ${rnd(10, 23)}:${rnd(10, 59)} `,
+    changedAt: m.joined || '-',
     reason: ['Turnover achieved', 'Manual upgrade', 'VIP promotion', 'Deposit threshold'][i % 4]
-  }));
+  })));
 
   return `
     ${pageHeader('Tier History for Member', '<span>Global Member List</span><span class="sep">›</span><span>Tier History</span>')}

@@ -100,8 +100,8 @@ pages['results-list'] = () => {
                   <td>${badge(r.status, r.status === 'Published' ? 'success' : 'warning')}</td>
                   <td>
                     <div class="action-btns">
-                      ${r.status === 'Pending' ? `<button class="btn btn-sm btn-success" onclick="toast('Result published','success')"><i class="fa-solid fa-check"></i> Publish</button>` : ''}
-                      <button class="btn btn-sm btn-icon" style="background:#f59e0b;color:#fff" onclick="toast('Edit result','info')"><i class="fa-solid fa-pen"></i></button>
+                      ${r.status === 'Pending' ? `<button class="btn btn-sm btn-success" onclick="window.publishResult('${r.id}')"><i class="fa-solid fa-check"></i> Publish</button>` : ''}
+                      <button class="btn btn-sm btn-icon" style="background:#f59e0b;color:#fff" onclick="window.openEditResultModal('${r.id}')"><i class="fa-solid fa-pen"></i></button>
                     </div>
                   </td>
                 </tr>
@@ -426,4 +426,65 @@ window.applyQuickResultEntry = () => {
       if (el) el.value = parts[idx];
     });
   });
+};
+
+/* ─── PUBLISH RESULT (mark as settled/published) ─── */
+window.publishResult = async (id) => {
+  if (!confirm(`Publish result ${id}? This will settle all pending bets for this draw.`)) return;
+  if (window.db?.dbSaveLotteryResult) {
+    const { error } = await window.db.dbSaveLotteryResult({ id, isSettled: true, status: 'Published' });
+    if (error) { toast('Publish failed: ' + error.message, 'error'); return; }
+  } else {
+    // Fallback: update in STATE
+    const res = (STATE.lotteryResults || []).find(r => r.id === id);
+    if (res) { res.isSettled = true; res.status = 'Published'; saveState(); }
+    const mock = (STATE.results || []).find(r => r.id === id);
+    if (mock) { mock.status = 'Published'; saveState(); }
+  }
+  toast(`Result ${id} published ✓`, 'success');
+  window.go('results-list');
+};
+
+/* ─── EDIT RESULT MODAL ─── */
+window.openEditResultModal = (id) => {
+  const store = Array.isArray(STATE.lotteryResults) && STATE.lotteryResults.length
+    ? STATE.lotteryResults.map(r => ({ ...r, status: r.isSettled ? 'Published' : 'Pending' }))
+    : STATE.results || [];
+  const r = store.find(x => x.id === id);
+  if (!r) { toast('Result not found', 'error'); return; }
+  openModal('Edit Result', `
+    <div class="form-grid">
+      <div class="form-field"><label>Pool</label><input id="edit_pool" value="${r.pool}" readonly/></div>
+      <div class="form-field"><label>Date</label><input id="edit_date" type="date" value="${(r.drawDate || r.date || '').slice(0,10)}"/></div>
+      <div class="form-field"><label>1st Prize</label><input id="edit_r1" value="${r.r1}" maxlength="4"/></div>
+      <div class="form-field"><label>2nd Prize</label><input id="edit_r2" value="${r.r2}" maxlength="4"/></div>
+      <div class="form-field"><label>3rd Prize</label><input id="edit_r3" value="${r.r3}" maxlength="4"/></div>
+      <div class="form-field"><label>Special</label><input id="edit_r4" value="${r.r4}" maxlength="4"/></div>
+      <div class="form-field"><label>Consolation</label><input id="edit_r5" value="${r.r5}" maxlength="4"/></div>
+    </div>
+  `, `
+    <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+    <button class="btn btn-primary" onclick="window.saveEditResult('${id}')"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+  `);
+};
+
+window.saveEditResult = async (id) => {
+  const r1 = document.getElementById('edit_r1')?.value.trim();
+  const r2 = document.getElementById('edit_r2')?.value.trim();
+  const r3 = document.getElementById('edit_r3')?.value.trim();
+  const r4 = document.getElementById('edit_r4')?.value.trim();
+  const r5 = document.getElementById('edit_r5')?.value.trim();
+  const drawDate = document.getElementById('edit_date')?.value;
+  const update = { id, drawDate, result1st: r1, result2nd: r2, result3rd: r3, r1, r2, r3, r4, r5 };
+  if (window.db?.dbSaveLotteryResult) {
+    const { error } = await window.db.dbSaveLotteryResult(update);
+    if (error) { toast('Save failed: ' + error.message, 'error'); return; }
+  } else {
+    const res = (STATE.lotteryResults || STATE.results || []).find(r => r.id === id);
+    if (res) Object.assign(res, update);
+    saveState();
+  }
+  closeModalBtn();
+  window.go('results-list');
+  toast('Result updated ✓', 'success');
 };

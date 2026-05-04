@@ -399,7 +399,7 @@ pages['settings-togel-commission'] = () => {
 
   return `
     ${pageHeader('Togel Commission Settings', '<span>Settings</span><span class="sep">›</span><span>Togel Commission</span>', `
-      <button class="btn btn-primary" onclick="toast('Togel settings saved','success')"><i class="fa-solid fa-check"></i> Save All</button>`)}
+      <button class="btn btn-primary" onclick="window.saveTogelCommissionAll()"><i class="fa-solid fa-check"></i> Save All</button>`)}
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">
       <div class="card">
@@ -653,4 +653,29 @@ window.saveCommission = async (company, tab) => {
   if (typeof closeModalBtn === 'function') closeModalBtn();
   toast(`Commission for ${company} saved: ${val}%`, 'success');
   window.go('settings-commission');
+};
+
+/* ─── TOGEL COMMISSION SAVE ALL ─── */
+window.saveTogelCommissionAll = async () => {
+  const BET_TYPES = ['4D', '3D', '2D', 'Colok Bebas', 'Colok Macau', 'Colok Naga', 'Colok Jitu', '50-50', 'Kombinasi / BB', 'Shio'];
+  const POOLS = ['4D Togel External', '4D Togel Vigor', '4D Togel Global', '6D Togel Vigor', 'SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA', 'MAGNUM', 'DAMACAI', 'TOTO'];
+
+  // Read pool override inputs (first 4 pools have override discount inputs)
+  const poolOverrides = {};
+  POOLS.slice(0, 4).forEach((pool, i) => {
+    const inputs = document.querySelectorAll('.pool-override-disc');
+    if (inputs[i]) {
+      const key = `togel_pool_override_${pool.replace(/ /g,'_').toLowerCase()}`;
+      poolOverrides[key] = { disc: Number(inputs[i].value), active: true };
+    }
+  });
+
+  const saves = Object.entries(poolOverrides).map(([key, val]) => {
+    STATE.settings[key] = val;
+    return window.db?.dbSaveSetting ? window.db.dbSaveSetting(key, JSON.stringify(val)) : Promise.resolve();
+  });
+
+  await Promise.all(saves);
+  saveState();
+  toast('Togel commission settings saved ✓', 'success');
 };

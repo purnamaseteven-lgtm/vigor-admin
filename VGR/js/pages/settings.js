@@ -148,14 +148,16 @@ pages['settings-limit-credit-out'] = () => {
               </tr>
             </thead>
             <tbody>
-              ${COMPANIES.map((c, i) => {
-    const limit = rnd(5, 50) * 1000000;
-    const cur = Math.round(limit * (rnd(30, 110) / 100));
-    const pct = Math.round(cur / limit * 100);
+              ${(STATE.companies.length ? STATE.companies : COMPANIES.map(name => ({ name, credit: 0 }))).map((co, i) => {
+    const name = co.name || co;
+    const defaultLimit = Number(STATE.settings.defaultCreditLimit) || 50000000;
+    const limit = defaultLimit;
+    const cur = co.credit || 0;
+    const pct = limit > 0 ? Math.round(cur / limit * 100) : 0;
     return `
                   <tr>
                     <td>${i + 1}</td>
-                    <td>${c}</td>
+                    <td>${name}</td>
                     <td>${fmtCur(cur)}</td>
                     <td>${fmtCur(limit)}</td>
                     <td>
@@ -245,6 +247,11 @@ pages['settings-referral-rate'] = () => {
               <tbody>
                 ${COMPANIES.map((c, i) => {
       const active = STATE.settings.companyReferralStatus[c] !== false;
+      const companyMembers = STATE.members.filter(m => m.company === c);
+      const activeReferrals = companyMembers.filter(m => m.referredBy).length;
+      const totalEarned = (STATE.bonuses || [])
+        .filter(b => b.company === c && b.type === 'Referral' && b.status === 'Approved')
+        .reduce((s, b) => s + (b.bonusAmount || 0), 0);
       return `
                   <tr>
                     <td>${i + 1}</td>
@@ -257,8 +264,8 @@ pages['settings-referral-rate'] = () => {
                         <div class="toggle-slider"></div>
                       </label>
                     </td>
-                    <td>${rnd(5, 80)}</td>
-                    <td style="color:var(--green);font-weight:600">${fmtCur(rnd(1, 50) * 100000)}</td>
+                    <td>${activeReferrals}</td>
+                    <td style="color:var(--green);font-weight:600">${fmtCur(totalEarned)}</td>
                     <td><button class="btn btn-sm btn-primary" onclick="toast('Edit ${c} referral','info')"><i class="fa-solid fa-pen"></i></button></td>
                   </tr>`;
     }).join('')}
@@ -273,10 +280,21 @@ pages['settings-referral-rate'] = () => {
 /* ─── SETTINGS GAMES ─── */
 pages['settings-games'] = () => {
   const GAME_PROVIDERS = ['PRAGMATIC PLAY', 'HABANERO', 'MICROGAMING', 'SBOBET', 'EVOLUTION', 'JOKER', 'SPADEGAMING', 'PG SOFT'];
-  const gameSettings = GAME_PROVIDERS.map((p, i) => ({
-    provider: p, enabled: i !== 3, minBet: rnd(1, 5) * 10000, maxBet: rnd(10, 100) * 1000000,
-    rtp: (94 + Math.random() * 4).toFixed(1), games: rnd(20, 200), maintenance: i === 3
-  }));
+  // Aggregate real game counts per provider from STATE.seamless.games
+  const seamlessGames = STATE.seamless?.games || [];
+  const gameSettings = GAME_PROVIDERS.map((p, i) => {
+    const provGames = seamlessGames.filter(g => (g.provider || '').toUpperCase().includes(p.split(' ')[0]));
+    const cfg = STATE.settings['game_config_' + p.replace(/ /g, '_').toLowerCase()] || {};
+    return {
+      provider: p,
+      enabled: cfg.enabled !== false && i !== 3,
+      minBet: Number(cfg.minBet) || (i + 1) * 10000,
+      maxBet: Number(cfg.maxBet) || (i + 1) * 10 * 1000000,
+      rtp: cfg.rtp || '95.0',
+      games: provGames.length || seamlessGames.length,
+      maintenance: cfg.maintenance || (i === 3),
+    };
+  });
 
   return `
     ${pageHeader('Games Settings', '<span>Settings</span><span class="sep">›</span><span>Games</span>', `
@@ -334,19 +352,25 @@ pages['settings-agent-games'] = () => {
             <table>
               <thead><tr><th>#</th><th>Game Type</th><th>Access</th><th>Min Bet</th><th>Max Bet</th><th>Commission</th><th>Action</th></tr></thead>
               <tbody>
-                ${GAME_TYPES.map((g, i) => `
+                ${GAME_TYPES.map((g, i) => {
+                  const key = 'agent_game_' + g.replace(/ /g, '_').toLowerCase();
+                  const cfg = STATE.settings[key] || {};
+                  const minBet = Number(cfg.minBet) || (i + 1) * 10000;
+                  const maxBet = Number(cfg.maxBet) || (i + 1) * 1000000;
+                  const commission = cfg.commission || (i + 1) + '%';
+                  return `
                   <tr>
                     <td>${i + 1}</td>
                     <td><strong>${g}</strong></td>
                     <td>
-                      <label class="toggle"><input type="checkbox" ${i < 6 ? 'checked' : ''} onchange="toast('${g} '+(this.checked?'enabled':'disabled'),'success')"/><div class="toggle-slider"></div></label>
+                      <label class="toggle"><input type="checkbox" ${cfg.enabled !== false && i < 6 ? 'checked' : ''} onchange="toast('${g} '+(this.checked?'enabled':'disabled'),'success')"/><div class="toggle-slider"></div></label>
                     </td>
-                    <td>${fmtCur(rnd(1, 5) * 10000)}</td>
-                    <td>${fmtCur(rnd(1, 10) * 1000000)}</td>
-                    <td>${rnd(1, 5)}%</td>
+                    <td>${fmtCur(minBet)}</td>
+                    <td>${fmtCur(maxBet)}</td>
+                    <td>${commission}</td>
                     <td><button class="btn btn-sm btn-primary" onclick="toast('Edit ${g}','info')"><i class="fa-solid fa-pen"></i></button></td>
-                  </tr>
-                `).join('')}
+                  </tr>`;
+                }).join('')}
               </tbody>
             </table>
           `)}
@@ -360,10 +384,17 @@ pages['settings-togel-commission'] = () => {
   const POOLS = ['4D Togel External', '4D Togel Vigor', '4D Togel Global', '6D Togel Vigor', 'SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA', 'MAGNUM', 'DAMACAI', 'TOTO'];
   const BET_TYPES = ['4D', '3D', '2D', 'Colok Bebas', 'Colok Macau', 'Colok Naga', 'Colok Jitu', '50-50', 'Kombinasi / BB', 'Shio'];
   const commissions = POOLS.flatMap(pool =>
-    BET_TYPES.map(bet => ({
-      pool, bet, disc: rnd(25, 70), prize4d: rnd(3000, 5000),
-      prize3d: rnd(300, 500), prize2d: rnd(50, 100)
-    }))
+    BET_TYPES.map(bet => {
+      const key = `togel_${pool.replace(/ /g,'_').toLowerCase()}_${bet.replace(/ /g,'_').toLowerCase()}`;
+      const cfg = STATE.settings[key] || {};
+      return {
+        pool, bet,
+        disc: Number(cfg.disc) || 0,
+        prize4d: Number(cfg.prize4d) || 0,
+        prize3d: Number(cfg.prize3d) || 0,
+        prize2d: Number(cfg.prize2d) || 0,
+      };
+    })
   ).slice(0, 24);
 
   return `
@@ -378,15 +409,18 @@ pages['settings-togel-commission'] = () => {
             <table>
               <thead><tr><th>Bet Type</th><th>Discount</th><th>Prize 4D</th><th>Prize 3D</th><th>Prize 2D</th></tr></thead>
               <tbody>
-                ${BET_TYPES.map((bet, i) => `
+                ${BET_TYPES.map((bet) => {
+                  const key = `togel_default_${bet.replace(/ /g,'_').toLowerCase()}`;
+                  const cfg = STATE.settings[key] || {};
+                  return `
                   <tr>
                     <td><strong>${bet}</strong></td>
-                    <td>${rnd(25, 70)}%</td>
-                    <td>${fmt(rnd(3000, 5000))}</td>
-                    <td>${fmt(rnd(300, 500))}</td>
-                    <td>${fmt(rnd(50, 100))}</td>
-                  </tr>
-                `).join('')}
+                    <td>${cfg.disc || 0}%</td>
+                    <td>${fmt(cfg.prize4d || 0)}</td>
+                    <td>${fmt(cfg.prize3d || 0)}</td>
+                    <td>${fmt(cfg.prize2d || 0)}</td>
+                  </tr>`;
+                }).join('')}
               </tbody>
             </table>
           `)}
@@ -399,14 +433,19 @@ pages['settings-togel-commission'] = () => {
             <table>
               <thead><tr><th>Pool</th><th>Override Disc.</th><th>Status</th><th>Action</th></tr></thead>
               <tbody>
-                ${POOLS.map((pool, i) => `
+                ${POOLS.map((pool, i) => {
+                  const key = `togel_pool_override_${pool.replace(/ /g,'_').toLowerCase()}`;
+                  const cfg = STATE.settings[key] || {};
+                  const hasOverride = cfg.disc !== undefined;
+                  const active = cfg.active !== false && i !== 5;
+                  return `
                   <tr>
                     <td><strong>${pool}</strong></td>
-                    <td>${i < 4 ? `<input type="number" value="${rnd(30, 65)}" min="0" max="100" style="width:60px;border:1px solid var(--border);border-radius:6px;padding:.2rem .4rem;font-size:.82rem;outline:none"/>%` : '<span style="color:var(--text3)">Default</span>'}</td>
-                    <td>${badge(i !== 5 ? 'Active' : 'Inactive', i !== 5 ? 'success' : 'danger')}</td>
+                    <td>${hasOverride || i < 4 ? `<input type="number" value="${cfg.disc || 0}" min="0" max="100" style="width:60px;border:1px solid var(--border);border-radius:6px;padding:.2rem .4rem;font-size:.82rem;outline:none"/>%` : '<span style="color:var(--text3)">Default</span>'}</td>
+                    <td>${badge(active ? 'Active' : 'Inactive', active ? 'success' : 'danger')}</td>
                     <td><button class="btn btn-sm btn-primary" onclick="toast('Edit ${pool}','info')"><i class="fa-solid fa-pen"></i></button></td>
-                  </tr>
-                `).join('')}
+                  </tr>`;
+                }).join('')}
               </tbody>
             </table>
           `)}

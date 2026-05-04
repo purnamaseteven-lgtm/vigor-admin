@@ -376,16 +376,16 @@ pages['invoice-file'] = () => {
 function makeLogPage(title, breadcrumbLabel, actorType) {
   return () => {
     const PG = 'logs-' + actorType;
-    const fakeLogs = Array.from({ length: 30 }, (_, i) => ({
-      id: 'L' + (Date.now() - i * 60000),
-      date: `${rnd(20, 27)}/04/2026 ${rnd(10, 23)}:${rnd(10, 59)}:${rnd(10, 59)}`,
-      actor: actorType === 'member' ? MEMBERS[i % MEMBERS.length] : COMPANIES[i % COMPANIES.length],
-      ip: `${rnd(100, 200)}.${rnd(10, 99)}.${rnd(1, 250)}.${rnd(1, 254)}`,
-      action: ['Login', 'Logout', 'Deposit', 'Withdraw', 'Change Password', 'Update Profile', 'View Balance', 'API Call'][i % 8],
-      target: actorType === 'member' ? MEMBERS[(i + 1) % MEMBERS.length] : COMPANIES[(i + 1) % COMPANIES.length],
-      description: 'Action performed successfully'
-    }));
-    const filtered = filterData(fakeLogs, PG);
+    // Use real STATE.logs filtered by actor type; fall back to empty array (no mock)
+    const memberUsernames = new Set((STATE.members || []).map(m => m.username));
+    const companyNames = new Set((STATE.companies || []).map(c => c.name || c));
+    const allLogs = STATE.logs || [];
+    const typeLogs = actorType === 'member'
+      ? allLogs.filter(l => memberUsernames.has(l.actor))
+      : actorType === 'admin'
+      ? allLogs.filter(l => !memberUsernames.has(l.actor) && !companyNames.has(l.actor))
+      : allLogs.filter(l => companyNames.has(l.actor));
+    const filtered = filterData(typeLogs.length ? typeLogs : allLogs, PG);
     const pp = getPerPage(PG);
     const cp = getCurPage(PG);
     const rows = paginate(filtered, cp, pp);

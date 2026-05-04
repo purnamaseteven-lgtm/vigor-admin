@@ -62,12 +62,23 @@ pages['bets-list'] = () => {
 
 pages['bets-table'] = () => {
   const POOLS = ['4D Togel External', '4D Togel Vigor', '4D Togel Global', '6D Togel Vigor', 'SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA'];
-  const poolRows = POOLS.map(pool => ({
-    pool, open: rnd(3, 10) + ':00', close: rnd(17, 20) + ':00',
-    totalBets: rnd(200, 2000), totalAmount: rnd(50, 500) * 1000000,
-    winners: rnd(10, 200), payoutAmt: rnd(30, 400) * 1000000,
-    status: pool === 'PCSO' ? 'Closed' : 'Open'
-  }));
+  const allBets = STATE.lotteryBets || [];
+  const poolRows = POOLS.map(pool => {
+    const poolBets = allBets.filter(b => b.pool === pool);
+    const winners = poolBets.filter(b => (b.winAmount || 0) > 0);
+    // Pool schedule from STATE.settings if available
+    const sched = STATE.settings['pool_sched_' + pool.replace(/ /g, '_').toLowerCase()] || {};
+    return {
+      pool,
+      open: sched.open || '10:00',
+      close: sched.close || '18:00',
+      totalBets: poolBets.length,
+      totalAmount: poolBets.reduce((s, b) => s + (b.betAmount || 0), 0),
+      winners: winners.length,
+      payoutAmt: poolBets.reduce((s, b) => s + (b.winAmount || 0), 0),
+      status: sched.status || (pool === 'PCSO' ? 'Closed' : 'Open'),
+    };
+  });
 
   return `
     ${pageHeader('Bets Table', '<span>Bets</span><span class="sep">›</span><span>Bets Table</span>', `

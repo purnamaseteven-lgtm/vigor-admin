@@ -199,66 +199,56 @@ window.deleteAdmin = async (id) => {
     go('admin-management');
 };
 
-/* ─── DEV SIMULATOR: ROLE MATRIX ─── */
+/* ─── PERMISSION MATRIX EDITOR ─── */
 pages['dev-menu-config'] = () => {
     const defaultTree = {
-        home: { dashboard: true, statistics: true, providerAnalytics: true, deviceReport: true },
-        master: { whitelist: true, blacklist: true, masterWhitelist: true },
-        administrators: { systemAdmins: true, rolePermissions: true },
-        companyManagement: { whitelabelList: true, regisNewCompany: true },
-        whitelabel: { whitelabelList: true, masterWlList: true },
-        members: { memberList: true, addMember: true, tierHistory: true },
-        bankManagement: { bankList: true, createNewBank: true },
-        finance: { deposit: true, withdrawal: true },
-        bets: { betsListing: true, bettingTable: true, transferredList: true },
-        bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: true },
-        results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
-        integrations: { providerSetup: true, apiLogs: true, developerDocs: true },
-        customization: { templateBuilder: true, templatePreview: true, promotions: true, systemTheme: true, globalBanner: true, appNotification: true, siteConfig: true, seoTools: true },
-        settings: { commission: true, referralRate: true, poolsList: true, games: true, agentGameSettings: true, togelCommission: true, limitCreditOut: true, vipDesigner: true, rebateCalc: true },
-        tools: { coin2pay: true, hostManagement: true, sawala: true, smartico: true, unopay: true },
-        memo: { memoBox: true, autoMemo: true },
-        reports: { winloss: true, agentDaily: true, limitCredit: true, lostMoney: true, togelLost: true, topTurnover: true },
-        invoice: { monthly: true, fileManagement: true, tournamentWinners: true },
-        logs: { adminLogs: true, companyLogs: true, whitelabelLogs: true, memberLogs: true, masterWlLogs: true }
+        home:               { dashboard: true, statistics: true, providerAnalytics: true, deviceReport: true },
+        master:             { whitelist: true, blacklist: true, masterWhitelist: true },
+        administrators:     { systemAdmins: true, rolePermissions: true },
+        companyManagement:  { whitelabelList: true, regisNewCompany: true },
+        whitelabel:         { whitelabelList: true, masterWlList: true },
+        members:            { memberList: true, addMember: true, tierHistory: true },
+        bankManagement:     { bankList: true, createNewBank: true },
+        finance:            { deposit: true, withdrawal: true },
+        bets:               { betsListing: true, bettingTable: true, transferredList: true },
+        bonus:              { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: true, promotions: true, promotionRelease: true, promotionRollingRelease: true },
+        results:            { resultsListing: true, resultScan: true, resultsAnalyze: true },
+        integrations:       { providerSetup: true, apiLogs: true, developerDocs: true },
+        customization:      { templateBuilder: true, templatePreview: true, promotions: true, systemTheme: true, globalBanner: true, appNotification: true, announcements: true, siteConfig: true, seoTools: true },
+        settings:           { commission: true, referralRate: true, poolsList: true, games: true, agentGameSettings: true, togelCommission: true, limitCreditOut: true, vipDesigner: true, rebateCalc: true, financeLimits: true },
+        tools:              { coin2pay: true, hostManagement: true, sawala: true, smartico: true, unopay: true },
+        memo:               { memoBox: true, autoMemo: true },
+        reports:            { winloss: true, agentDaily: true, limitCredit: true, lostMoney: true, togelLost: true, topTurnover: true },
+        invoice:            { monthly: true, fileManagement: true, tournamentWinners: true },
+        logs:               { adminLogs: true, companyLogs: true, whitelabelLogs: true, memberLogs: true, masterWlLogs: true }
     };
 
     const mx = STATE.permissionMatrix;
-    const roles = ['Master', 'Company'];
+    const roles = ['Master', 'Company', 'Shop'];
+    const roleLabels = { Master: 'Master Agent', Company: 'Agent / Toko', Shop: 'Shop Operator' };
 
-    let tableHTML = `<div style="max-height: 600px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;">`;
-    tableHTML += `<table style="width:100%; border-collapse:collapse; text-align:left;">`;
-    tableHTML += `<thead style="position: sticky; top: 0; background: #1e293b; z-index: 10;">
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.1)">
-            <th style="padding:1rem; color:var(--acc); font-weight:800; font-size:0.85rem">System Module & Sub-Menus</th>`;
-    const roleLabels = {
-        Master: 'Master Agent',
-        Company: 'Agent/Toko'
-    };
-
-    roles.forEach(r => tableHTML += `<th style="padding:1rem">${roleLabels[r] || r}</th>`);
+    let tableHTML = `<div style="max-height:600px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">`;
+    tableHTML += `<table style="width:100%;border-collapse:collapse;text-align:left">`;
+    tableHTML += `<thead style="position:sticky;top:0;background:var(--bg2);z-index:10">
+        <tr style="border-bottom:1px solid var(--border)">
+            <th style="padding:1rem;color:var(--acc);font-weight:800;font-size:.85rem">Module / Feature</th>`;
+    roles.forEach(r => tableHTML += `<th style="padding:1rem;font-size:.82rem;font-weight:700;text-align:center">${roleLabels[r]||r}</th>`);
     tableHTML += `</tr></thead><tbody>`;
 
     Object.keys(defaultTree).forEach(mod => {
-        // Parent Header
-        tableHTML += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(255,255,255,0.03);">`;
-        tableHTML += `<td style="padding:.8rem 1rem; font-weight:700; color:#cbd5e1; text-transform:uppercase; letter-spacing:0.05em; font-size:0.75rem">${mod}</td>`;
-        roles.forEach(r => tableHTML += `<td></td>`);
+        tableHTML += `<tr style="border-bottom:1px solid var(--border);background:var(--bg2)">`;
+        tableHTML += `<td colspan="${roles.length+1}" style="padding:.6rem 1rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-size:.72rem"><i class="fa-solid fa-folder-open" style="margin-right:.4rem;opacity:.5"></i>${mod}</td>`;
         tableHTML += `</tr>`;
-
-        // Sub Items
         Object.keys(defaultTree[mod]).forEach(sub => {
-            tableHTML += `<tr style="border-bottom:1px dashed rgba(255,255,255,0.02)">`;
-            tableHTML += `<td style="padding:.5rem 1rem .5rem 2.5rem; font-size:0.8rem; color:#94a3b8"><i class="fa-solid fa-turn-up fa-rotate-90" style="margin-right:6px; opacity:0.3"></i> ${sub}</td>`;
+            tableHTML += `<tr style="border-bottom:1px dashed var(--border)44">`;
+            tableHTML += `<td style="padding:.45rem 1rem .45rem 2.2rem;font-size:.8rem;color:var(--text2)"><i class="fa-solid fa-angle-right" style="margin-right:.4rem;opacity:.3"></i>${sub}</td>`;
             roles.forEach(r => {
                 if (!mx[r]) mx[r] = JSON.parse(JSON.stringify(defaultTree));
-                if (!mx[r][mod]) mx[r][mod] = JSON.parse(JSON.stringify(defaultTree[mod]));
+                if (!mx[r][mod]) mx[r][mod] = {};
                 const isChecked = mx[r][mod][sub] ? 'checked' : '';
-                tableHTML += `<td style="padding:.5rem 1rem">
-                    <label style="display:flex; align-items:center; cursor:pointer;">
-                        <input type="checkbox" style="width:15px;height:15px;accent-color:var(--acc)" 
-                            onchange="window.updateRoleMatrix('${r}', '${mod}', '${sub}', this.checked)" ${isChecked}>
-                    </label>
+                tableHTML += `<td style="padding:.45rem 1rem;text-align:center">
+                    <input type="checkbox" style="width:15px;height:15px;accent-color:var(--acc);cursor:pointer"
+                        onchange="window.updateRoleMatrix('${r}','${mod}','${sub}',this.checked)" ${isChecked}>
                 </td>`;
             });
             tableHTML += `</tr>`;
@@ -267,29 +257,41 @@ pages['dev-menu-config'] = () => {
     tableHTML += `</tbody></table></div>`;
 
     return `
-    ${pageHeader('Full Platform Matrix', '<span>System Config</span><span class="sep">›</span><span>Permissions</span>', `
-        <button class="btn btn-secondary" onclick="go('admin-management')"><i class="fa-solid fa-arrow-left"></i> Back</button>
+    ${pageHeader('Permission Matrix', '<span>Administrators</span><span class="sep">›</span><span>Permissions</span>', `
+        <div style="display:flex;gap:.5rem">
+            <button class="btn btn-secondary" onclick="go('admin-management')"><i class="fa-solid fa-arrow-left"></i> Back</button>
+            <button class="btn btn-primary" id="btnSaveMatrix" onclick="window.savePermissionMatrix()"><i class="fa-solid fa-floppy-disk"></i> Save to Database</button>
+        </div>
     `)}
 
-    <div style="display:grid; grid-template-columns: 1fr 320px; gap: 1.5rem; align-items:start;">
-        <div class="card" style="box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-            <div class="card-header"><span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--acc)"></i> Granular Visibility Control</span></div>
-            <div class="card-body">
-                <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:1rem">This matrix now covers <b>100% of detected platform modules</b>. Toggling a checkbox will instantly remove/add that sub-menu for the selected role.</p>
-                <div class="table-wrapper-outer" style="background:#0f172a; border-radius:12px; border:1px solid rgba(255,255,255,0.05); padding:1px">
-                    ${tableHTML}
-                </div>
+    <div class="alert alert-info" style="margin-bottom:1.25rem">
+        <i class="fa-solid fa-info-circle"></i>
+        <div>Changes are applied <strong>live</strong> to STATE immediately. Click <strong>Save to Database</strong> to persist across sessions.</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:1.5rem;align-items:start">
+        <div class="card">
+            <div class="card-header"><span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--acc)"></i> Role Access Control</span></div>
+            <div class="card-body" style="padding:.75rem">
+                ${tableHTML}
             </div>
         </div>
-        <div class="card" style="background:#1e293b; border:1px solid var(--acc); border-radius:12px; padding:1.5rem; position:sticky; top:1.5rem">
-            <h3 style="color:#fff; margin:0 0 1rem 0; display:flex; align-items:center; gap:.5rem; font-size:1rem"><i class="fa-solid fa-bolt" style="color:var(--acc)"></i> Simulator Tips</h3>
-            <ul style="color:#cbd5e1; font-size:0.75rem; line-height:1.6; padding-left:1.1rem; margin:0">
-                <li><b>Ghost Menus:</b> If a parent category has zero items checked, the entire label will disappear from the sidebar.</li>
-                <li><b>Instant Persistence:</b> All changes save to <code>STATE.permissionMatrix</code> and <code>localStorage</code> immediately.</li>
-                <li><b>Role Switching:</b> Change roles in the top-right header to verify your changes.</li>
-            </ul>
-            <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid rgba(255,255,255,0.1)">
-                <button class="btn btn-primary" style="width:100%" onclick="saveState(); toast('Snapshot Saved', 'success')"><i class="fa-solid fa-floppy-disk"></i> Save Matrix Snapshot</button>
+        <div class="card" style="position:sticky;top:1rem">
+            <div class="card-header"><span class="card-title">Quick Actions</span></div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:.75rem">
+                ${roles.map(r => `
+                <div style="padding:.75rem;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+                    <div style="font-weight:700;margin-bottom:.5rem">${roleLabels[r]}</div>
+                    <div style="display:flex;gap:.4rem">
+                        <button class="btn btn-xs btn-success" style="flex:1" onclick="window.setAllRolePerms('${r}',true)"><i class="fa-solid fa-check-double"></i> All On</button>
+                        <button class="btn btn-xs btn-danger" style="flex:1" onclick="window.setAllRolePerms('${r}',false)"><i class="fa-solid fa-xmark"></i> All Off</button>
+                    </div>
+                </div>`).join('')}
+                <div style="padding:.75rem;background:var(--acc)11;border-radius:8px;border:1px solid var(--acc)33;font-size:.75rem;color:var(--text3)">
+                    <i class="fa-solid fa-lightbulb" style="color:var(--acc);margin-right:.3rem"></i>
+                    Parent categories with 0 active items auto-hide in sidebar.
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="window.resetMatrixToDefault()"><i class="fa-solid fa-rotate-left"></i> Reset to Defaults</button>
             </div>
         </div>
     </div>
@@ -301,8 +303,58 @@ window.updateRoleMatrix = (role, mod, sub, isChecked) => {
     if (typeof STATE.permissionMatrix[role][mod] !== 'object') STATE.permissionMatrix[role][mod] = {};
     STATE.permissionMatrix[role][mod][sub] = isChecked;
     saveState();
-    toast(`Permission updated: [${role}] -> ${mod} : ${sub} = ${isChecked}`, 'info');
-
-    // Automatically re-render the sidebar to reflect the change visually if we are simulating that role
     if (window.renderSidebar) window.renderSidebar();
+};
+
+window.setAllRolePerms = (role, value) => {
+    if (!STATE.permissionMatrix[role]) STATE.permissionMatrix[role] = {};
+    document.querySelectorAll(`input[onchange*="'${role}'"]`).forEach(cb => {
+        cb.checked = value;
+        const match = cb.getAttribute('onchange').match(/'([^']+)','([^']+)','([^']+)'/);
+        if (match) {
+            const [, r, mod, sub] = match;
+            if (!STATE.permissionMatrix[r][mod]) STATE.permissionMatrix[r][mod] = {};
+            STATE.permissionMatrix[r][mod][sub] = value;
+        }
+    });
+    saveState();
+    toast(`${role}: all permissions ${value ? 'enabled' : 'disabled'}`, 'info');
+};
+
+window.resetMatrixToDefault = () => {
+    confirmAction('Reset Permission Matrix', 'This will reset all role permissions to system defaults. Continue?', () => {
+        delete STATE.permissionMatrix.Master;
+        delete STATE.permissionMatrix.Company;
+        delete STATE.permissionMatrix.Shop;
+        saveState();
+        go('dev-menu-config');
+        toast('Matrix reset to defaults', 'success');
+    });
+};
+
+window.savePermissionMatrix = async () => {
+    const btn = document.getElementById('btnSaveMatrix');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...'; }
+
+    const matrixJson = JSON.stringify({
+        Master:  STATE.permissionMatrix.Master  || {},
+        Company: STATE.permissionMatrix.Company || {},
+        Shop:    STATE.permissionMatrix.Shop    || {},
+    });
+
+    if (window.db?.dbSaveSetting) {
+        const { error } = await window.db.dbSaveSetting('permission_matrix', matrixJson);
+        if (error) {
+            toast('Save failed: ' + error.message, 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Database'; }
+            return;
+        }
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Permissions', 'matrix', 'Permission matrix saved to database');
+        toast('Permission matrix saved to database', 'success');
+    } else {
+        saveState();
+        toast('Saved to local storage (no DB connection)', 'info');
+    }
+
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save to Database'; }
 };

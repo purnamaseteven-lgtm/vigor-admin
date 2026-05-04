@@ -224,13 +224,23 @@ export const fetchSettings = async () => {
     const { data } = await supabase.from('settings').select('*').is('company', null);
     if (data) {
         data.forEach(s => {
-            if (s.key === 'commission')       STATE.settings.commission     = Number(s.value);
-            if (s.key === 'referral')         STATE.settings.referral       = Number(s.value);
-            if (s.key === 'referral_slot')    STATE.settings.referralSlot   = Number(s.value);
-            if (s.key === 'min_deposit')      STATE.settings.minDeposit     = Number(s.value);
-            if (s.key === 'max_deposit')      STATE.settings.maxDeposit     = Number(s.value);
-            if (s.key === 'max_withdraw')     STATE.settings.maxWithdraw    = Number(s.value);
-            if (s.key === 'maintenance_mode') STATE.settings.maintenanceMode = s.value === 'true';
+            switch (s.key) {
+                case 'commission':             STATE.settings.commission            = Number(s.value); break;
+                case 'referral':               STATE.settings.referral              = Number(s.value); break;
+                case 'referral_slot':          STATE.settings.referralSlot          = Number(s.value); break;
+                case 'min_deposit':            STATE.settings.minDeposit            = Number(s.value); break;
+                case 'max_deposit':            STATE.settings.maxDeposit            = Number(s.value); break;
+                case 'max_withdraw':           STATE.settings.maxWithdraw           = Number(s.value); break;
+                case 'daily_withdraw_limit':   STATE.settings.dailyWithdrawLimit    = Number(s.value); break;
+                case 'maintenance_mode':       STATE.settings.maintenanceMode       = s.value === 'true'; break;
+                case 'registration_open':      STATE.settings.registrationOpen      = s.value !== 'false'; break;
+                case 'auto_approve_deposit':   STATE.settings.autoApproveDeposit    = s.value === 'true'; break;
+                case 'manual_withdraw_review': STATE.settings.manualWithdrawReview  = s.value !== 'false'; break;
+                case 'permission_matrix': {
+                    try { const pm = JSON.parse(s.value); if (pm && typeof pm === 'object') Object.assign(STATE.permissionMatrix, pm); } catch {}
+                    break;
+                }
+            }
         });
         saveState();
     }
@@ -255,9 +265,14 @@ const PAGE_FETCHES = {
     'logs-admin':             [fetchLogs],
     'memo-list':              [fetchMemos],
     'settings-commission':    [fetchSettings],
+    'settings-referral-rate': [fetchSettings],
+    'settings-finance':       [fetchSettings],
+    'custom-promotion-list':  [fetchPromotions],
     'promotions':             [fetchPromotions],
     'custom-promotions':      [fetchPromotions],
+    'announcement-list':      [fetchAnnouncements],
     'announcements':          [fetchAnnouncements],
+    'admin-management':       [fetchSettings],
     'bets-list':              [fetchLotteryBets],
     'bets-table':             [fetchLotteryBets],
     'results-listing':        [fetchLotteryResults],

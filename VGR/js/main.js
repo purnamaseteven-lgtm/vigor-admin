@@ -3,6 +3,7 @@ import { initState } from './core/state.js';
 import { go, toggleMenu } from './core/router.js';
 import { requireAuth, onAuthChange, applyRBAC } from './core/auth.js';
 import { initRealtime } from './core/realtime.js';
+import { fetchSettings } from './core/db.js';
 import { SUPABASE_ENABLED } from './core/supabase.js';
 import { t, applyTranslations, changeLanguage } from './core/i18n.js';
 import './api/payment.js';  // register window.paymentAPI
@@ -145,6 +146,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         onAuthChange((event) => {
             if (event === 'TOKEN_REFRESHED') console.log('[Auth] Token refreshed');
         });
+        // Load settings from DB on startup so STATE.settings reflects persisted values
+        fetchSettings().catch(e => console.warn('[Init] fetchSettings failed:', e.message));
         console.log('[VIGOR] Supabase mode — live data enabled');
     } else {
         showModeBanner();

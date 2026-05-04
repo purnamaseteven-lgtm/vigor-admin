@@ -54,7 +54,7 @@ pages['master'] = () => {
                   <td style="font-size:.75rem">${c.joined}</td>
                   <td>${actionBtns(
     `window.openFormModal('company','${c.id}')`,
-    `confirmAction('Delete Master','Delete master [${c.username}]?',()=>{window.stateDelete('companies','${c.id}');window.go('master');toast('Master deleted','success')},'Delete','danger')`
+    `confirmAction('Delete Master','Delete master [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','master'),'Delete','danger')`
   )}</td>
                 </tr>
               `).join('')}
@@ -343,7 +343,7 @@ pages['company-list'] = () => {
                   <td style="font-size:.75rem">${c.joined}</td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
-      `confirmAction('Delete Company','Delete company [${c.username}]?',()=>{window.stateDelete('companies','${c.id}');window.go('company-list');toast('Company deleted','success')},'Delete','danger')`
+      `confirmAction('Delete Company','Delete company [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','company-list'),'Delete','danger')`
     )}</td>
                 </tr>
               `).join('')}
@@ -398,7 +398,7 @@ pages['master-whitelabel-list'] = () => {
                   <td>${badge(c.status, c.status === 'Active' ? 'success' : 'danger')}</td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
-      `confirmAction('Delete Record','Delete record [${c.username}]?',()=>{window.stateDelete('companies','${c.id}');window.go('master-whitelabel-list');toast('Record deleted','success')},'Delete','danger')`
+      `confirmAction('Delete Record','Delete record [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','master-whitelabel-list'),'Delete','danger')`
     )}</td>
                 </tr>
               `).join('')}
@@ -454,7 +454,7 @@ pages['whitelabel-list'] = () => {
                   <td>${badge(c.status, c.status === 'Active' ? 'success' : 'danger')}</td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
-      `confirmAction('Delete Whitelabel','Delete whitelabel [${c.username}]?',()=>{window.stateDelete('companies','${c.id}');window.go('whitelabel-list');toast('Whitelabel deleted','success')},'Delete','danger')`
+      `confirmAction('Delete Whitelabel','Delete whitelabel [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','whitelabel-list'),'Delete','danger')`
     )}</td>
                 </tr>
               `).join('')}
@@ -763,8 +763,9 @@ window.submitCompanyCreate = () => {
   const template = document.getElementById('cc_template')?.value;
   const country = document.getElementById('cc_country')?.value;
 
-  stateAdd('companies', {
-    id: 'C' + Date.now(),
+  const newId = 'C' + Date.now();
+  const newCompany = {
+    id: newId,
     username: u,
     name: n || u,
     email: '',
@@ -778,11 +779,21 @@ window.submitCompanyCreate = () => {
     whitelistIPs: ips,
     togelMarkets: pools,
     joined: new Date().toISOString().split('T')[0]
-  });
+  };
 
-  addLog('company_create', u, `New company [${u}] created with ${pools.length} pools`);
-  toast('Company created successfully', 'success');
-  setTimeout(() => window.go('company-list'), 800);
+  if (window.db?.dbAddCompany) {
+    window.db.dbAddCompany(newCompany).then(({ error }) => {
+      if (error) { toast('Failed: ' + error.message, 'error'); return; }
+      if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Company', newId, `New company [${u}] created with ${pools.length} pools`);
+      toast('Company created successfully', 'success');
+      setTimeout(() => window.go('company-list'), 800);
+    });
+  } else {
+    stateAdd('companies', newCompany);
+    addLog('company_create', u, `New company [${u}] created with ${pools.length} pools`);
+    toast('Company created successfully', 'success');
+    setTimeout(() => window.go('company-list'), 800);
+  }
 };
 
 window.submitBankCreate = () => {
@@ -794,10 +805,21 @@ window.submitBankCreate = () => {
   const minD = parseInt(document.getElementById('bk_min')?.value) || 10000;
   const maxD = parseInt(document.getElementById('bk_max')?.value) || 100000000;
   const status = document.querySelector('input[name="bk_status"]:checked')?.value || 'Active';
-  stateAdd('banks', { id: 'B' + Date.now(), bank, accountName: accName, accountNumber: accNo, type, minDeposit: minD, maxDeposit: maxD, status });
-  addLog('bank_create', bank, 'New bank account added');
-  toast('Bank account added successfully', 'success');
-  setTimeout(() => window.go('bank-list'), 800);
+  const newBankId = 'B' + Date.now();
+  const newBank = { id: newBankId, bank, accountName: accName, accountNumber: accNo, type, minDeposit: minD, maxDeposit: maxD, status };
+  if (window.db?.dbAddBank) {
+    window.db.dbAddBank(newBank).then(({ error }) => {
+      if (error) { toast('Failed: ' + error.message, 'error'); return; }
+      if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Bank', newBankId, `New bank account added: ${bank}`);
+      toast('Bank account added successfully', 'success');
+      setTimeout(() => window.go('bank-list'), 800);
+    });
+  } else {
+    stateAdd('banks', newBank);
+    addLog('bank_create', bank, 'New bank account added');
+    toast('Bank account added successfully', 'success');
+    setTimeout(() => window.go('bank-list'), 800);
+  }
 };
 
 window.saveProfile = () => {

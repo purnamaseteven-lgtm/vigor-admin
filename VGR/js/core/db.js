@@ -737,6 +737,61 @@ export async function dbSaveSetting(key, value, company = null) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  ADMIN PROFILES CRUD
+// ══════════════════════════════════════════════════════════════════
+export async function dbAddAdmin(adminData, password = null) {
+    if (!SUPABASE_ENABLED || !supabase) {
+        STATE.admins = STATE.admins || [];
+        STATE.admins.unshift(adminData);
+        saveState();
+        return { error: null };
+    }
+    const { error } = await supabase.from('admin_profiles').insert({
+        id: adminData.id,
+        username: adminData.username,
+        name: adminData.name,
+        role: adminData.role,
+        company: adminData.company || null,
+        shop: adminData.shop || null,
+        status: adminData.status || 'Active',
+    });
+    if (!error) {
+        STATE.admins = STATE.admins || [];
+        STATE.admins.unshift(adminData);
+        saveState();
+    }
+    return { error };
+}
+
+export async function dbUpdateAdmin(id, updates) {
+    if (!SUPABASE_ENABLED || !supabase) {
+        stateUpdate('admins', id, updates);
+        saveState();
+        return { error: null };
+    }
+    const { error } = await supabase.from('admin_profiles').update({
+        name: updates.name,
+        role: updates.role,
+        company: updates.company || null,
+        shop: updates.shop || null,
+        status: updates.status,
+    }).eq('id', id);
+    if (!error) { stateUpdate('admins', id, updates); saveState(); }
+    return { error };
+}
+
+export async function dbDeleteAdmin(id) {
+    if (!SUPABASE_ENABLED || !supabase) {
+        stateDelete('admins', id);
+        saveState();
+        return { error: null };
+    }
+    const { error } = await supabase.from('admin_profiles').delete().eq('id', id);
+    if (!error) { stateDelete('admins', id); saveState(); }
+    return { error };
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  ADMIN LOGS
 // ══════════════════════════════════════════════════════════════════
 export async function dbWriteLog(action, target = '', description = '', actor = '') {
@@ -790,6 +845,8 @@ window.db = {
     dbAddLotteryBet, dbSaveLotteryResult, dbSettleLotteryBets,
     // Seamless
     dbUpdateSeamlessConfig,
+    // Admins
+    dbAddAdmin, dbUpdateAdmin, dbDeleteAdmin,
     // Settings & Logs
     dbSaveSetting, dbWriteLog,
 };

@@ -4,41 +4,28 @@
 -- Run AFTER 001 and 002
 -- ═══════════════════════════════════════════════════════════════
 
--- ── STEP 1: Create the SuperAdmin auth user ────────────────────
--- NOTE: Replace the email and password before running!
--- This uses Supabase's admin API. Run via SQL Editor with service_role.
-INSERT INTO auth.users (
-    id,
-    instance_id,
-    email,
-    encrypted_password,
-    email_confirmed_at,
-    created_at,
-    updated_at,
-    raw_app_meta_data,
-    raw_user_meta_data,
-    aud,
-    role
-) VALUES (
-    gen_random_uuid(),
-    '00000000-0000-0000-0000-000000000000',
-    'superadmin@vigor.internal',  -- CHANGE THIS
-    crypt('VigorAdmin2026!', gen_salt('bf')),  -- CHANGE THIS
-    NOW(),
-    NOW(),
-    NOW(),
-    '{"provider":"email","providers":["email"]}',
-    '{}',
-    'authenticated',
-    'authenticated'
-) ON CONFLICT DO NOTHING;
+-- ── STEP 1 & 2: SuperAdmin user ───────────────────────────────
+-- NOTE: Create SuperAdmin via Supabase Auth Admin API (not raw SQL!)
+-- Use this curl command AFTER running this migration:
+--
+--   curl -X POST https://YOUR_PROJECT.supabase.co/auth/v1/admin/users \
+--     -H "apikey: YOUR_SERVICE_ROLE_KEY" \
+--     -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
+--     -H "Content-Type: application/json" \
+--     -d '{"email":"superadmin@vigor.internal","password":"VigorAdmin2026!","email_confirm":true}'
+--
+-- Then insert admin_profile with the returned user ID:
+--
+-- INSERT INTO admin_profiles (id, username, name, role, company, status)
+-- VALUES ('<USER_ID_FROM_ABOVE>', 'superadmin', 'VIGOR Super Admin', 'SuperAdmin', 'Global', 'Active');
+--
+-- ALREADY DONE for project eflrvtqoyrgemvgnfdzj:
+-- SuperAdmin user ID: cf46ada9-149e-47aa-a410-ea668e0ec79b
 
--- ── STEP 2: Create admin_profile for SuperAdmin ────────────────
+-- Ensure admin_profile exists (idempotent)
 INSERT INTO admin_profiles (id, username, name, role, company, status)
-SELECT id, 'superadmin', 'VIGOR Super Admin', 'SuperAdmin', 'Global', 'Active'
-FROM auth.users
-WHERE email = 'superadmin@vigor.internal'
-ON CONFLICT DO NOTHING;
+VALUES ('cf46ada9-149e-47aa-a410-ea668e0ec79b', 'superadmin', 'VIGOR Super Admin', 'SuperAdmin', 'Global', 'Active')
+ON CONFLICT (id) DO NOTHING;
 
 -- ── STEP 3: Global settings ────────────────────────────────────
 INSERT INTO settings (key, value, company) VALUES

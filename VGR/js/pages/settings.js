@@ -414,16 +414,17 @@ export function saveSettingsCommission() {
   if (isNaN(v) || v < 0 || v > 100) { toast('Invalid commission value (0-100)', 'error'); return; }
   STATE.settings.commission = v;
   addLog('Update Settings', 'commission', `Default commission set to ${v}%`);
+  if (window.db?.dbSaveSetting) window.db.dbSaveSetting('commission', v);
   toast(`Default commission updated to ${v}%!`, 'success');
 }
 
 window.saveSettingsCommission = saveSettingsCommission;
 
-window.saveReferralSettings = () => {
+window.saveReferralSettings = async () => {
   const ref = parseFloat(document.getElementById('settReferral')?.value);
   const slot = parseFloat(document.getElementById('settRefSlot')?.value);
-  if (!isNaN(ref)) STATE.settings.referral = ref;
-  if (!isNaN(slot)) STATE.settings.referralSlot = slot;
+  if (!isNaN(ref)) { STATE.settings.referral = ref; if (window.db?.dbSaveSetting) await window.db.dbSaveSetting('referral', ref); }
+  if (!isNaN(slot)) { STATE.settings.referralSlot = slot; if (window.db?.dbSaveSetting) await window.db.dbSaveSetting('referral_slot', slot); }
   addLog('Update Settings', 'referral', `Referral rate set to ${ref}%`);
   toast('Referral settings saved!', 'success');
 };
@@ -431,5 +432,6 @@ window.saveReferralSettings = () => {
 window.toggleCompanyReferrer = (company, checked) => {
   STATE.settings.companyReferralStatus[company] = checked;
   addLog('Update Settings', `Referral: ${company}`, `${company} referral switched ${checked ? 'ON' : 'OFF'}`);
+  if (window.db?.dbSaveSetting) window.db.dbSaveSetting(`referral_company_${company}`, checked ? '1' : '0');
   toast(`${company} referral system ${checked ? 'Activated' : 'Deactivated'}`, checked ? 'success' : 'warning');
 };

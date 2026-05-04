@@ -148,7 +148,7 @@ window.toggleAdminFields = (role) => {
     }
 };
 
-window.saveAdmin = (id) => {
+window.saveAdmin = async (id) => {
     const data = {
         username: document.getElementById('adm_username').value,
         name: document.getElementById('adm_name').value,
@@ -157,22 +157,44 @@ window.saveAdmin = (id) => {
         shop: document.getElementById('adm_shop')?.value || null,
         status: 'Active'
     };
+    const password = document.getElementById('adm_pass')?.value;
 
     if (id) {
-        stateUpdate('admins', id, data);
+        // Update in Supabase admin_profiles
+        if (window.db?.dbUpdateAdmin) {
+            const { error } = await window.db.dbUpdateAdmin(id, data);
+            if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Admin', id, `Updated admin ${data.username}`);
+        } else {
+            stateUpdate('admins', id, data);
+        }
         toast('Administrator profile updated', 'success');
     } else {
         data.id = 'adm-' + Date.now();
         data.lastLogin = 'Never';
-        stateAdd('admins', data);
+        // Create in Supabase admin_profiles
+        if (window.db?.dbAddAdmin) {
+            const { error } = await window.db.dbAddAdmin(data, password);
+            if (error) { toast('Failed: ' + error.message, 'error'); return; }
+            if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Admin', data.id, `Created admin ${data.username} [${data.role}]`);
+        } else {
+            stateAdd('admins', data);
+        }
         toast('New administrator created successfully', 'success');
     }
     closeModalBtn();
     go('admin-management');
 };
 
-window.deleteAdmin = (id) => {
-    stateDelete('admins', id);
+window.deleteAdmin = async (id) => {
+    const admin = STATE.admins?.find(a => a.id === id);
+    if (window.db?.dbDeleteAdmin) {
+        const { error } = await window.db.dbDeleteAdmin(id);
+        if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Admin', id, `Deleted admin ${admin?.username}`);
+    } else {
+        stateDelete('admins', id);
+    }
     toast('Administrator access revoked', 'warning');
     go('admin-management');
 };

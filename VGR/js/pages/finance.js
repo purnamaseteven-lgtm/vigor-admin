@@ -191,7 +191,7 @@ pages['bank-list'] = () => {
               <td>
                 <div class="action-btns">
                   <button class="btn btn-sm btn-icon" style="background:#f59e0b;color:#fff" onclick="window.openFormModal('bank','${b.id}')"><i class="fa-solid fa-pen"></i></button>
-                  <button class="btn btn-sm btn-danger btn-icon" onclick="confirmAction('Delete Bank','Delete bank [${b.bank} - ${b.accountName}]?',()=>{window.stateDelete('banks','${b.id}');window.go('bank-list');toast('Bank deleted','success')},'Delete','danger')"><i class="fa-solid fa-trash"></i></button>
+                  <button class="btn btn-sm btn-danger btn-icon" onclick="confirmAction('Delete Bank','Delete bank [${b.bank} - ${b.accountName}]?',()=>window.deleteBank('${b.id}','${b.bank} ${b.accountName}'),'Delete','danger')"><i class="fa-solid fa-trash"></i></button>
                 </div>
               </td>
             </tr>

@@ -164,11 +164,31 @@ export function saveCompany(id) {
         togelMarkets: pools
     };
     if (isEdit) {
-        stateUpdate('companies', id, payload);
-        toast('Company updated successfully', 'success');
+        if (window.db?.dbUpdateCompany) {
+            window.db.dbUpdateCompany(id, payload).then(({ error }) => {
+                if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+                if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Company', id, `Updated company ${payload.name}`);
+                toast('Company updated successfully', 'success');
+            });
+        } else {
+            stateUpdate('companies', id, payload);
+            addLog('Update Company', id, `Updated company ${payload.name}`);
+            toast('Company updated successfully', 'success');
+        }
     } else {
-        stateAdd('companies', { id: 'C' + Date.now(), ...payload, members: 0, joined: new Date().toISOString().split('T')[0] });
-        toast('Company created successfully', 'success');
+        const newId = 'C' + Date.now();
+        const newCompany = { id: newId, ...payload, members: 0, joined: new Date().toISOString().split('T')[0] };
+        if (window.db?.dbAddCompany) {
+            window.db.dbAddCompany(newCompany).then(({ error }) => {
+                if (error) { toast('Failed: ' + error.message, 'error'); return; }
+                if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Company', newId, `Created company ${payload.name}`);
+                toast('Company created successfully', 'success');
+            });
+        } else {
+            stateAdd('companies', newCompany);
+            addLog('Add Company', newId, `Created company ${payload.name}`);
+            toast('Company created successfully', 'success');
+        }
     }
     closeModalBtn();
     if (window.currentPage) window.go(window.currentPage);
@@ -184,15 +204,72 @@ export function saveBank(id) {
         type: fmVal('f_type'), status: 'Active', minDeposit: 10000, maxDeposit: 100000000
     };
     if (id && id !== 'null') {
-        stateUpdate('banks', id, payload);
-        toast('Bank account updated', 'success');
+        if (window.db?.dbUpdateBank) {
+            window.db.dbUpdateBank(id, payload).then(({ error }) => {
+                if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+                if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Bank', id, `Updated bank ${payload.bank} ${payload.accountNumber}`);
+                toast('Bank account updated', 'success');
+            });
+        } else {
+            stateUpdate('banks', id, payload);
+            toast('Bank account updated', 'success');
+        }
     } else {
-        stateAdd('banks', { id: 'B' + Date.now(), ...payload });
-        toast('Bank account added', 'success');
+        const newId = 'B' + Date.now();
+        if (window.db?.dbAddBank) {
+            window.db.dbAddBank({ id: newId, ...payload }).then(({ error }) => {
+                if (error) { toast('Failed: ' + error.message, 'error'); return; }
+                if (window.db?.dbWriteLog) window.db.dbWriteLog('Add Bank', newId, `Added bank ${payload.bank} ${payload.accountNumber}`);
+                toast('Bank account added', 'success');
+            });
+        } else {
+            stateAdd('banks', { id: newId, ...payload });
+            toast('Bank account added', 'success');
+        }
     }
     closeModalBtn();
     if (window.currentPage === 'bank-list') window.go('bank-list');
 }
+
+/* ─── DELETE HELPERS (wired to DB + STATE fallback) ─── */
+window.deleteMember = async (id, username) => {
+    if (window.db?.dbDeleteMember) {
+        const { error } = await window.db.dbDeleteMember(id);
+        if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Member', id, `Deleted member ${username}`);
+    } else {
+        stateDelete('members', id);
+        addLog('Delete Member', id, `Deleted member ${username}`);
+    }
+    toast('Member deleted', 'success');
+    window.go(window.currentPage || 'global-member-list');
+};
+
+window.deleteCompany = async (id, name, redirectPage = 'company-list') => {
+    if (window.db?.dbDeleteCompany) {
+        const { error } = await window.db.dbDeleteCompany(id);
+        if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Company', id, `Deleted company ${name}`);
+    } else {
+        stateDelete('companies', id);
+        addLog('Delete Company', id, `Deleted company ${name}`);
+    }
+    toast('Company deleted', 'success');
+    window.go(redirectPage);
+};
+
+window.deleteBank = async (id, name) => {
+    if (window.db?.dbDeleteBank) {
+        const { error } = await window.db.dbDeleteBank(id);
+        if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('Delete Bank', id, `Deleted bank ${name}`);
+    } else {
+        stateDelete('banks', id);
+        addLog('Delete Bank', id, `Deleted bank ${name}`);
+    }
+    toast('Bank deleted', 'success');
+    window.go('bank-list');
+};
 
 window.openFormModal = openFormModal;
 window.saveMember = saveMember;

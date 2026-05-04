@@ -69,7 +69,7 @@ pages['global-member-list'] = () => {
               <td>${m.joined}</td>
               <td>${actionBtns(
     `openFormModal('member','${m.id}')`,
-    `confirmAction('Delete Member','Delete member [${m.username}]? This action cannot be undone.',()=>{window.stateDelete('members','${m.id}');window.go('global-member-list');toast('Member deleted','success')},'Delete','danger')`,
+    `confirmAction('Delete Member','Delete member [${m.username}]? This action cannot be undone.',()=>window.deleteMember('${m.id}','${m.username}'),'Delete','danger')`,
     `<button class="btn btn-sm btn-icon" style="background:var(--acc);color:#fff" title="View Detail" onclick="window.showMember('${m.username}')"><i class="fa-solid fa-eye"></i></button>`
   )}</td>
             </tr>

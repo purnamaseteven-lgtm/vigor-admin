@@ -332,6 +332,14 @@ const PAGE_FETCHES = {
     'seamless-api-logs':            [fetchSeamlessApiLogs],
     'seamless-config':              [fetchSeamlessGames],
 
+    // ── CRM ───────────────────────────────────────────────────
+    'crm-dashboard':                [fetchCrmSegments, fetchCrmMissions, fetchCrmTournaments, fetchCrmAutomation, fetchMembers],
+    'crm-segments':                 [fetchCrmSegments, fetchMembers],
+    'crm-missions':                 [fetchCrmMissions, fetchCrmSegments],
+    'crm-tournaments':              [fetchCrmTournaments, fetchCrmSegments],
+    'crm-automation':               [fetchCrmAutomation, fetchCrmSegments],
+    'crm-push':                     [fetchCrmPush, fetchCrmSegments],
+
     // ── Logs ──────────────────────────────────────────────────
     'logs-admin':                   [fetchLogs],
     'logs-company':                 [fetchLogs],
@@ -959,6 +967,329 @@ export async function dbWriteLog(action, target = '', description = '', actor = 
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  CRM MODULE — FETCH + CRUD
+// ══════════════════════════════════════════════════════════════════
+
+// ── Mappers ──────────────────────────────────────────────────────
+const mapCrmSegment = r => ({
+    id: r.id, name: r.name, description: r.description,
+    criteria: r.criteria || {}, company: r.company, status: r.status,
+    memberCount: r.member_count || 0, createdBy: r.created_by,
+    createdAt: r.created_at, updatedAt: r.updated_at,
+});
+const mapCrmMission = r => ({
+    id: r.id, name: r.name, description: r.description,
+    type: r.type, targetValue: r.target_value, rewardType: r.reward_type,
+    rewardAmount: r.reward_amount, segmentId: r.segment_id, company: r.company,
+    status: r.status, startDate: r.start_date, endDate: r.end_date,
+    maxParticipants: r.max_participants, participants: r.participants || 0,
+    completions: r.completions || 0, createdAt: r.created_at,
+});
+const mapCrmTournament = r => ({
+    id: r.id, name: r.name, description: r.description,
+    prizePool: r.prize_pool, prizeStructure: r.prize_structure || [],
+    gameType: r.game_type, segmentId: r.segment_id, company: r.company,
+    status: r.status, startDate: r.start_date, endDate: r.end_date,
+    maxParticipants: r.max_participants, scoringMetric: r.scoring_metric,
+    createdAt: r.created_at,
+});
+const mapCrmAutomation = r => ({
+    id: r.id, name: r.name, description: r.description,
+    triggerEvent: r.trigger_event, conditions: r.conditions || [],
+    actions: r.actions || [], company: r.company, status: r.status,
+    firedCount: r.fired_count || 0, lastFiredAt: r.last_fired_at,
+    createdAt: r.created_at,
+});
+const mapCrmPush = r => ({
+    id: r.id, title: r.title, message: r.message,
+    imageUrl: r.image_url, actionUrl: r.action_url,
+    segmentId: r.segment_id, company: r.company, status: r.status,
+    scheduledAt: r.scheduled_at, sentAt: r.sent_at,
+    sentCount: r.sent_count || 0, openCount: r.open_count || 0,
+    clickCount: r.click_count || 0, createdAt: r.created_at,
+});
+const mapCrmProgress = r => ({
+    id: r.id, missionId: r.mission_id, member: r.member, company: r.company,
+    progress: r.progress || 0, completed: r.completed, rewarded: r.rewarded,
+    completedAt: r.completed_at,
+});
+const mapCrmTournamentEntry = r => ({
+    id: r.id, tournamentId: r.tournament_id, member: r.member,
+    company: r.company, score: r.score || 0, rank: r.rank,
+    prizeAmount: r.prize_amount || 0, prizePaid: r.prize_paid,
+});
+const mapCrmLoyalty = r => ({
+    id: r.id, member: r.member, company: r.company,
+    points: r.points || 0, event: r.event, source: r.source,
+    sourceId: r.source_id, note: r.note, createdAt: r.created_at,
+});
+
+// ── Fetches ──────────────────────────────────────────────────────
+export const fetchCrmSegments = () => sbFetch('crm_segments', mapCrmSegment, 'crm.segments',
+    supabase?.from('crm_segments').select('*').order('created_at', { ascending: false }));
+export const fetchCrmMissions = () => sbFetch('crm_missions', mapCrmMission, 'crm.missions',
+    supabase?.from('crm_missions').select('*').order('created_at', { ascending: false }));
+export const fetchCrmTournaments = () => sbFetch('crm_tournaments', mapCrmTournament, 'crm.tournaments',
+    supabase?.from('crm_tournaments').select('*').order('created_at', { ascending: false }));
+export const fetchCrmAutomation = () => sbFetch('crm_automation_rules', mapCrmAutomation, 'crm.automationRules',
+    supabase?.from('crm_automation_rules').select('*').order('created_at', { ascending: false }));
+export const fetchCrmPush = () => sbFetch('crm_push_campaigns', mapCrmPush, 'crm.pushCampaigns',
+    supabase?.from('crm_push_campaigns').select('*').order('created_at', { ascending: false }));
+export const fetchCrmProgress = (missionId) => sbFetch('crm_mission_progress', mapCrmProgress, 'crm.missionProgress',
+    supabase?.from('crm_mission_progress').select('*').eq('mission_id', missionId));
+export const fetchCrmTournamentEntries = (tournamentId) => sbFetch('crm_tournament_entries', mapCrmTournamentEntry, 'crm.tournamentEntries',
+    supabase?.from('crm_tournament_entries').select('*').order('score', { ascending: false }).eq('tournament_id', tournamentId));
+export const fetchCrmLoyalty = (member) => sbFetch('crm_loyalty_points', mapCrmLoyalty, 'crm.loyaltyPoints',
+    supabase?.from('crm_loyalty_points').select('*').eq('member', member).order('created_at', { ascending: false }).limit(100));
+
+// ── Segment CRUD ─────────────────────────────────────────────────
+export async function dbSaveCrmSegment(seg) {
+    const row = {
+        id: seg.id || ('SEG' + Date.now().toString().slice(-6)),
+        name: seg.name, description: seg.description || '',
+        criteria: seg.criteria || {}, company: seg.company || null,
+        status: seg.status || 'Active', member_count: seg.memberCount || 0,
+        created_by: STATE.profile?.username,
+    };
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (SUPABASE_ENABLED && supabase) {
+        const { data, error } = await supabase.from('crm_segments').upsert(row).select().single();
+        if (!error && data) {
+            const mapped = mapCrmSegment(data);
+            const idx = STATE.crm.segments.findIndex(s => s.id === mapped.id);
+            if (idx >= 0) STATE.crm.segments[idx] = mapped; else STATE.crm.segments.unshift(mapped);
+            saveState();
+        }
+        return { error };
+    }
+    const mapped = mapCrmSegment(row);
+    const idx = STATE.crm.segments.findIndex(s => s.id === mapped.id);
+    if (idx >= 0) STATE.crm.segments[idx] = mapped; else STATE.crm.segments.unshift(mapped);
+    saveState();
+    return { error: null };
+}
+export async function dbDeleteCrmSegment(id) {
+    if (!STATE.crm) return { error: null };
+    if (SUPABASE_ENABLED && supabase) {
+        const { error } = await supabase.from('crm_segments').delete().eq('id', id);
+        if (!error) STATE.crm.segments = STATE.crm.segments.filter(s => s.id !== id);
+        saveState();
+        return { error };
+    }
+    STATE.crm.segments = STATE.crm.segments.filter(s => s.id !== id);
+    saveState();
+    return { error: null };
+}
+
+// ── Mission CRUD ─────────────────────────────────────────────────
+export async function dbSaveCrmMission(m) {
+    const row = {
+        id: m.id || ('MSN' + Date.now().toString().slice(-6)),
+        name: m.name, description: m.description || '',
+        type: m.type || 'Deposit', target_value: m.targetValue || 0,
+        reward_type: m.rewardType || 'Bonus', reward_amount: m.rewardAmount || 0,
+        segment_id: m.segmentId || null, company: m.company || null,
+        status: m.status || 'Draft', start_date: m.startDate || null, end_date: m.endDate || null,
+        max_participants: m.maxParticipants || null,
+        created_by: STATE.profile?.username,
+    };
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (SUPABASE_ENABLED && supabase) {
+        const { data, error } = await supabase.from('crm_missions').upsert(row).select().single();
+        if (!error && data) {
+            const mapped = mapCrmMission(data);
+            const idx = STATE.crm.missions.findIndex(x => x.id === mapped.id);
+            if (idx >= 0) STATE.crm.missions[idx] = mapped; else STATE.crm.missions.unshift(mapped);
+            saveState();
+        }
+        return { error };
+    }
+    const mapped = mapCrmMission(row);
+    const idx = STATE.crm.missions.findIndex(x => x.id === mapped.id);
+    if (idx >= 0) STATE.crm.missions[idx] = mapped; else STATE.crm.missions.unshift(mapped);
+    saveState();
+    return { error: null };
+}
+export async function dbDeleteCrmMission(id) {
+    if (!STATE.crm) return { error: null };
+    if (SUPABASE_ENABLED && supabase) {
+        const { error } = await supabase.from('crm_missions').delete().eq('id', id);
+        if (!error) STATE.crm.missions = STATE.crm.missions.filter(x => x.id !== id);
+        saveState();
+        return { error };
+    }
+    STATE.crm.missions = STATE.crm.missions.filter(x => x.id !== id);
+    saveState();
+    return { error: null };
+}
+
+// ── Tournament CRUD ──────────────────────────────────────────────
+export async function dbSaveCrmTournament(t) {
+    const row = {
+        id: t.id || ('TRN' + Date.now().toString().slice(-6)),
+        name: t.name, description: t.description || '',
+        prize_pool: t.prizePool || 0, prize_structure: t.prizeStructure || [],
+        game_type: t.gameType || 'All', segment_id: t.segmentId || null,
+        company: t.company || null, status: t.status || 'Draft',
+        start_date: t.startDate || null, end_date: t.endDate || null,
+        max_participants: t.maxParticipants || null,
+        scoring_metric: t.scoringMetric || 'Turnover',
+        created_by: STATE.profile?.username,
+    };
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (SUPABASE_ENABLED && supabase) {
+        const { data, error } = await supabase.from('crm_tournaments').upsert(row).select().single();
+        if (!error && data) {
+            const mapped = mapCrmTournament(data);
+            const idx = STATE.crm.tournaments.findIndex(x => x.id === mapped.id);
+            if (idx >= 0) STATE.crm.tournaments[idx] = mapped; else STATE.crm.tournaments.unshift(mapped);
+            saveState();
+        }
+        return { error };
+    }
+    const mapped = mapCrmTournament(row);
+    const idx = STATE.crm.tournaments.findIndex(x => x.id === mapped.id);
+    if (idx >= 0) STATE.crm.tournaments[idx] = mapped; else STATE.crm.tournaments.unshift(mapped);
+    saveState();
+    return { error: null };
+}
+export async function dbDeleteCrmTournament(id) {
+    if (!STATE.crm) return { error: null };
+    if (SUPABASE_ENABLED && supabase) {
+        const { error } = await supabase.from('crm_tournaments').delete().eq('id', id);
+        if (!error) STATE.crm.tournaments = STATE.crm.tournaments.filter(x => x.id !== id);
+        saveState();
+        return { error };
+    }
+    STATE.crm.tournaments = STATE.crm.tournaments.filter(x => x.id !== id);
+    saveState();
+    return { error: null };
+}
+export async function dbUpdateTournamentEntry(entry) {
+    const row = { tournament_id: entry.tournamentId, member: entry.member, company: entry.company, score: entry.score };
+    if (SUPABASE_ENABLED && supabase) {
+        await supabase.from('crm_tournament_entries').upsert({ ...row, id: entry.id || ('TE' + Date.now().toString().slice(-6)) });
+    }
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (!STATE.crm.tournamentEntries) STATE.crm.tournamentEntries = [];
+    const idx = STATE.crm.tournamentEntries.findIndex(e => e.member === entry.member && e.tournamentId === entry.tournamentId);
+    if (idx >= 0) STATE.crm.tournamentEntries[idx] = { ...STATE.crm.tournamentEntries[idx], ...entry };
+    else STATE.crm.tournamentEntries.push(entry);
+    saveState();
+    return { error: null };
+}
+
+// ── Automation CRUD ──────────────────────────────────────────────
+export async function dbSaveCrmAutomation(rule) {
+    const row = {
+        id: rule.id || ('AUT' + Date.now().toString().slice(-6)),
+        name: rule.name, description: rule.description || '',
+        trigger_event: rule.triggerEvent, conditions: rule.conditions || [],
+        actions: rule.actions || [], company: rule.company || null,
+        status: rule.status || 'Active',
+        created_by: STATE.profile?.username,
+    };
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (SUPABASE_ENABLED && supabase) {
+        const { data, error } = await supabase.from('crm_automation_rules').upsert(row).select().single();
+        if (!error && data) {
+            const mapped = mapCrmAutomation(data);
+            const idx = STATE.crm.automationRules.findIndex(x => x.id === mapped.id);
+            if (idx >= 0) STATE.crm.automationRules[idx] = mapped; else STATE.crm.automationRules.unshift(mapped);
+            saveState();
+        }
+        return { error };
+    }
+    const mapped = mapCrmAutomation(row);
+    const idx = STATE.crm.automationRules.findIndex(x => x.id === mapped.id);
+    if (idx >= 0) STATE.crm.automationRules[idx] = mapped; else STATE.crm.automationRules.unshift(mapped);
+    saveState();
+    return { error: null };
+}
+export async function dbDeleteCrmAutomation(id) {
+    if (!STATE.crm) return { error: null };
+    if (SUPABASE_ENABLED && supabase) {
+        const { error } = await supabase.from('crm_automation_rules').delete().eq('id', id);
+        if (!error) STATE.crm.automationRules = STATE.crm.automationRules.filter(x => x.id !== id);
+        saveState();
+        return { error };
+    }
+    STATE.crm.automationRules = STATE.crm.automationRules.filter(x => x.id !== id);
+    saveState();
+    return { error: null };
+}
+
+// ── Push CRUD ────────────────────────────────────────────────────
+export async function dbSaveCrmPush(p) {
+    const row = {
+        id: p.id || ('PSH' + Date.now().toString().slice(-6)),
+        title: p.title, message: p.message,
+        image_url: p.imageUrl || null, action_url: p.actionUrl || null,
+        segment_id: p.segmentId || null, company: p.company || null,
+        status: p.status || 'Draft', scheduled_at: p.scheduledAt || null,
+        created_by: STATE.profile?.username,
+    };
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (SUPABASE_ENABLED && supabase) {
+        const { data, error } = await supabase.from('crm_push_campaigns').upsert(row).select().single();
+        if (!error && data) {
+            const mapped = mapCrmPush(data);
+            const idx = STATE.crm.pushCampaigns.findIndex(x => x.id === mapped.id);
+            if (idx >= 0) STATE.crm.pushCampaigns[idx] = mapped; else STATE.crm.pushCampaigns.unshift(mapped);
+            saveState();
+        }
+        return { error };
+    }
+    const mapped = mapCrmPush(row);
+    const idx = STATE.crm.pushCampaigns.findIndex(x => x.id === mapped.id);
+    if (idx >= 0) STATE.crm.pushCampaigns[idx] = mapped; else STATE.crm.pushCampaigns.unshift(mapped);
+    saveState();
+    return { error: null };
+}
+export async function dbDeleteCrmPush(id) {
+    if (!STATE.crm) return { error: null };
+    if (SUPABASE_ENABLED && supabase) {
+        const { error } = await supabase.from('crm_push_campaigns').delete().eq('id', id);
+        if (!error) STATE.crm.pushCampaigns = STATE.crm.pushCampaigns.filter(x => x.id !== id);
+        saveState();
+        return { error };
+    }
+    STATE.crm.pushCampaigns = STATE.crm.pushCampaigns.filter(x => x.id !== id);
+    saveState();
+    return { error: null };
+}
+
+// ── Loyalty Points ───────────────────────────────────────────────
+export async function dbAddLoyaltyPoints(member, points, source, sourceId, note) {
+    const entry = { member, points, source, source_id: sourceId || null, note: note || null,
+        event: points >= 0 ? 'earn' : 'redeem', company: STATE.profile?.company || null };
+    if (SUPABASE_ENABLED && supabase) {
+        await supabase.from('crm_loyalty_points').insert(entry);
+    }
+    if (!STATE.crm) STATE.crm = { segments: [], missions: [], tournaments: [], automationRules: [], pushCampaigns: [] };
+    if (!STATE.crm.loyaltyPoints) STATE.crm.loyaltyPoints = [];
+    STATE.crm.loyaltyPoints.unshift({ ...entry, id: 'LP' + Date.now(), createdAt: new Date().toISOString() });
+    saveState();
+    return { error: null };
+}
+
+// ── Segment member-count refresh (runs evaluate criteria) ─────────
+export async function dbRefreshSegmentCount(segId) {
+    const seg = STATE.crm?.segments?.find(s => s.id === segId);
+    if (!seg) return;
+    const criteria = seg.criteria || {};
+    let members = STATE.members || [];
+    if (criteria.company) members = members.filter(m => m.company === criteria.company);
+    if (criteria.status) members = members.filter(m => m.status === criteria.status);
+    if (criteria.minBalance) members = members.filter(m => (m.balance || 0) >= Number(criteria.minBalance));
+    if (criteria.maxBalance) members = members.filter(m => (m.balance || 0) <= Number(criteria.maxBalance));
+    seg.memberCount = members.length;
+    if (SUPABASE_ENABLED && supabase) await supabase.from('crm_segments').update({ member_count: seg.memberCount }).eq('id', segId);
+    saveState();
+    return seg.memberCount;
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  EXPOSE ON WINDOW (onclick compatibility)
 // ══════════════════════════════════════════════════════════════════
 window.db = {
@@ -968,6 +1299,8 @@ window.db = {
     fetchSeamlessTransactions, fetchSeamlessGames, fetchSeamlessApiLogs,
     fetchPromotions, fetchAnnouncements, fetchNotifications,
     fetchLotteryBets, fetchLotteryResults, fetchBonuses,
+    fetchCrmSegments, fetchCrmMissions, fetchCrmTournaments,
+    fetchCrmAutomation, fetchCrmPush,
     // Members
     dbAddMember, dbUpdateMember, dbDeleteMember, dbAdjustMemberBalance,
     // Companies
@@ -993,4 +1326,11 @@ window.db = {
     dbAddAdmin, dbUpdateAdmin, dbDeleteAdmin,
     // Settings & Logs
     dbSaveSetting, dbWriteLog,
+    // CRM
+    dbSaveCrmSegment, dbDeleteCrmSegment,
+    dbSaveCrmMission, dbDeleteCrmMission,
+    dbSaveCrmTournament, dbDeleteCrmTournament, dbUpdateTournamentEntry,
+    dbSaveCrmAutomation, dbDeleteCrmAutomation,
+    dbSaveCrmPush, dbDeleteCrmPush,
+    dbAddLoyaltyPoints, dbRefreshSegmentCount,
 };

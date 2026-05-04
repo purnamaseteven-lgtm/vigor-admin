@@ -6,33 +6,36 @@ import { filterData, paginate, getCurPage, getPerPage, rnd, MEMBERS, COMPANIES }
 
 function ensureToolsState() {
   if (!STATE.tools) STATE.tools = {};
-  if (!Array.isArray(STATE.tools.unopayTx)) {
-    STATE.tools.unopayTx = Array.from({ length: 15 }, (_, i) => ({
-      id: 'UNO' + (1000 + i),
-      member: MEMBERS[i % MEMBERS.length],
-      amount: rnd(1, 20) * 100000,
-      fee: rnd(1, 5) * 1000,
-      method: ['VA BCA', 'VA BNI', 'VA BRI', 'QRIS', 'Gopay', 'OVO', 'Dana'][i % 7],
-      status: i < 3 ? 'Pending' : i % 6 === 0 ? 'Failed' : 'Success',
-      date: `${rnd(20, 27)}/04/2026 ${rnd(10, 23)}:${rnd(10, 59)}`
-    }));
+
+  // UnoPay transactions: derive from real STATE.deposits/withdrawals filtered by VA/QRIS/e-wallet methods
+  const UNOPAY_METHODS = ['VA BCA', 'VA BNI', 'VA BRI', 'QRIS', 'Gopay', 'OVO', 'Dana'];
+  const realDeposits = (STATE.deposits || []).filter(d => UNOPAY_METHODS.some(m => (d.method || '').includes(m.split(' ').pop())));
+  const realWithdrawals = (STATE.withdrawals || []).filter(w => UNOPAY_METHODS.some(m => (w.method || '').includes(m.split(' ').pop())));
+  if (!Array.isArray(STATE.tools.unopayTx) || STATE.tools.unopayTx.length === 0) {
+    if (realDeposits.length > 0 || realWithdrawals.length > 0) {
+      STATE.tools.unopayTx = [
+        ...realDeposits.slice(0, 10).map(d => ({ id: d.id, member: d.username, amount: d.amount, fee: 0, method: d.method || 'VA', status: d.status === 'Approved' ? 'Success' : d.status === 'Pending' ? 'Pending' : 'Failed', date: d.date })),
+        ...realWithdrawals.slice(0, 5).map(w => ({ id: w.id, member: w.username, amount: w.amount, fee: 0, method: w.method || 'VA', status: w.status === 'Approved' ? 'Success' : w.status === 'Pending' ? 'Pending' : 'Failed', date: w.date })),
+      ];
+    }
   }
   if (!STATE.tools.unopayConfig) {
     STATE.tools.unopayConfig = { apiVersion: 'v3.2.1', connected: true };
   }
-  if (!Array.isArray(STATE.tools.coin2payTx)) {
-    const cryptos = ['BTC', 'ETH', 'USDT', 'BNB', 'LTC'];
-    STATE.tools.coin2payTx = Array.from({ length: 10 }, (_, i) => ({
-      id: 'C2P' + (2000 + i),
-      member: MEMBERS[i % MEMBERS.length],
-      crypto: cryptos[i % cryptos.length],
-      cryptoAmt: (rnd(1, 10) * 0.001).toFixed(4),
-      idrAmt: rnd(5, 100) * 100000,
-      type: i % 2 === 0 ? 'Deposit' : 'Withdraw',
-      status: i < 2 ? 'Pending' : 'Confirmed',
-      txHash: '0x' + Math.random().toString(16).slice(2, 18) + '...',
-      date: `${rnd(20, 27)}/04/2026`
-    }));
+
+  // Coin2Pay: derive from deposits/withdrawals with crypto methods
+  const CRYPTO_METHODS = ['BTC', 'ETH', 'USDT', 'BNB', 'LTC', 'crypto', 'Crypto'];
+  const realCrypto = (STATE.deposits || []).filter(d => CRYPTO_METHODS.some(m => (d.method || '').toLowerCase().includes(m.toLowerCase())));
+  if (!Array.isArray(STATE.tools.coin2payTx) || STATE.tools.coin2payTx.length === 0) {
+    if (realCrypto.length > 0) {
+      STATE.tools.coin2payTx = realCrypto.slice(0, 10).map(d => ({
+        id: d.id, member: d.username, crypto: d.method || 'USDT',
+        cryptoAmt: (d.amount / 16000).toFixed(4), idrAmt: d.amount,
+        type: 'Deposit', status: d.status === 'Approved' ? 'Confirmed' : 'Pending',
+        txHash: '0x' + d.id.replace(/\D/g, '').padEnd(16, '0') + '...',
+        date: d.date,
+      }));
+    }
   }
   if (!STATE.tools.sawala) {
     STATE.tools.sawala = {
@@ -44,11 +47,13 @@ function ensureToolsState() {
     };
   }
   if (!Array.isArray(STATE.tools.smarticoCampaigns)) {
+    // Derive player counts from real STATE.members total per campaign type
+    const totalMembers = STATE.members?.length || 0;
     STATE.tools.smarticoCampaigns = [
-      { id: 'SM1', name: 'Welcome Journey', type: 'Gamification', status: 'Active', players: rnd(200, 1000), completion: rnd(30, 80) },
-      { id: 'SM2', name: 'Level Up Challenge', type: 'Tournament', status: 'Active', players: rnd(100, 500), completion: rnd(20, 70) },
-      { id: 'SM3', name: 'Deposit Streak', type: 'Mission', status: 'Paused', players: rnd(50, 300), completion: rnd(10, 50) },
-      { id: 'SM4', name: 'VIP Loyalty', type: 'Points', status: 'Active', players: rnd(500, 2000), completion: rnd(60, 95) },
+      { id: 'SM1', name: 'Welcome Journey', type: 'Gamification', status: 'Active', players: Math.round(totalMembers * 0.6), completion: 65 },
+      { id: 'SM2', name: 'Level Up Challenge', type: 'Tournament', status: 'Active', players: Math.round(totalMembers * 0.3), completion: 45 },
+      { id: 'SM3', name: 'Deposit Streak', type: 'Mission', status: 'Paused', players: Math.round(totalMembers * 0.15), completion: 28 },
+      { id: 'SM4', name: 'VIP Loyalty', type: 'Points', status: 'Active', players: Math.round(totalMembers * 0.8), completion: 72 },
     ];
   }
   if (!Array.isArray(STATE.tools.hosts)) {
@@ -62,31 +67,41 @@ function ensureToolsState() {
     STATE.tools.deletedHosts = [];
   }
   if (!Array.isArray(STATE.tools.tournamentWinners)) {
-    STATE.tools.tournamentWinners = Array.from({ length: 10 }, (_, i) => ({
-      id: 'TW' + (i + 1),
-      rank: i + 1,
-      member: MEMBERS[i % MEMBERS.length],
-      company: COMPANIES[i % COMPANIES.length],
-      score: rnd(50000, 500000) - (i * 30000),
-      prize: [5000000, 3000000, 1500000, 1000000, 750000, 500000, 400000, 300000, 200000, 100000][i],
-      status: i < 3 ? 'Paid' : 'Pending'
+    // Derive from real members sorted by total bet turnover (highest = tournament winners)
+    const prizes = [5000000, 3000000, 1500000, 1000000, 750000, 500000, 400000, 300000, 200000, 100000];
+    const realBets = STATE.lotteryBets || [];
+    const txs = STATE.seamless?.transactions || [];
+    const memberScores = (STATE.members || []).map(m => {
+      const score = realBets.filter(b => b.member === m.username).reduce((s, b) => s + (b.betAmount || 0), 0)
+        + txs.filter(t => t.player === m.username).reduce((s, t) => s + (t.betAmount || 0), 0);
+      return { username: m.username, company: m.company, score };
+    }).sort((a, b) => b.score - a.score).slice(0, 10);
+    STATE.tools.tournamentWinners = memberScores.map((m, i) => ({
+      id: 'TW' + (i + 1), rank: i + 1,
+      member: m.username, company: m.company,
+      score: m.score, prize: prizes[i] || 100000,
+      status: i < 3 ? 'Paid' : 'Pending',
     }));
   }
   if (!Array.isArray(STATE.tools.monthlyInvoices)) {
-    STATE.tools.monthlyInvoices = COMPANIES.slice(0, 10).map((c, i) => {
-      const platformFee = rnd(5, 50) * 100000;
-      const licenseFee = rnd(2, 20) * 100000;
-      const transactionFee = rnd(1, 10) * 100000;
+    // Derive invoice amounts from real deposit totals per company (platform fee = 2% of deposits)
+    const allDeps = STATE.deposits || [];
+    const allWds = STATE.withdrawals || [];
+    const companies = STATE.companies?.length ? STATE.companies.map(c => c.name || c) : COMPANIES;
+    STATE.tools.monthlyInvoices = companies.slice(0, 10).map((c, i) => {
+      const compDeps = allDeps.filter(d => d.company === c && d.status === 'Approved');
+      const depTotal = compDeps.reduce((s, d) => s + (d.amount || 0), 0);
+      const txCount = compDeps.length + allWds.filter(w => w.company === c && w.status === 'Approved').length;
+      const platformFee = Math.round(depTotal * 0.02) || 1000000;
+      const licenseFee = 500000;
+      const transactionFee = txCount * 2500;
       return {
         id: 'INV-2026-04-' + String(i + 1).padStart(3, '0'),
-        company: c,
-        period: 'April 2026',
-        platformFee,
-        licenseFee,
-        transactionFee,
+        company: c, period: 'April 2026',
+        platformFee, licenseFee, transactionFee,
         total: platformFee + licenseFee + transactionFee,
         dueDate: '05/05/2026',
-        status: i < 3 ? 'Paid' : i < 7 ? 'Unpaid' : 'Overdue'
+        status: i < 3 ? 'Paid' : i < 7 ? 'Unpaid' : 'Overdue',
       };
     });
   }

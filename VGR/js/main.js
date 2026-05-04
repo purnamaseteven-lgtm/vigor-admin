@@ -24,6 +24,7 @@ import './pages/reports.js';
 import './pages/tools.js';
 import './pages/seamless.js';
 import './pages/master.js';
+import './pages/crm.js';
 import './pages/missing-pages.js';
 
 import './pages/simulator.js';

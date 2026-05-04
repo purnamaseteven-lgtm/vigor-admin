@@ -441,13 +441,28 @@ export function renderSidebar() {
                 <div class="nav-link" style="${check('tools', 'coin2pay') ? '' : 'display:none'}" onclick="go('tools-coin2pay')"><i class="fa-solid fa-coins nav-icon"></i><span class="nav-label">Coin2pay</span></div>
                 <div class="nav-link" style="${check('tools', 'hostManagement') ? '' : 'display:none'}" onclick="go('tools-host')"><i class="fa-solid fa-server nav-icon"></i><span class="nav-label">Host Management</span></div>
                 <div class="nav-link" style="${check('tools', 'sawala') ? '' : 'display:none'}" onclick="go('tools-sawala')"><i class="fa-solid fa-comments nav-icon"></i><span class="nav-label">Sawala</span></div>
-                <div class="nav-link" style="${check('tools', 'smartico') ? '' : 'display:none'}" onclick="go('tools-smartico')"><i class="fa-solid fa-brain nav-icon"></i><span class="nav-label">Smartico</span></div>
                 <div class="nav-link" style="${check('tools', 'unopay') ? '' : 'display:none'}" onclick="go('tools-unopay')"><i class="fa-solid fa-credit-card nav-icon"></i><span class="nav-label">Unopay Payment</span></div>
             </div>
         </div>`;
     }
 
-    // 10. Memo
+    // 10. CRM
+    if (sectionActive('crm')) {
+        html += `
+        <div class="nav-item">
+            <div class="nav-link" onclick="toggleMenu('crmMenu', this)"><i class="fa-solid fa-bullseye nav-icon"></i><span class="nav-label">CRM</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-submenu" id="crmMenu">
+                <div class="nav-link" style="${check('crm', 'dashboard') ? '' : 'display:none'}" onclick="go('crm-dashboard')"><i class="fa-solid fa-gauge nav-icon"></i><span class="nav-label">Overview</span></div>
+                <div class="nav-link" style="${check('crm', 'segments') ? '' : 'display:none'}" onclick="go('crm-segments')"><i class="fa-solid fa-layer-group nav-icon"></i><span class="nav-label">Segments</span></div>
+                <div class="nav-link" style="${check('crm', 'missions') ? '' : 'display:none'}" onclick="go('crm-missions')"><i class="fa-solid fa-flag-checkered nav-icon"></i><span class="nav-label">Missions</span></div>
+                <div class="nav-link" style="${check('crm', 'tournaments') ? '' : 'display:none'}" onclick="go('crm-tournaments')"><i class="fa-solid fa-trophy nav-icon"></i><span class="nav-label">Tournaments</span></div>
+                <div class="nav-link" style="${check('crm', 'automation') ? '' : 'display:none'}" onclick="go('crm-automation')"><i class="fa-solid fa-robot nav-icon"></i><span class="nav-label">Automation</span></div>
+                <div class="nav-link" style="${check('crm', 'push') ? '' : 'display:none'}" onclick="go('crm-push')"><i class="fa-solid fa-bell nav-icon"></i><span class="nav-label">Push Campaigns</span></div>
+            </div>
+        </div>`;
+    }
+
+    // 11. Memo
     if (sectionActive('memo')) {
         html += `
         <div class="nav-item">

@@ -100,7 +100,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           cd VGR/server
-          railway up --service vigor-backend --project ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service vigor-backend --project ${{ secrets.RAILWAY_PROJECT_ID }} --environment production
 
   # ─────────────────────────────────────────────────────────────
   # JOB 4: Run Supabase migrations (main branch only)

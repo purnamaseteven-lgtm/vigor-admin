@@ -184,7 +184,8 @@ export function destroyCharts() {
 
 export function logout() {
     confirmAction('Logout', 'Are you sure you want to log out?', () => {
-        window.location.href = 'app.html';
+        try { sessionStorage.removeItem('VGR_DEMO_SESSION'); } catch (_) {}
+        window.location.href = './index.html';
     });
 }
 

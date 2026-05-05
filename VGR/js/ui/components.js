@@ -311,14 +311,73 @@ export function renderPagerHTML(key, total, perPage, curPage) {
 }
 
 export function renderSidebar() {
-    const role = STATE.currentAdmin.role;
-    const isSuper = role === 'SuperAdmin';
+    const roleAliases = {
+        superadmin: 'SuperAdmin',
+        company: 'Company',
+        whitelabel: 'Company',
+        master: 'Master',
+        shop: 'Shop',
+        agent: 'Agent',
+    };
+    const rawRole = STATE.currentAdmin.role;
+    const roleNorm = String(rawRole || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const role = roleAliases[roleNorm] || 'Agent';
+    const isSuper = roleNorm === 'superadmin';
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
 
     const mx = STATE.permissionMatrix || {};
-    const check = (mod, sub) => isSuper || (mx[role] && mx[role][mod] && mx[role][mod][sub]);
-    const sectionActive = (mod) => isSuper || (mx[role] && mx[role][mod] && Object.values(mx[role][mod]).some(v => v === true));
+    const cpRaw = STATE.currentAdmin.customPermissions || null;
+    const cpHasEntries = !!(cpRaw && typeof cpRaw === 'object' && Object.keys(cpRaw).length > 0);
+    const cp = cpHasEntries ? cpRaw : null;
+
+    // Map permissionMatrix (mod.sub) → page key, for custom permission lookup
+    const _P2PG = {
+        'home.dashboard':'dashboard','home.statistics':'statistics','home.providerAnalytics':'provider-analytics','home.deviceReport':'device-report',
+        'master.whitelist':'whitelist','master.blacklist':'blacklist','master.masterWhitelist':'master-whitelist',
+        'administrators.systemAdmins':'admin-management','administrators.rolePermissions':'dev-menu-config',
+        'companyManagement.whitelabelList':'company-list','companyManagement.regisNewCompany':'company-create','companyManagement.myDownlines':'my-downlines',
+        'whitelabel.whitelabelList':'whitelabel-list','whitelabel.masterWlList':'master-wl-list',
+        'members.memberList':'global-member-list','members.addMember':'global-member-list','members.tierHistory':'tier-history',
+        'bankManagement.bankList':'bank-list','bankManagement.createNewBank':'bank-create',
+        'finance.deposit':'deposit-list','finance.withdrawal':'withdrawal-list','finance.adjustment':'finance-adjustment','finance.adjustmentLogs':'finance-adjustment-logs',
+        'bets.betsListing':'bets-list','bets.bettingTable':'bets-table','bets.transferredList':'bets-transferred',
+        'bonus.bonusReport':'bonus-report','bonus.agentFreebet':'bonus-agent-freebet','bonus.agentFreebetReport':'bonus-agent-freebet-report',
+        'bonus.pragmaticFrb':'bonus-pragmatic-frb','bonus.promotions':'custom-promotion-list','bonus.promotionRelease':'promotion-release','bonus.promotionRollingRelease':'promotion-rolling-release',
+        'results.resultsListing':'results-list','results.resultScan':'results-scan','results.resultsAnalyze':'results-analyze',
+        'integrations.providerSetup':'seamless-config','integrations.apiLogs':'seamless-api-logs','integrations.developerDocs':'seamless-docs',
+        'customization.templateBuilder':'template-builder','customization.templatePreview':'template-preview','customization.systemTheme':'custom-theme',
+        'customization.globalBanner':'custom-global-banner','customization.appNotification':'custom-app-notification','customization.pushAppNotification':'app-notification','customization.themePresets':'custom-theme-presets','customization.announcements':'announcement-list',
+        'customization.siteConfig':'custom-site-config','customization.seoTools':'custom-seo',
+        'settings.commission':'settings-commission','settings.referralRate':'settings-referral-rate','settings.poolsList':'settings-pools',
+        'settings.games':'settings-games','settings.agentGameSettings':'settings-agent-games','settings.togelCommission':'settings-togel-commission',
+        'settings.limitCreditOut':'settings-limit-credit-out','settings.vipDesigner':'custom-vip','settings.rebateCalc':'rebate-calc','settings.financeLimits':'settings-finance',
+        'tools.coin2pay':'tools-coin2pay','tools.hostManagement':'tools-host','tools.sawala':'tools-sawala','tools.unopay':'tools-unopay','tools.nawalaScan':'nawala-scan',
+        'crm.dashboard':'crm-dashboard','crm.segments':'crm-segments','crm.missions':'crm-missions','crm.tournaments':'crm-tournaments',
+        'crm.automation':'crm-automation','crm.push':'crm-push','crm.dormancy':'crm-dormancy','crm.loyalty':'crm-loyalty',
+        'memo.memoBox':'memo-list','memo.autoMemo':'memo-auto',
+        'reports.winloss':'reports-winloss','reports.agentDaily':'reports-agent-daily','reports.limitCredit':'reports-limit-credit',
+        'reports.lostMoney':'reports-lost-money','reports.togelLost':'reports-togel-lost','reports.topTurnover':'reports-top-turnover',
+        'invoice.monthly':'invoice-monthly','invoice.fileManagement':'invoice-file','invoice.tournamentWinners':'invoice-tournament',
+        'logs.adminLogs':'logs-admin','logs.companyLogs':'logs-company','logs.whitelabelLogs':'logs-whitelabel','logs.memberLogs':'logs-member','logs.masterWlLogs':'logs-master-wl',
+    };
+
+    const check = (mod, sub) => {
+        if (isSuper) return true;
+        if (cp) {
+            const pg = _P2PG[mod + '.' + sub];
+            return pg ? !!(cp[pg] && cp[pg].read) : false;
+        }
+        return !!(mx[role] && mx[role][mod] && mx[role][mod][sub]);
+    };
+    const sectionActive = (mod) => {
+        if (isSuper) return true;
+        if (cp) {
+            const prefix = mod + '.';
+            return Object.keys(_P2PG).some(k => k.startsWith(prefix) && cp[_P2PG[k]] && cp[_P2PG[k]].read);
+        }
+        return !!(mx[role] && mx[role][mod] && Object.values(mx[role][mod]).some(v => v === true));
+    };
 
     let html = '';
 
@@ -350,17 +409,7 @@ export function renderSidebar() {
         </div>`;
     }
 
-    // 4. Administrators
-    if (sectionActive('administrators')) {
-        html += `
-        <div class="nav-item">
-            <div class="nav-link" onclick="toggleMenu('admMenu', this)"><i class="fa-solid fa-user-shield nav-icon"></i><span class="nav-label">Administrators</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
-            <div class="nav-submenu" id="admMenu">
-                <div class="nav-link" style="${check('administrators', 'systemAdmins') ? '' : 'display:none'}" onclick="go('admins-list')"><i class="fa-solid fa-users-gear nav-icon"></i><span class="nav-label">System Admins</span></div>
-                <div class="nav-link" style="${check('administrators', 'rolePermissions') ? '' : 'display:none'}" onclick="go('dev-menu-config')"><i class="fa-solid fa-toggle-on nav-icon"></i><span class="nav-label">Platform Matrix</span></div>
-            </div>
-        </div>`;
-    }
+    // 4. Platform Matrix — SuperAdmin only, shown in Settings area later
 
     // 5. Agent Management (Renamed from Company Management)
     if (sectionActive('companyManagement')) {
@@ -386,15 +435,33 @@ export function renderSidebar() {
         </div>`;
     }
 
-    // 7. Members
-    if (sectionActive('members')) {
+    // 6b. My Downlines — visible to Company / Master / Shop / Agent (not SuperAdmin)
+    // Each non-SuperAdmin role can manage their own direct downline companies
+    if (!isSuper && ['Company', 'Master', 'Shop', 'Agent'].includes(role)) {
+        const dlIconMap   = { Company: 'building-user', Master: 'user-tie', Shop: 'store', Agent: 'user-tag' };
+        const dlLabelMap  = { Company: 'My Companies', Master: 'My Agents', Shop: 'My Sub-Agents', Agent: 'My Sub-Agents' };
+        const dlAddMap    = { Company: 'Add Company', Master: 'Add Agent', Shop: 'Add Sub-Agent', Agent: 'Add Sub-Agent' };
         html += `
         <div class="nav-item">
-            <div class="nav-link" onclick="toggleMenu('memMenu', this)"><i class="fa-solid fa-users nav-icon"></i><span class="nav-label">Members</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-link" onclick="toggleMenu('dlMenu', this)"><i class="fa-solid fa-${dlIconMap[role] || 'sitemap'} nav-icon"></i><span class="nav-label">${dlLabelMap[role] || 'My Downlines'}</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-submenu" id="dlMenu">
+                <div class="nav-link" onclick="go('my-downlines')"><i class="fa-solid fa-list-tree nav-icon"></i><span class="nav-label">Downline List</span></div>
+                <div class="nav-link" onclick="window.openFormModal('company')"><i class="fa-solid fa-plus-circle nav-icon"></i><span class="nav-label">${dlAddMap[role] || 'Add Downline'}</span></div>
+            </div>
+        </div>`;
+    }
+
+    // 7. User Management (Members + Dashboard Users merged)
+    if (sectionActive('members') || check('administrators', 'systemAdmins')) {
+        html += `
+        <div class="nav-item">
+            <div class="nav-link" onclick="toggleMenu('memMenu', this)"><i class="fa-solid fa-users nav-icon"></i><span class="nav-label">User Management</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="memMenu">
                 <div class="nav-link" style="${check('members', 'memberList') ? '' : 'display:none'}" onclick="go('global-member-list')"><i class="fa-solid fa-user-group nav-icon"></i><span class="nav-label">Member List</span></div>
-                <div class="nav-link" style="${check('members', 'addMember') ? '' : 'display:none'}" onclick="go('global-member-list')"><i class="fa-solid fa-user-plus nav-icon"></i><span class="nav-label">Add Member</span></div>
-                <div class="nav-link" style="${check('members', 'tierHistory') ? '' : 'display:none'}" onclick="go('tier-history')"><i class="fa-solid fa-clock-rotate-left nav-icon"></i><span class="nav-label">Tier History</span></div>
+                <div class="nav-link" style="${check('members', 'addMember') ? '' : 'display:none'}" onclick="window.openFormModal('member')"><i class="fa-solid fa-user-plus nav-icon"></i><span class="nav-label">Add Member</span></div>
+                <div class="nav-link" style="${check('members', 'tierHistory') ? '' : 'display:none'}" onclick="go('tier-history')"><i class="fa-solid fa-clock-rotate-left nav-icon"></i><span class="nav-label">Tier / VIP History</span></div>
+                <div class="nav-link" style="${check('administrators', 'systemAdmins') ? '' : 'display:none'}" onclick="go('admin-management')"><i class="fa-solid fa-user-shield nav-icon"></i><span class="nav-label">Dashboard Users</span></div>
+                <div class="nav-link" style="${check('administrators', 'rolePermissions') ? '' : 'display:none'}" onclick="go('dev-menu-config')"><i class="fa-solid fa-toggle-on nav-icon"></i><span class="nav-label">Role Permissions</span></div>
             </div>
         </div>`;
     }
@@ -478,6 +545,8 @@ export function renderSidebar() {
                     <div class="nav-link" onclick="toggleMenu('seamlessMenu', this)"><i class="fa-solid fa-puzzle-piece nav-icon" style="color:var(--acc)"></i><span class="nav-label">Seamless API</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
                     <div class="nav-submenu" id="seamlessMenu">
                         <div class="nav-link" style="${check('integrations', 'providerSetup') ? '' : 'display:none'}" onclick="go('seamless-config')"><i class="fa-solid fa-gear nav-icon"></i><span class="nav-label">Provider Setup</span></div>
+                        <div class="nav-link" style="${check('integrations', 'providerSetup') ? '' : 'display:none'}" onclick="go('seamless-transactions')"><i class="fa-solid fa-exchange-alt nav-icon"></i><span class="nav-label">Transactions</span></div>
+                        <div class="nav-link" style="${check('integrations', 'providerSetup') ? '' : 'display:none'}" onclick="go('seamless-games')"><i class="fa-solid fa-gamepad nav-icon"></i><span class="nav-label">Game Catalog</span></div>
                         <div class="nav-link" style="${check('integrations', 'apiLogs') ? '' : 'display:none'}" onclick="go('seamless-api-logs')"><i class="fa-solid fa-file-code nav-icon"></i><span class="nav-label">API Logs</span></div>
                         <div class="nav-link" style="${check('integrations', 'developerDocs') ? '' : 'display:none'}" onclick="go('seamless-docs')"><i class="fa-solid fa-book nav-icon"></i><span class="nav-label">Developer Docs</span></div>
                     </div>
@@ -493,7 +562,9 @@ export function renderSidebar() {
                         <div class="nav-link" style="${check('customization', 'templatePreview') ? '' : 'display:none'}" onclick="go('custom-template')"><i class="fa-solid fa-list-check nav-icon"></i><span class="nav-label">Templates List</span></div>
                         <div class="nav-link" style="${check('customization', 'templatePreview') ? '' : 'display:none'}" onclick="go('template-preview')"><i class="fa-solid fa-eye nav-icon"></i><span class="nav-label">Template Preview</span></div>
                         <div class="nav-link" style="${check('customization', 'systemTheme') ? '' : 'display:none'}" onclick="go('custom-theme')"><i class="fa-solid fa-droplet nav-icon"></i><span class="nav-label">System Theme</span></div>
+                        <div class="nav-link" style="${check('customization', 'systemTheme') ? '' : 'display:none'}" onclick="go('custom-theme-presets')"><i class="fa-solid fa-palette nav-icon"></i><span class="nav-label">Theme Presets</span></div>
                         <div class="nav-link" style="${check('customization', 'globalBanner') ? '' : 'display:none'}" onclick="go('custom-global-banner')"><i class="fa-solid fa-images nav-icon"></i><span class="nav-label">Global Banner</span></div>
+                        <div class="nav-link" style="${check('customization', 'appNotification') ? '' : 'display:none'}" onclick="go('app-notification')"><i class="fa-solid fa-mobile-screen-button nav-icon"></i><span class="nav-label">Push App Notification</span></div>
                         <div class="nav-link" style="${check('customization', 'appNotification') ? '' : 'display:none'}" onclick="go('custom-app-notification')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">App Notification</span></div>
                         <div class="nav-link" style="${check('customization', 'announcements') ? '' : 'display:none'}" onclick="go('announcement-list')"><i class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Announcements</span></div>
                         <div class="nav-link" style="${check('customization', 'siteConfig') ? '' : 'display:none'}" onclick="go('custom-site-config')"><i class="fa-solid fa-sliders nav-icon"></i><span class="nav-label">Site Config</span></div>
@@ -533,6 +604,18 @@ export function renderSidebar() {
                 <div class="nav-link" style="${check('tools', 'sawala') ? '' : 'display:none'}" onclick="go('tools-sawala')"><i class="fa-solid fa-comments nav-icon"></i><span class="nav-label">Sawala</span></div>
                 <div class="nav-link" style="${check('tools', 'unopay') ? '' : 'display:none'}" onclick="go('tools-unopay')"><i class="fa-solid fa-credit-card nav-icon"></i><span class="nav-label">Unopay Payment</span></div>
                 <div class="nav-link" style="${check('tools', 'nawalaScan') ? '' : 'display:none'}" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div>
+            </div>
+        </div>`;
+    }
+
+    if (isSuper) {
+        html += `
+        <div class="nav-item">
+            <div class="nav-link" onclick="toggleMenu('superShortcutsMenu', this)"><i class="fa-solid fa-star nav-icon"></i><span class="nav-label">SuperAdmin Shortcuts</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-submenu" id="superShortcutsMenu">
+                <div class="nav-link" onclick="go('admin-management')"><i class="fa-solid fa-user-shield nav-icon"></i><span class="nav-label">Dashboard Users</span></div>
+                <div class="nav-link" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div>
+                <div class="nav-link" onclick="go('seamless-config')"><i class="fa-solid fa-puzzle-piece nav-icon"></i><span class="nav-label">Seamless Setup</span></div>
             </div>
         </div>`;
     }
@@ -628,6 +711,19 @@ export function renderSidebar() {
     // Session Control
     html += `<div class="sidebar-menu-label">Session Control</div>
         <div class="nav-item"><div class="nav-link" onclick="logout()"><i class="fa-solid fa-right-from-bracket nav-icon"></i><span class="nav-label">Logout Account</span></div></div>`;
+
+    // Fail-safe: if dynamic RBAC menu unexpectedly resolves to empty, keep minimal working menu.
+    if (!html || html.trim().length < 40) {
+        nav.innerHTML = `
+        <div class="sidebar-menu-label">Main Menu</div>
+        <div class="nav-item"><div class="nav-link" onclick="go('dashboard')"><i class="fa-solid fa-gauge-high nav-icon"></i><span class="nav-label">Dashboard</span></div></div>
+        <div class="nav-item"><div class="nav-link" onclick="go('global-member-list')"><i class="fa-solid fa-users nav-icon"></i><span class="nav-label">Members</span></div></div>
+        <div class="nav-item"><div class="nav-link" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div></div>
+        <div class="nav-item"><div class="nav-link" onclick="go('crm-dashboard')"><i class="fa-solid fa-bullseye nav-icon"></i><span class="nav-label">CRM</span></div></div>
+        <div class="nav-item"><div class="nav-link" onclick="logout()"><i class="fa-solid fa-right-from-bracket nav-icon"></i><span class="nav-label">Logout</span></div></div>
+        `;
+        return;
+    }
 
     nav.innerHTML = html;
 }

@@ -6,19 +6,50 @@ export let sidebarCollapsed = false;
 export let activeCharts = {};
 
 export const pages = {};
+let ensurePageForRoute = null;
 
-export function go(page) {
+export function setPageResolver(resolver) {
+    ensurePageForRoute = resolver;
+}
+
+export async function go(page) {
     // ── Enhancement 5: Maintenance Mode Gate (Production Readiness) ──
     if (window.maintenanceMode && page !== 'dashboard' && page !== 'profile') {
         renderMaintenanceUI(page);
         return;
     }
 
+    if (!page || typeof page !== 'string') page = 'dashboard';
     currentPage = page;
     destroyCharts();
     const content = document.getElementById('pageContent');
+    if (!content) {
+        console.error('[Router] #pageContent not found');
+        return;
+    }
+    if (!pages[page] && typeof ensurePageForRoute === 'function') {
+        try {
+            await ensurePageForRoute(page);
+        } catch (e) {
+            console.warn('[Router] lazy load failed for page:', page, e?.message || e);
+        }
+    }
     if (pages[page]) {
-        content.innerHTML = pages[page]();
+        try {
+            content.innerHTML = pages[page]();
+        } catch (err) {
+            console.error('[Router] Page render error for:', page, err);
+            content.innerHTML = `
+                <div class="card" style="margin-top:2rem">
+                    <div class="card-body" style="text-align:center;padding:4rem">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size:3rem;color:var(--yellow);margin-bottom:1rem;display:block"></i>
+                        <h2 style="margin-bottom:.5rem">Page Render Error</h2>
+                        <p style="color:var(--text3);margin-bottom:1.5rem">${err.message || 'Unknown error'}</p>
+                        <button class="btn btn-primary" onclick="go('dashboard')"><i class="fa-solid fa-house"></i> Go to Dashboard</button>
+                    </div>
+                </div>`;
+            return;
+        }
 
         // Sync Browser Tab Title (UX 1)
         const label = page.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

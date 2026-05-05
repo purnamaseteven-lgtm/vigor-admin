@@ -42,14 +42,21 @@ const lazyPageModules = [
 ];
 
 async function ensurePageForRoute(page) {
+    let lastError = null;
     for (const mod of lazyPageModules) {
         if (mod.match(page) && !mod.loaded) {
-            await mod.load();
-            mod.loaded = true;
-            break;
+            try {
+                await mod.load();
+                mod.loaded = true;
+                break;
+            } catch (e) {
+                lastError = e;
+                console.error('[Init] Failed loading module for page:', page, e);
+            }
         }
         if (mod.match(page) && mod.loaded) break;
     }
+    if (!window.pages?.[page] && lastError) throw lastError;
 }
 
 setPageResolver(ensurePageForRoute);
@@ -135,12 +142,31 @@ window.simulateDevRole = (role) => {
 /* INIT */
 document.addEventListener('DOMContentLoaded', async () => {
     initState();
-    await ensurePageForRoute('dashboard');
+    try {
+        await ensurePageForRoute('dashboard');
+    } catch (e) {
+        console.error('[Init] Dashboard preload failed:', e);
+    }
 
     const authed = await requireAuth();
     if (!authed) return;
 
-    go('dashboard');
+    try {
+        await go('dashboard');
+    } catch (e) {
+        console.error('[Init] Initial route failed:', e);
+        const content = document.getElementById('pageContent');
+        if (content) {
+            content.innerHTML = `
+            <div class="card" style="margin-top:1rem">
+                <div class="card-body" style="padding:2rem;text-align:center">
+                    <h2 style="margin-bottom:.5rem">Failed to Load Dashboard</h2>
+                    <p style="color:var(--text3);margin-bottom:1rem">${(e && e.message) ? e.message : 'Unknown startup error'}</p>
+                    <button class="btn btn-primary" onclick="window.go('dashboard')"><i class="fa-solid fa-rotate-right"></i> Retry</button>
+                </div>
+            </div>`;
+        }
+    }
 
     // Render canonical sidebar (contains full menu map incl. CRM/Nawala and validated routes).
     renderSidebar();

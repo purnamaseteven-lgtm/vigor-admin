@@ -15,8 +15,6 @@ import * as uiFuncs from './ui/components.js';
 import * as chartFuncs from './ui/charts.js';
 import * as helperFuncs from './utils/helpers.js';
 import * as formFuncs from './utils/forms.js';
-import * as tierFuncs from './utils/tier.js';
-import * as scopeFuncs from './utils/scope.js';
 
 Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs, formFuncs);
 

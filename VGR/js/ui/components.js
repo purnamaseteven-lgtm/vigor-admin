@@ -614,6 +614,7 @@ export function renderSidebar() {
             <div class="nav-link" onclick="toggleMenu('superShortcutsMenu', this)"><i class="fa-solid fa-star nav-icon"></i><span class="nav-label">SuperAdmin Shortcuts</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="superShortcutsMenu">
                 <div class="nav-link" onclick="go('admin-management')"><i class="fa-solid fa-user-shield nav-icon"></i><span class="nav-label">Dashboard Users</span></div>
+                <div class="nav-link" onclick="go('system-notifications')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">System Notifications</span></div>
                 <div class="nav-link" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div>
                 <div class="nav-link" onclick="go('seamless-config')"><i class="fa-solid fa-puzzle-piece nav-icon"></i><span class="nav-label">Seamless Setup</span></div>
             </div>

@@ -1,43 +1,60 @@
 /* MAIN ENTRY POINT */
 import { initState } from './core/state.js';
-import { go, toggleMenu } from './core/router.js';
-import { requireAuth, onAuthChange, applyRBAC } from './core/auth.js';
+import { go, toggleMenu, setPageResolver } from './core/router.js';
+import { requireAuth, onAuthChange } from './core/auth.js';
 import { initRealtime } from './core/realtime.js';
 import { fetchSettings } from './core/db.js';
 import { SUPABASE_ENABLED } from './core/supabase.js';
 import { t, applyTranslations, changeLanguage } from './core/i18n.js';
+import { renderSidebar, renderProfileDisplay, toast } from './ui/components.js';
 import './api/payment.js';  // register window.paymentAPI
 
-import './pages/dashboard.js';
-import './pages/members.js';
-import './pages/finance.js';
-import './pages/settings.js';
-import './pages/betting.js';
-import './builder/engine.js';
-import './pages/customization.js';
-import './pages/logs-memo.js';
-import './pages/company.js';
-import './pages/results.js';
-import './pages/admins.js';
-import './pages/bonus.js';
-import './pages/reports.js';
-import './pages/tools.js';
-import './pages/seamless.js';
-import './pages/master.js';
-import './pages/crm.js';
-import './pages/manual.js';
-import './pages/nawala.js';
-import './pages/missing-pages.js';
-
-import './pages/simulator.js';
 import * as stateFuncs from './core/state.js';
 import * as routerFuncs from './core/router.js';
 import * as uiFuncs from './ui/components.js';
 import * as chartFuncs from './ui/charts.js';
 import * as helperFuncs from './utils/helpers.js';
 import * as formFuncs from './utils/forms.js';
+import * as tierFuncs from './utils/tier.js';
+import * as scopeFuncs from './utils/scope.js';
 
 Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs, formFuncs);
+
+const lazyPageModules = [
+    { loaded: false, match: (p) => p === 'dashboard', load: () => import('./pages/dashboard.js') },
+    { loaded: false, match: (p) => p.includes('member'), load: () => import('./pages/members.js') },
+    { loaded: false, match: (p) => p.includes('finance') || p.includes('deposit') || p.includes('withdraw') || p.includes('bank'), load: () => import('./pages/finance.js') },
+    { loaded: false, match: (p) => p.includes('setting') || p === 'profile', load: () => import('./pages/settings.js') },
+    { loaded: false, match: (p) => p.includes('betting') || p.includes('lottery') || p.includes('game'), load: () => import('./pages/betting.js') },
+    { loaded: false, match: (p) => p.includes('custom') || p.includes('template') || p.includes('widget') || p.includes('vip') || p.includes('tier'), load: async () => { await import('./pages/customization.js'); await import('./builder/engine.js'); } },
+    { loaded: false, match: (p) => p.includes('memo') || p.includes('log'), load: () => import('./pages/logs-memo.js') },
+    { loaded: false, match: (p) => p.includes('company') || p.includes('whitelabel') || p.includes('agent') || p.includes('shop') || p === 'my-downlines' || p === 'master', load: () => import('./pages/company.js') },
+    { loaded: false, match: (p) => p.includes('result'), load: () => import('./pages/results.js') },
+    { loaded: false, match: (p) => p.includes('admin'), load: () => import('./pages/admins.js') },
+    { loaded: false, match: (p) => p.includes('bonus') || p.includes('promo'), load: () => import('./pages/bonus.js') },
+    { loaded: false, match: (p) => p.includes('report') || p.includes('invoice'), load: () => import('./pages/reports.js') },
+    { loaded: false, match: (p) => p.includes('tools'), load: () => import('./pages/tools.js') },
+    { loaded: false, match: (p) => p.includes('seamless') || p.includes('pgsoft'), load: () => import('./pages/seamless.js') },
+    { loaded: false, match: (p) => p.includes('master'), load: () => import('./pages/master.js') },
+    { loaded: false, match: (p) => p.includes('crm'), load: () => import('./pages/crm.js') },
+    { loaded: false, match: (p) => p.includes('manual'), load: () => import('./pages/manual.js') },
+    { loaded: false, match: (p) => p.includes('nawala') || p.includes('sawala'), load: () => import('./pages/nawala.js') },
+    { loaded: false, match: (p) => p.includes('simulator'), load: () => import('./pages/simulator.js') },
+    { loaded: false, match: () => true, load: () => import('./pages/missing-pages.js') },
+];
+
+async function ensurePageForRoute(page) {
+    for (const mod of lazyPageModules) {
+        if (mod.match(page) && !mod.loaded) {
+            await mod.load();
+            mod.loaded = true;
+            break;
+        }
+        if (mod.match(page) && mod.loaded) break;
+    }
+}
+
+setPageResolver(ensurePageForRoute);
 
 /* REAL-TIME WIDGET TIMERS */
 let jackpotInterval = null;
@@ -120,18 +137,18 @@ window.simulateDevRole = (role) => {
 /* INIT */
 document.addEventListener('DOMContentLoaded', async () => {
     initState();
+    await ensurePageForRoute('dashboard');
 
     const authed = await requireAuth();
     if (!authed) return;
 
     go('dashboard');
 
-    renderSidebar();
+    // Keep static sidebar from app.html to ensure all configured menu items stay visible.
+    // Dynamic sidebar RBAC renderer can hide sections when role mapping is stale.
+    // renderSidebar();
     renderProfileDisplay();
     window.initOmniSearch();
-
-    // Apply RBAC to sidebar based on current role
-    applyRBAC();
 
     const homeMenuTrigger = document.querySelector('[onclick*="toggleMenu(\'homeMenu\'"]');
     if (homeMenuTrigger) toggleMenu('homeMenu', homeMenuTrigger);
@@ -170,9 +187,10 @@ function showRoleSimulator() {
     `;
 
     const roles = [
-        { r: 'SuperAdmin', c: 'Global', label: '🏷️ Whitelabel', verified: true },
-        { r: 'Master', c: 'Vigor Group', label: '👑 Master Agent' },
-        { r: 'Company', c: 'HokiBet', label: '🏪 Agent/Toko' }
+        { r: 'SuperAdmin', c: 'Global',    label: '⚡ Super Admin',  verified: true },
+        { r: 'Company',    c: 'vigor88',   label: '🌐 Whitelabel'               },
+        { r: 'Master',     c: 'budi',      label: '👑 Master Agent'              },
+        { r: 'Shop',       c: 'casino888', label: '🏪 Agent/Toko'               },
     ];
 
     bar.innerHTML = `
@@ -191,8 +209,9 @@ function showRoleSimulator() {
 }
 
 window.switchSimulatedRole = (role, company, shop = '', verified = false) => {
+    const idMap = { SuperAdmin: 'adm-1', Company: 'adm-2', Master: 'adm-3', Shop: 'adm-4', Agent: 'adm-5' };
     STATE.currentAdmin = {
-        id: role === 'SuperAdmin' ? 'adm-1' : role === 'Company' ? 'adm-2' : 'adm-3',
+        id: idMap[role] || 'adm-1',
         username: role.toLowerCase() + '_sim',
         name: role + ' Simulator',
         role: role,
@@ -203,16 +222,12 @@ window.switchSimulatedRole = (role, company, shop = '', verified = false) => {
     };
 
     // Refresh UI
-    import('./ui/components.js').then(m => {
-        // Shared rendering logic for all roles (SuperAdmin uses centralized check() bypass)
-        m.renderSidebar();
-        m.renderProfileDisplay();
+    renderSidebar();
+    renderProfileDisplay();
+    toast(`God-Mode Active: ${role} (${company})`, 'info');
+    go('dashboard');
 
-        m.toast(`God-Mode Active: ${role} (${company})`, 'info');
-        go('dashboard');
-
-        const oldBar = document.querySelector('div[style*="z-index: 10001"]');
-        if (oldBar) oldBar.remove();
-        showRoleSimulator();
-    });
+    const oldBar = document.querySelector('div[style*="z-index: 10001"]');
+    if (oldBar) oldBar.remove();
+    showRoleSimulator();
 };

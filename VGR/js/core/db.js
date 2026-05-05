@@ -409,12 +409,13 @@ const PAGE_FETCHES = {
     'seamless-config':              [fetchSeamlessGames],
 
     // ── CRM ───────────────────────────────────────────────────
-    'crm-dashboard':                [fetchCrmSegments, fetchCrmMissions, fetchCrmTournaments, fetchCrmAutomation, fetchMembers],
-    'crm-segments':                 [fetchCrmSegments, fetchMembers],
-    'crm-missions':                 [fetchCrmMissions, fetchCrmSegments],
-    'crm-tournaments':              [fetchCrmTournaments, fetchCrmSegments],
-    'crm-automation':               [fetchCrmAutomation, fetchCrmSegments],
-    'crm-push':                     [fetchCrmPush, fetchCrmSegments],
+    // Use lazy wrappers for CRM fetchers (declared later in this module) to avoid TDZ on module init.
+    'crm-dashboard':                [() => fetchCrmSegments(), () => fetchCrmMissions(), () => fetchCrmTournaments(), () => fetchCrmAutomation(), fetchMembers],
+    'crm-segments':                 [() => fetchCrmSegments(), fetchMembers],
+    'crm-missions':                 [() => fetchCrmMissions(), () => fetchCrmSegments()],
+    'crm-tournaments':              [() => fetchCrmTournaments(), () => fetchCrmSegments()],
+    'crm-automation':               [() => fetchCrmAutomation(), () => fetchCrmSegments()],
+    'crm-push':                     [() => fetchCrmPush(), () => fetchCrmSegments()],
 
     // ── Logs ──────────────────────────────────────────────────
     'logs-admin':                   [fetchLogs],

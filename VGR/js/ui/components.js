@@ -341,7 +341,7 @@ export function renderSidebar() {
         'members.memberList':'global-member-list','members.addMember':'global-member-list','members.tierHistory':'tier-history',
         'bankManagement.bankList':'bank-list','bankManagement.createNewBank':'bank-create',
         'finance.deposit':'deposit-list','finance.withdrawal':'withdrawal-list','finance.adjustment':'finance-adjustment','finance.adjustmentLogs':'finance-adjustment-logs',
-        'bets.betsListing':'bets-list','bets.bettingTable':'bets-table','bets.transferredList':'bets-transferred',
+        'bets.betsListing':'bets-list','bets.bettingTable':'bets-table','bets.transferredList':'transferred-list',
         'bonus.bonusReport':'bonus-report','bonus.agentFreebet':'bonus-agent-freebet','bonus.agentFreebetReport':'bonus-agent-freebet-report',
         'bonus.pragmaticFrb':'bonus-pragmatic-frb','bonus.promotions':'custom-promotion-list','bonus.promotionRelease':'promotion-release','bonus.promotionRollingRelease':'promotion-rolling-release',
         'results.resultsListing':'results-list','results.resultScan':'results-scan','results.resultsAnalyze':'results-analyze',

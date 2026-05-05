@@ -3,6 +3,7 @@ import { STATE, addLog, fmtCur, stateAdd, stateUpdate, stateDelete } from '../co
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, openModal, closeModalBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, rnd, fmt, COMPANIES } from '../utils/helpers.js';
+import { getMyCompany, getDirectDownlines, getDownlineType } from '../utils/scope.js';
 
 /* ─── MASTER PAGE ─── */
 pages['master'] = () => {
@@ -303,7 +304,10 @@ pages['company-create'] = () => {
 /* ─── COMPANY LIST ─── */
 pages['company-list'] = () => {
   const PG = 'company-list';
-  const all = STATE.companies.filter(c => c.type === 'Company');
+  // Scope: SuperAdmin sees all Company-type; Company role sees only their direct downlines
+  const role = STATE.currentAdmin.role;
+  const myCompany = role !== 'SuperAdmin' ? getMyCompany() : null;
+  const all = STATE.companies.filter(c => c.type === 'Company' && (role === 'SuperAdmin' || !myCompany || c.parentId === myCompany.id));
   const filtered = filterData(all, PG);
   const total = filtered.length;
   const pp = getPerPage(PG);
@@ -488,158 +492,208 @@ pages['whitelabel-list'] = () => {
 
 // tier-history is defined in members.js (authoritative version)
 
-/* ─── BANK CREATE ─── */
-pages['bank-create'] = () => {
-  return `
-  < style >
-        .cc - layout { display: grid; grid - template - columns: 1fr 340px; gap: 1.5rem; align - items: start; }
-        .cc - card { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.05); border - radius: 16px; box - shadow: 0 10px 30px rgba(0, 0, 0, 0.2); overflow: hidden; position: relative; }
-        .cc - card.finance - card::before { background: linear - gradient(90deg, #10b981, #059669, #10b981); }
-        .cc - section - title { font - size: 0.85rem; font - weight: 800; color: #fff; margin: 0 0 1.25rem 0; display: flex; align - items: center; gap: 0.5rem; padding - bottom: 0.75rem; border - bottom: 1px dashed rgba(255, 255, 255, 0.1); }
-        .cc - grid { display: grid; grid - template - columns: 1fr 1fr; gap: 1.25rem; margin - bottom: 2rem; }
-        .cc - input - wrap { position: relative; }
-        .cc - input - wrap i { position: absolute; left: 1rem; top: 50 %; transform: translateY(-50 %); color: #64748b; font - size: 0.9rem; transition: color 0.3s; }
-        .cc - input - wrap input, .cc - input - wrap select, .cc - input - wrap textarea { width: 100 %; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); color: #f1f5f9; padding: 0.75rem 1rem 0.75rem 2.8rem; border - radius: 10px; font - size: 0.85rem; transition: all 0.3s; }
-        .cc - input - wrap select { appearance: none; }
-        .cc - input - wrap input: focus, .cc - input - wrap select:focus { border - color: #10b981; background: rgba(16, 185, 129, 0.05); box - shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
-        .cc - input - wrap input: focus + i, .cc - input - wrap select: focus + i { color: #10b981; }
-        .cc - label { display: block; font - size: 0.75rem; font - weight: 700; color: #94a3b8; margin - bottom: 0.5rem; text - transform: uppercase; letter - spacing: 0.05em; }
-        .cc - req { color: #ef4444; margin - left: 3px; }
-        .cc - sidebar - card { background: #1e293b; border - radius: 12px; padding: 1.5rem; text - align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
-        .cc - icon - circle.finance - icon { background: rgba(16, 185, 129, 0.1); color: #10b981; box - shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
-        
-        .status - radio { display: flex; gap: 1.5rem; background:#1e293b; padding: .5rem 1rem; border - radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05); }
-        .status - radio label { display: flex; align - items: center; gap: .5rem; font - size: .85rem; font - weight: 700; color: #cbd5e1; cursor: pointer; }
-        .status - radio input { accent - color:#10b981; width: 16px; height: 16px; cursor: pointer; }
-    </style >
+/* ─── MY DOWNLINES — scoped to current admin's own downline tree ─── */
+pages['my-downlines'] = () => {
+    const role      = STATE.currentAdmin.role;
+    const myCompany = getMyCompany();
+    const all       = getDirectDownlines();
+    const dlType    = getDownlineType();
 
-  ${pageHeader('Create Bank Account', '<span>Bank Management</span><span class="sep">›</span><span>Create</span>', `
-        <button class="btn btn-secondary" onclick="go('finance')"><i class="fa-solid fa-arrow-left"></i> Back to Finance</button>
-    `)
-    }
+    const roleLabel  = { Company: 'Whitelabel / Brand', Master: 'Master Agent', Shop: 'Agent / Shop', Agent: 'Agent' }[role] || role;
+    const typeLabel  = { Company: 'Sub-Company', Master: 'Master Agent', Agent: 'Sub-Agent' }[dlType] || dlType;
+    const pageTitleMap = { Company: 'My Sub-Companies', Master: 'My Master Agents', Shop: 'My Sub-Agents', Agent: 'My Sub-Agents' };
+    const pageTitle  = pageTitleMap[role] || 'My Downlines';
 
-<div class="cc-layout">
-  <!-- Main Form -->
-  <div class="cc-card finance-card">
-    <div style="padding: 2rem;">
+    const PG = 'my-downlines';
+    const filtered = filterData(all, PG);
+    const total = filtered.length;
+    const pp  = getPerPage(PG);
+    const cp  = getCurPage(PG);
+    const rows = paginate(filtered, cp, pp);
 
-      <!-- Ledger Identification -->
-      <div class="cc-section-title"><i class="fa-solid fa-building-columns" style="color:#10b981"></i> LEDGER IDENTIFICATION</div>
-      <div class="cc-grid">
-        <div>
-          <label class="cc-label">Financial Institution <span class="cc-req">*</span></label>
-          <div class="cc-input-wrap">
-            <select id="bk_bank">
-              ${['BCA', 'BNI', 'BRI', 'MANDIRI', 'DANAMON', 'CIMB', 'PERMATA', 'MAYBANK', 'BTN', 'OCBC', 'PANIN', 'MEGA', 'SINARMAS'].map(b => `<option>${b}</option>`).join('')}
-            </select>
-            <i class="fa-solid fa-university"></i>
-            <i class="fa-solid fa-chevron-down" style="left:auto; right:1rem; font-size:.8rem; pointer-events:none"></i>
-          </div>
-        </div>
-        <div>
-          <label class="cc-label">Operating Mode <span class="cc-req">*</span></label>
-          <div class="cc-input-wrap">
-            <select id="bk_type">
-              <option>Both (Dep & WD)</option>
-              <option>Deposit Only</option>
-              <option>Withdraw Only</option>
-            </select>
-            <i class="fa-solid fa-code-branch"></i>
-            <i class="fa-solid fa-chevron-down" style="left:auto; right:1rem; font-size:.8rem; pointer-events:none"></i>
-          </div>
-        </div>
-        <div>
-          <label class="cc-label">Registered Account Name <span class="cc-req">*</span></label>
-          <div class="cc-input-wrap">
-            <input type="text" id="bk_accname" placeholder="VIGOR OFFICIAL BCA">
-              <i class="fa-solid fa-id-card"></i>
-          </div>
-        </div>
-        <div>
-          <label class="cc-label">Account Number <span class="cc-req">*</span></label>
-          <div class="cc-input-wrap">
-            <input type="text" id="bk_accno" placeholder="e.g. 5200112233">
-              <i class="fa-solid fa-hashtag"></i>
-          </div>
-        </div>
-      </div>
+    const totalCredit  = all.reduce((s, c) => s + (c.credit || 0), 0);
+    const totalMembers = all.reduce((s, c) => s + (c.members || 0), 0);
+    const activeCount  = all.filter(c => c.status === 'Active').length;
 
-      <!-- Transaction Limits -->
-      <div class="cc-section-title"><i class="fa-solid fa-money-bill-transfer" style="color:#10b981"></i> TRANSACTION FLOW CONSTRAINTS</div>
-      <div class="cc-grid">
-        <div>
-          <label class="cc-label">Min Deposit Limit (Rp)</label>
-          <div class="cc-input-wrap" style="color:#10b981">
-            <input type="number" id="bk_min" value="10000" min="0">
-              <i class="fa-solid fa-arrow-down-short-wide"></i>
-          </div>
-        </div>
-        <div>
-          <label class="cc-label">Max Deposit Limit (Rp)</label>
-          <div class="cc-input-wrap" style="color:#10b981">
-            <input type="number" id="bk_max" value="100000000" min="0">
-              <i class="fa-solid fa-arrow-up-wide-short"></i>
-          </div>
-        </div>
-        <div>
-          <label class="cc-label">Min Withdraw Limit (Rp)</label>
-          <div class="cc-input-wrap" style="color:#ef4444">
-            <input type="number" id="bk_minw" value="50000" min="0">
-              <i class="fa-solid fa-hand-holding-dollar"></i>
-          </div>
-        </div>
-        <div>
-          <label class="cc-label">Max Withdraw Limit (Rp)</label>
-          <div class="cc-input-wrap" style="color:#ef4444">
-            <input type="number" id="bk_maxw" value="50000000" min="0">
-              <i class="fa-solid fa-vault"></i>
-          </div>
-        </div>
-      </div>
+    return `
+    ${pageHeader(pageTitle, `<span>${roleLabel}</span><span class="sep">›</span><span>My Downlines</span>`, `
+        <button class="btn btn-primary" onclick="window.openFormModal('company')"><i class="fa-solid fa-plus"></i> Add ${typeLabel}</button>`)}
 
-      <!-- Status -->
-      <div class="cc-section-title"><i class="fa-solid fa-power-off" style="color:#10b981"></i> OPERATIONAL STATUS</div>
-      <div style="margin-bottom:2rem">
-        <label class="cc-label">Gateway Availability</label>
-        <div class="status-radio">
-          <label><input type="radio" name="bk_status" value="Active" checked /> System Active</label>
-          <label><input type="radio" name="bk_status" value="Inactive" /> Temporarily Offline</label>
-        </div>
-      </div>
-
-      <div style="display:flex; justify-content:flex-end; gap:1rem; margin-top:2rem; padding-top:1.5rem; border-top:1px solid rgba(255,255,255,0.05)">
-        <button class="btn btn-secondary" style="padding: 0 2rem; border-radius: 12px; height: 48px; font-weight:800" onclick="go('finance')">CANCEL</button>
-        <button class="btn" style="background:#10b981; color:#fff; border:none; padding: 0 3rem; border-radius: 12px; height: 48px; font-weight:800; font-size:.9rem; box-shadow: 0 10px 20px rgba(16,185,129,0.3)" onclick="window.submitBankCreate()">
-          <i class="fa-solid fa-check-circle" style="margin-right:.5rem"></i> PROVISION ACCOUNT
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Right Side Panel -->
-  <div style="display:flex; flex-direction:column; gap:1.5rem">
-    <div class="cc-sidebar-card">
-      <div class="cc-icon-circle finance-icon"><i class="fa-solid fa-vault"></i></div>
-      <h3 style="color:#fff; margin:0 0 .5rem 0; font-size:1.1rem; font-weight:800">Secure Gateway</h3>
-      <p style="color:#94a3b8; font-size:.8rem; line-height:1.5; margin:0">
-        Registering a new payment gateway automatically provisions receiving limits and routing algorithms.
-      </p>
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem">
+        ${[
+            { icon: 'sitemap',          label: 'Total Downlines',   val: all.length,                      color: '#6366f1' },
+            { icon: 'circle-check',     label: 'Active',            val: activeCount,                     color: '#10b981' },
+            { icon: 'coins',            label: 'Total Credit',      val: fmtCur(totalCredit),             color: '#f59e0b' },
+            { icon: 'users',            label: 'Total Members',     val: fmt(totalMembers),               color: '#8b5cf6' },
+        ].map(s => `
+        <div class="card" style="border-left:3px solid ${s.color}20">
+            <div class="card-body" style="display:flex;align-items:center;gap:1rem;padding:1rem">
+                <div style="width:40px;height:40px;border-radius:10px;background:${s.color}18;display:flex;align-items:center;justify-content:center">
+                    <i class="fa-solid fa-${s.icon}" style="color:${s.color};font-size:1.1rem"></i>
+                </div>
+                <div>
+                    <div style="font-size:1.2rem;font-weight:800;color:#fff">${s.val}</div>
+                    <div style="font-size:.72rem;color:var(--text3)">${s.label}</div>
+                </div>
+            </div>
+        </div>`).join('')}
     </div>
 
-    <div class="cc-sidebar-card" style="text-align:left">
-      <div style="font-size:.75rem; font-weight:800; color:#fff; text-transform:uppercase; margin-bottom:1rem; display:flex; align-items:center; gap:.5rem">
-        <i class="fa-solid fa-shield-halved" style="color:#10b981"></i> Compliance Rules
-      </div>
-      <ul style="padding-left:1.2rem; color:#94a3b8; font-size:.78rem; line-height:1.8; margin:0">
-        <li>Account Name must perfectly match your KYC to avoid player bounce.</li>
-        <li>Min/Max constraints protect against algorithmic transaction flooding.</li>
-        <li>"System Active" makes the gateway instantly visible to VIP players.</li>
-      </ul>
+    <!-- Parent company banner -->
+    ${myCompany ? `
+    <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.75rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;font-size:.83rem">
+        <i class="fa-solid fa-building-user" style="color:#6366f1;font-size:1.1rem"></i>
+        <span style="color:#a5b4fc">Your company: <strong style="color:#fff">${myCompany.name}</strong> &nbsp;·&nbsp; All ${typeLabel.toLowerCase()}s listed below are direct downlines of your account.</span>
+    </div>` : ''}
+
+    ${filterCard(`
+        ${fsInput('my-downlines', 'username', 'Username', 'Search username…')}
+        ${fsInput('my-downlines', 'name', 'Name', 'Search name…')}
+        ${fsSelect('my-downlines', 'status', 'Status', ['All Status', 'Active', 'Inactive'])}
+        ${fsActions('my-downlines')}
+    `)}
+
+    <div class="card">
+        <div class="card-body">
+            ${tableWrap(`
+                <table>
+                    <thead>
+                        <tr><th>#</th><th>Username</th><th>Name</th><th>Email</th><th>Type</th><th>Credit</th><th>Members</th><th>Joined</th><th>Status</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map((c, i) => `
+                        <tr>
+                            <td>${(cp - 1) * pp + i + 1}</td>
+                            <td><strong style="color:var(--acc)">${c.username}</strong></td>
+                            <td>${c.name}</td>
+                            <td style="font-size:.75rem">${c.email || '-'}</td>
+                            <td><span style="font-size:.72rem;font-weight:700;padding:.2rem .6rem;border-radius:12px;background:rgba(99,102,241,.15);color:#a5b4fc">${c.type}</span></td>
+                            <td style="font-weight:700">${fmtCur(c.credit)}</td>
+                            <td>${fmt(c.members)}</td>
+                            <td style="font-size:.75rem">${c.joined}</td>
+                            <td>
+                                <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
+                                    class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700">
+                                    ${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}
+                                </button>
+                            </td>
+                            <td>${actionBtns(
+                                `window.openFormModal('company','${c.id}')`,
+                                `confirmAction('Delete ${typeLabel}','Delete [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','my-downlines'),'Delete','danger')`
+                            )}</td>
+                        </tr>`).join('')}
+                        ${rows.length === 0 ? `<tr><td colspan="10" style="text-align:center;color:var(--text3)">No ${typeLabel.toLowerCase()}s found</td></tr>` : ''}
+                    </tbody>
+                </table>
+            `)}
+        </div>
     </div>
-  </div>
-</div>`;
+    ${renderPagerHTML(PG, total, pp, cp)}`;
 };
 
+/* BANK CREATE */
+pages['bank-create'] = () => {
+  const banks = ['BCA', 'BNI', 'BRI', 'MANDIRI', 'DANAMON', 'CIMB', 'PERMATA', 'MAYBANK', 'BTN', 'OCBC', 'PANIN', 'MEGA', 'SINARMAS'];
+
+  return `
+    ${pageHeader('Create Bank Account', '<span>Bank Management</span><span class="sep">�</span><span>Create</span>', `
+      <button class="btn btn-secondary" onclick="go('bank-list')"><i class="fa-solid fa-arrow-left"></i> Back to Bank List</button>
+    `)}
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:1.25rem;align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Add Bank Account</span></div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Financial Institution</label>
+              <select id="bk_bank">${banks.map(b => `<option>${b}</option>`).join('')}</select>
+            </div>
+            <div class="form-field">
+              <label>Operating Mode</label>
+              <select id="bk_type">
+                <option>Both (Dep & WD)</option>
+                <option>Deposit Only</option>
+                <option>Withdraw Only</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Registered Account Name</label>
+              <input type="text" id="bk_accname" placeholder="VIGOR OFFICIAL BCA" />
+            </div>
+            <div class="form-field">
+              <label>Account Number</label>
+              <input type="text" id="bk_accno" placeholder="e.g. 5200112233" />
+            </div>
+            <div class="form-field">
+              <label>Min Deposit Limit (Rp)</label>
+              <input type="number" id="bk_min" value="10000" min="0" />
+            </div>
+            <div class="form-field">
+              <label>Max Deposit Limit (Rp)</label>
+              <input type="number" id="bk_max" value="100000000" min="0" />
+            </div>
+            <div class="form-field">
+              <label>Min Withdraw Limit (Rp)</label>
+              <input type="number" id="bk_minw" value="50000" min="0" />
+            </div>
+            <div class="form-field">
+              <label>Max Withdraw Limit (Rp)</label>
+              <input type="number" id="bk_maxw" value="50000000" min="0" />
+            </div>
+          </div>
+
+          <div class="form-field" style="margin-top:1rem">
+            <label>Gateway Availability</label>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;padding:.75rem 1rem;border:1px solid var(--border);border-radius:10px;background:var(--bg2)">
+              <label style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:600">
+                <input type="radio" name="bk_status" value="Active" checked /> System Active
+              </label>
+              <label style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:600">
+                <input type="radio" name="bk_status" value="Inactive" /> Temporarily Offline
+              </label>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem">
+            <button class="btn btn-secondary" onclick="go('bank-list')">Cancel</button>
+            <button class="btn btn-primary" onclick="window.submitBankCreate()"><i class="fa-solid fa-check"></i> Provision Account</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:1rem">
+        <div class="card">
+          <div class="card-body" style="padding:1.25rem">
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+              <div style="width:44px;height:44px;border-radius:12px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center;color:var(--green)">
+                <i class="fa-solid fa-vault"></i>
+              </div>
+              <div>
+                <div style="font-weight:700">Secure Gateway</div>
+                <div style="font-size:.78rem;color:var(--text3)">New receiving account provisioning</div>
+              </div>
+            </div>
+            <p style="margin:0;color:var(--text2);font-size:.82rem;line-height:1.6">
+              Use this form to register a payout / deposit gateway with limits and operational status.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body" style="padding:1.25rem">
+            <div style="font-size:.75rem;font-weight:800;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem">Quick Notes</div>
+            <ul style="margin:0;padding-left:1.1rem;color:var(--text2);font-size:.82rem;line-height:1.8">
+              <li>Account name should match the KYC holder.</li>
+              <li>Limit values are editable after creation.</li>
+              <li>Inactive banks stay hidden from routing.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>`;
+};
 /* ─── PROFILE ─── */
 pages['profile'] = () => {
   const p = STATE.profile;
@@ -767,6 +821,9 @@ window.submitCompanyCreate = () => {
   const country = document.getElementById('cc_country')?.value;
 
   const newId = 'C' + Date.now();
+  // For non-SuperAdmin: auto-set parentId to their own company
+  const myComp = getMyCompany();
+  const autoParentId = (STATE.currentAdmin.role !== 'SuperAdmin' && myComp) ? myComp.id : null;
   const newCompany = {
     id: newId,
     username: u,
@@ -776,12 +833,14 @@ window.submitCompanyCreate = () => {
     credit: 0,
     members: 0,
     status: 'Active',
-    type: 'Company',
+    type: STATE.currentAdmin.role !== 'SuperAdmin' ? getDownlineType() : 'Company',
     template,
     country,
     whitelistIPs: ips,
     togelMarkets: pools,
-    joined: new Date().toISOString().split('T')[0]
+    joined: new Date().toISOString().split('T')[0],
+    ...(autoParentId ? { parentId: autoParentId } : {}),
+    createdBy: STATE.currentAdmin.id || null,
   };
 
   if (window.db?.dbAddCompany) {
@@ -838,9 +897,15 @@ window.openCompanyTypeForm = (type) => {
   window.openFormModal('company');
   requestAnimationFrame(() => {
     const typeEl = document.getElementById('f_type');
-    if (typeEl) typeEl.value = type;
+    if (typeEl && STATE.currentAdmin.role === 'SuperAdmin') typeEl.value = type;
     const statusEl = document.getElementById('f_status');
     if (statusEl) statusEl.value = 'Active';
+    // Ensure parentId is filled from scope helper for non-SuperAdmin
+    const pidEl = document.getElementById('f_parentId');
+    if (pidEl && !pidEl.value) {
+        const mc = getMyCompany();
+        if (mc) pidEl.value = mc.id;
+    }
   });
 };
 

@@ -144,14 +144,27 @@ export function toggleSidebar() {
 
 export function toggleMenu(id, el) {
     const menu = document.getElementById(id);
-    const arrow = el.querySelector('.nav-arrow');
+    if (!menu) return;
+    const arrow = el?.querySelector('.nav-arrow');
     const isOpen = menu.classList.contains('active');
+    if (!isOpen) {
+        document.querySelectorAll('.nav-submenu.active').forEach(other => {
+            if (other.id === id) return;
+            other.classList.remove('active');
+            other.style.maxHeight = '0px';
+            const trigger = document.querySelector(`[onclick*="toggleMenu('${other.id}'"]`);
+            const otherArrow = trigger?.querySelector('.nav-arrow');
+            if (otherArrow) otherArrow.style.transform = 'rotate(0deg)';
+        });
+    }
     if (isOpen) {
         menu.classList.remove('active');
-        arrow.style.transform = 'rotate(0deg)';
+        menu.style.maxHeight = '0px';
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
     } else {
         menu.classList.add('active');
-        arrow.style.transform = 'rotate(90deg)';
+        menu.style.maxHeight = `${menu.scrollHeight}px`;
+        if (arrow) arrow.style.transform = 'rotate(90deg)';
     }
 }
 
@@ -163,6 +176,7 @@ export function updateActiveNav(page) {
             const parentSubmenu = l.closest('.nav-submenu');
             if (parentSubmenu) {
                 parentSubmenu.classList.add('active');
+                parentSubmenu.style.maxHeight = `${parentSubmenu.scrollHeight}px`;
                 const triggerId = parentSubmenu.id;
                 const trigger = document.querySelector(`[onclick*="toggleMenu('${triggerId}'"]`);
                 if (trigger) {

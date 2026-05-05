@@ -142,9 +142,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     go('dashboard');
 
-    // Keep static sidebar from app.html to ensure all configured menu items stay visible.
-    // Dynamic sidebar RBAC renderer can hide sections when role mapping is stale.
-    // renderSidebar();
+    // Render canonical sidebar (contains full menu map incl. CRM/Nawala and validated routes).
+    renderSidebar();
     renderProfileDisplay();
     window.initOmniSearch();
 

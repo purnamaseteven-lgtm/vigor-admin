@@ -452,7 +452,7 @@ export function renderSidebar() {
     }
 
     // 7. User Management (Members + Dashboard Users merged)
-    if (sectionActive('members') || check('administrators', 'systemAdmins')) {
+    if (sectionActive('members') || check('administrators', 'systemAdmins') || isSuper) {
         html += `
         <div class="nav-item">
             <div class="nav-link" onclick="toggleMenu('memMenu', this)"><i class="fa-solid fa-users nav-icon"></i><span class="nav-label">User Management</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
@@ -460,7 +460,7 @@ export function renderSidebar() {
                 <div class="nav-link" style="${check('members', 'memberList') ? '' : 'display:none'}" onclick="go('global-member-list')"><i class="fa-solid fa-user-group nav-icon"></i><span class="nav-label">Member List</span></div>
                 <div class="nav-link" style="${check('members', 'addMember') ? '' : 'display:none'}" onclick="window.openFormModal('member')"><i class="fa-solid fa-user-plus nav-icon"></i><span class="nav-label">Add Member</span></div>
                 <div class="nav-link" style="${check('members', 'tierHistory') ? '' : 'display:none'}" onclick="go('tier-history')"><i class="fa-solid fa-clock-rotate-left nav-icon"></i><span class="nav-label">Tier / VIP History</span></div>
-                <div class="nav-link" style="${check('administrators', 'systemAdmins') ? '' : 'display:none'}" onclick="go('admin-management')"><i class="fa-solid fa-user-shield nav-icon"></i><span class="nav-label">Dashboard Users</span></div>
+                <div class="nav-link" onclick="go('admin-management')"><i class="fa-solid fa-user-shield nav-icon"></i><span class="nav-label">User Management</span></div>
                 <div class="nav-link" style="${check('administrators', 'rolePermissions') ? '' : 'display:none'}" onclick="go('dev-menu-config')"><i class="fa-solid fa-toggle-on nav-icon"></i><span class="nav-label">Role Permissions</span></div>
             </div>
         </div>`;

@@ -827,7 +827,68 @@ window.archiveOldLogs = async () => {
     }
 };
 
-window.viewArchiveHistory = () => {
-    toast('Opening archive bucket in external window...', 'info');
-    // Simulated
+window.viewArchiveHistory = async () => {
+    toast('Fetching archive history...', 'info');
+    
+    try {
+        const { supabase, SUPABASE_ENABLED } = await import('../core/supabase.js');
+        if (!SUPABASE_ENABLED) {
+            openModal('Archive History (Simulated)', `
+                <div style="padding:1rem; text-align:center; color:var(--text3)">
+                    <i class="fa-solid fa-cloud-moon fa-3x" style="margin-bottom:1rem; opacity:.2"></i>
+                    <p>Supabase is not enabled. In production, this would show a list of .csv and .json snapshots stored in the "archive" bucket.</p>
+                </div>
+            `, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`);
+            return;
+        }
+
+        const { data, error } = await supabase.storage.from('archive').list('', {
+            limit: 100,
+            offset: 0,
+            sortBy: { column: 'name', order: 'desc' },
+        });
+
+        if (error) throw error;
+
+        const rows = (data || []).map(file => {
+            const size = (file.metadata.size / 1024).toFixed(2) + ' KB';
+            const created = new Date(file.created_at).toLocaleString('id-ID');
+            const { data: { publicUrl } } = supabase.storage.from('archive').getPublicUrl(file.name);
+            
+            return `
+                <tr>
+                    <td><i class="fa-solid fa-file-csv" style="color:var(--green)"></i></td>
+                    <td style="font-family:monospace; font-size:.85rem">${file.name}</td>
+                    <td>${size}</td>
+                    <td style="font-size:.75rem">${created}</td>
+                    <td>
+                        <a href="${publicUrl}" target="_blank" class="btn btn-xs btn-primary">
+                            <i class="fa-solid fa-download"></i> Download
+                        </a>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        const table = rows ? `
+            <table style="width:100%; border-collapse:collapse">
+                <thead>
+                    <tr style="text-align:left; font-size:.75rem; color:var(--text3); border-bottom:1px solid var(--border)">
+                        <th style="padding:.5rem">Type</th>
+                        <th style="padding:.5rem">Filename</th>
+                        <th style="padding:.5rem">Size</th>
+                        <th style="padding:.5rem">Created</th>
+                        <th style="padding:.5rem">Action</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        ` : `<div style="text-align:center; padding:2rem; color:var(--text3)">No archives found in storage.</div>`;
+
+        openModal('Cold Storage: Archive History', table, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`);
+
+    } catch (e) {
+        console.error('Failed to fetch history', e);
+        toast(`Failed to load history: ${e.message}`, 'error');
+    }
 };

@@ -1073,3 +1073,88 @@ window.printReport = (title) => {
     </body></html>`);
   win.document.close();
 };
+
+/* ─── PROVIDER ANALYTICS (Feature #20) ─── */
+pages['provider-analytics'] = () => {
+    const PG = 'provider-analytics';
+    const txs = STATE.seamless?.transactions || [];
+    const providers = [...new Set(txs.map(t => t.provider || 'PG_SOFT'))];
+
+    const stats = providers.map(p => {
+        const pTxs = txs.filter(t => (t.provider || 'PG_SOFT') === p);
+        const bet = pTxs.reduce((s, t) => s + (t.betAmount || 0), 0);
+        const win = pTxs.reduce((s, t) => s + (t.winAmount || 0), 0);
+        const ggr = bet - win;
+        const players = [...new Set(pTxs.map(t => t.player))].length;
+        const avgBet = players > 0 ? bet / players : 0;
+        const margin = bet > 0 ? (ggr / bet) * 100 : 0;
+        return { provider: p, bet, win, ggr, players, avgBet, margin };
+    }).sort((a, b) => b.ggr - a.ggr);
+
+    const totalBet = stats.reduce((s, x) => s + x.bet, 0);
+    const totalWin = stats.reduce((s, x) => s + x.win, 0);
+    const totalGGR = totalBet - totalWin;
+
+    return `
+    ${pageHeader('Provider Performance Analytics', '<span>Reports</span><span class="sep">›</span><span>Provider Analytics</span>', `
+        <button class="btn btn-secondary btn-sm" onclick="window.printReport('Provider Performance')"><i class="fa-solid fa-print"></i> Print</button>
+    `)}
+
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:var(--acc)22;color:var(--acc)"><i class="fa-solid fa-coins"></i></div>
+            <div class="stat-info"><div class="stat-label">Aggregated Bet</div><div class="stat-value">${fmtCur(totalBet)}</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:var(--green)22;color:var(--green)"><i class="fa-solid fa-trophy"></i></div>
+            <div class="stat-info"><div class="stat-label">Aggregated Win</div><div class="stat-value">${fmtCur(totalWin)}</div></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:var(--purple)22;color:var(--purple)"><i class="fa-solid fa-chart-line"></i></div>
+            <div class="stat-info"><div class="stat-label">Total GGR Profit</div><div class="stat-value">${fmtCur(totalGGR)}</div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><span class="card-title">Provider Performance Comparison</span></div>
+        <div class="card-body">
+            ${tableWrap(`
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>Active Players</th>
+                            <th>Total Bet</th>
+                            <th>Total Win</th>
+                            <th>GGR Profit</th>
+                            <th>Avg Bet/Player</th>
+                            <th>Profit Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${stats.map(s => `
+                            <tr>
+                                <td><div style="font-weight:800;color:var(--acc)">${s.provider}</div></td>
+                                <td>${fmt(s.players)}</td>
+                                <td style="font-weight:600">${fmtCur(s.bet)}</td>
+                                <td style="color:var(--green)">${fmtCur(s.win)}</td>
+                                <td style="font-weight:700;color:var(--acc)">${fmtCur(s.ggr)}</td>
+                                <td style="font-size:.78rem">${fmtCur(s.avgBet)}</td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:.5rem">
+                                        <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px">
+                                            <div style="width:${Math.min(100, Math.max(0, s.margin))}%;height:100%;background:${s.margin > 20 ? 'var(--green)' : s.margin > 10 ? 'var(--yellow)' : 'var(--red)'};border-radius:4px"></div>
+                                        </div>
+                                        <span style="font-size:.75rem;font-weight:600">${s.margin.toFixed(1)}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                        ${stats.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text3)">No provider data available. Run some seamless transactions first.</td></tr>' : ''}
+                    </tbody>
+                </table>
+            `)}
+        </div>
+    </div>
+    `;
+};

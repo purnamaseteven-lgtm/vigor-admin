@@ -15,8 +15,9 @@ import * as uiFuncs from './ui/components.js';
 import * as chartFuncs from './ui/charts.js';
 import * as helperFuncs from './utils/helpers.js';
 import * as formFuncs from './utils/forms.js';
+import * as tierFuncs from './utils/tier.js';
 
-Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs, formFuncs);
+Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs, formFuncs, tierFuncs);
 
 const lazyPageModules = [
     { loaded: false, match: (p) => p === 'dashboard', load: () => import('./pages/dashboard.js') },

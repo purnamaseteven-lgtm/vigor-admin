@@ -40,9 +40,11 @@ pages['branding-settings'] = () => {
                     
                     <div class="form-group" style="margin-bottom:1.5rem">
                         <label>Logo Upload (PNG/SVG)</label>
-                        <div style="border:2px dashed var(--border); padding:2rem; text-align:center; border-radius:12px; cursor:pointer" onclick="toast('File upload simulated', 'info')">
+                        <input type="file" id="logoUpload" style="display:none" accept="image/*" onchange="window.handleBrandingUpload(this, 'logo')">
+                        <div id="logoDropzone" style="border:2px dashed var(--border); padding:2rem; text-align:center; border-radius:12px; cursor:pointer" onclick="document.getElementById('logoUpload').click()">
                             <i class="fa-solid fa-cloud-arrow-up" style="font-size:2rem; color:var(--text3); margin-bottom:1rem"></i>
                             <div style="font-size:.85rem; color:var(--text2)">Click to browse or drag & drop logo</div>
+                            <div id="logoStatus" style="font-size:.7rem; color:var(--acc); margin-top:.5rem"></div>
                         </div>
                     </div>
 
@@ -72,6 +74,49 @@ pages['branding-settings'] = () => {
             </div>
         </div>
     `;
+};
+
+window.handleBrandingUpload = async (input, type) => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const status = document.getElementById(`${type}Status`);
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading...';
+
+    try {
+        const { supabase, SUPABASE_ENABLED } = await import('../core/supabase.js');
+        if (!SUPABASE_ENABLED) {
+            toast('Storage requires Supabase configuration', 'warning');
+            status.textContent = 'Demo Mode: Upload Skipped';
+            return;
+        }
+
+        const fileName = `${Date.now()}_${file.name}`;
+        const { data, error } = await supabase.storage
+            .from('branding')
+            .upload(`logos/${fileName}`, file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('branding')
+            .getPublicUrl(data.path);
+
+        STATE.theme[type] = publicUrl;
+        saveState();
+
+        status.innerHTML = `<i class="fa-solid fa-circle-check"></i> Uploaded: ${file.name}`;
+        toast('Logo uploaded successfully', 'success');
+        
+        // Update preview image if exists
+        const previewImg = document.getElementById('brandingPreviewImg');
+        if (previewImg) previewImg.src = publicUrl;
+
+    } catch (e) {
+        console.error('[Branding] Upload failed:', e);
+        status.innerHTML = `<span style="color:var(--red)">Upload failed: ${e.message}</span>`;
+        toast('Upload failed', 'error');
+    }
 };
 
 window.saveBranding = () => {

@@ -34,7 +34,9 @@ const lazyPageModules = [
     // customization: also covers announcement-list, app-notification, rebate-calc
     { loaded: false, match: (p) => p.includes('custom') || p.includes('template') || p.includes('widget') || p.includes('vip') || p.includes('tier') || p.includes('announc') || p.includes('rebate') || p.includes('seo') || p === 'site-config', load: async () => { await import('./pages/customization.js'); await import('./builder/engine.js'); } },
     // logs-memo: memo + logs-admin only (specific log pages are routed to tools.js above)
-    { loaded: false, match: (p) => p.includes('memo') || p === 'logs-admin' || p.includes('notif'), load: () => import('./pages/missing-pages.js') },
+    { loaded: false, match: (p) => p.includes('memo') || p === 'logs-admin', load: () => import('./pages/logs-memo.js') },
+    // missing-pages handles notifications and template list
+    { loaded: false, match: (p) => p.includes('notif'), load: () => import('./pages/missing-pages.js') },
     { loaded: false, match: (p) => p.includes('company') || p.includes('whitelabel') || p.includes('agent') || p === 'my-downlines' || p === 'master', load: () => import('./pages/company.js') },
     { loaded: false, match: (p) => p.includes('result'), load: () => import('./pages/results.js') },
     { loaded: false, match: (p) => p.includes('bonus') || p.includes('promo'), load: () => import('./pages/bonus.js') },
@@ -318,6 +320,16 @@ window.runGlobalSearch = (val) => {
         </div>
     `).join('');
 };
+
+window.appendLiveFeed = (htmlStr) => {
+    const container = document.getElementById('liveFeedContainer');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.innerHTML = htmlStr;
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+};
+
 
 // Global Hotkey Listener
 document.addEventListener('keydown', (e) => {

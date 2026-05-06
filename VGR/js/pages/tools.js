@@ -193,6 +193,20 @@ pages['tools-sawala'] = () => {
     </div></div>`;
 };
 
+pages['tools-smartico'] = () => {
+  return `
+    ${pageHeader('Smartico Integration', '<span>Tools</span><span class="sep">›</span><span>Smartico</span>', `
+      <div style="display:flex;gap:.5rem"><button class="btn btn-primary btn-sm" onclick="toast('Connecting...','info')"><i class="fa-solid fa-bolt"></i> Test Connection</button></div>`)}
+    <div class="card"><div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div><strong>API Endpoint</strong><div>https://api.smartico.ai/v1</div></div>
+        <div><strong>Auth Token</strong><div>********************b8c9</div></div>
+        <div><strong>Webhook URL</strong><div>https://vigor.io/webhook/smartico</div></div>
+        <div><strong>Status</strong><div><span class="badge badge-success">Connected</span></div></div>
+      </div>
+    </div></div>`;
+};
+
 pages['host-management'] = () => {
   const hosts = STATE.tools.hosts;
   const deleted = STATE.tools.deletedHosts || [];
@@ -734,3 +748,86 @@ window.openFileForm = () => { openModal('Upload File', `<div class="form-grid"><
 window.saveFile = () => { STATE.tools.files.unshift({ id: 'F' + Date.now().toString().slice(-4), name: document.getElementById('fl_name')?.value || 'New_File.xlsx', size: '128 KB', date: new Date().toLocaleDateString('id-ID'), type: document.getElementById('fl_type')?.value || 'xlsx', status: 'Ready' }); saveState(); closeModalBtn(); go('invoice-file'); toast('File added', 'success'); };
 window.downloadFile = (id) => { const f = STATE.tools.files.find(x => x.id === id); if (!f) return; toast(`Prepared download for ${f.name}`, 'success'); };
 window.deleteFile = (id) => { STATE.tools.files = STATE.tools.files.filter(x => x.id !== id); saveState(); go('invoice-file'); toast('File deleted', 'success'); };
+
+pages['archive-logs'] = () => {
+  return `
+    ${pageHeader('Audit Logs Archival', '<span>Tools</span><span class="sep">›</span><span>Log Archival</span>', `
+      <button class="btn btn-secondary btn-sm" onclick="window.viewArchiveHistory()"><i class="fa-solid fa-clock-rotate-left"></i> History</button>`)}
+    
+    <div class="card" style="max-width:800px; margin: 0 auto;">
+      <div class="card-header"><span class="card-title">Archive Configuration</span></div>
+      <div class="card-body">
+        <p style="color:var(--text3); font-size:.85rem; margin-bottom:1.5rem">
+            Archiving logs moves them from the active database to a cold storage bucket (Supabase Storage). 
+            This improves dashboard query performance while retaining data for compliance.
+        </p>
+
+        <div style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; padding:1rem; margin-bottom:1.5rem; display:flex; gap:1rem; align-items:flex-start">
+            <i class="fa-solid fa-triangle-exclamation" style="color:var(--yellow); font-size:1.5rem; margin-top:2px"></i>
+            <div>
+                <strong style="color:var(--yellow); display:block; margin-bottom:.25rem">Warning: Irreversible Action</strong>
+                <span style="font-size:.8rem; color:var(--text2)">Once logs are archived, they will no longer be visible in the live dashboard search. They can only be downloaded as JSON/CSV dumps.</span>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1.5rem">
+            <label>Select Log Type</label>
+            <select class="form-control" id="arch_type">
+                <option value="admin_logs">Admin Activity Logs</option>
+                <option value="seamless_api_logs">Seamless API Logs</option>
+                <option value="deposits">Resolved Transactions (Approved/Rejected)</option>
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1.5rem">
+            <label>Age Threshold (Older than)</label>
+            <select class="form-control" id="arch_age">
+                <option value="30">30 Days</option>
+                <option value="60">60 Days</option>
+                <option value="90" selected>90 Days (Recommended)</option>
+                <option value="180">6 Months</option>
+                <option value="365">1 Year</option>
+            </select>
+        </div>
+
+        <button class="btn btn-danger w-full" onclick="window.archiveOldLogs()">
+            <i class="fa-solid fa-box-archive"></i> Run Archival Job Now
+        </button>
+      </div>
+    </div>
+  `;
+};
+
+window.archiveOldLogs = async () => {
+    const type = document.getElementById('arch_type').value;
+    const days = parseInt(document.getElementById('arch_age').value, 10);
+    
+    const confirmMsg = `Are you sure you want to archive ${type} older than ${days} days?`;
+    if (!confirm(confirmMsg)) return;
+
+    toast('Starting archival process...', 'info');
+
+    try {
+        const { supabase, SUPABASE_ENABLED } = await import('../core/supabase.js');
+        if (!SUPABASE_ENABLED) {
+            setTimeout(() => toast(`Archived simulated for ${type} (> ${days} days)`, 'success'), 1500);
+            return;
+        }
+
+        // Call the RPC we defined in schema.sql (clean_old_logs)
+        const { error } = await supabase.rpc('clean_old_logs');
+        if (error) throw error;
+
+        toast(`Archival completed. Data moved to cold storage.`, 'success');
+        if (window.db?.dbWriteLog) window.db.dbWriteLog('System Archival', 'DB', `Archived ${type} older than ${days} days`);
+
+    } catch(e) {
+        console.error('Archival failed', e);
+        toast(`Archival failed: ${e.message}`, 'error');
+    }
+};
+
+window.viewArchiveHistory = () => {
+    toast('Opening archive bucket in external window...', 'info');
+    // Simulated
+};

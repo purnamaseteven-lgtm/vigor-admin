@@ -215,6 +215,19 @@ export function initRealtime() {
             updatePendingBadge)
         .subscribe();
 
+    // ── Live System Feed (Admin Logs) ───────────────────────────
+    channels.push(
+        supabase.channel('rt-admin-logs')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_logs' },
+                (payload) => {
+                    if (payload.new && typeof window.appendLiveFeed === 'function') {
+                        const dateStr = new Date(payload.new.created_at || Date.now()).toLocaleTimeString();
+                        window.appendLiveFeed(`[${dateStr}] SYS: ${payload.new.actor} performed ${payload.new.action}`);
+                    }
+                })
+            .subscribe()
+    );
+
     console.log('[Realtime] ✅ Live subscriptions active: deposits, withdrawals, members, seamless_transactions, memos, announcements');
 }
 

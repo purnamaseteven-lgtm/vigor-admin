@@ -73,10 +73,23 @@ function guessCompanyDomain(name) {
     return (name || 'site').toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
 }
 function getProxyUrl(isp) {
+    const nodes = STATE.settings?.['nawala_nodes_' + isp] || [];
+    if (nodes.length > 0) {
+        // Return first active node (or random one for load balancing)
+        return nodes[0].url;
+    }
     const configured = STATE.settings?.['nawala_proxy_' + isp];
     if (configured) return configured;
     // Default internal proxy endpoints — replace with real proxy URLs in production
     return `https://nawala-proxy.vigor.internal/check/${isp}`;
+}
+
+async function getAvailableProxyNodes(isp) {
+    const nodes = STATE.settings?.['nawala_nodes_' + isp] || [];
+    if (nodes.length > 0) return nodes.map(n => n.url);
+    const configured = STATE.settings?.['nawala_proxy_' + isp];
+    if (configured) return [configured];
+    return [`https://nawala-proxy.vigor.internal/check/${isp}`];
 }
 function getScanResult(domain, ispId) {
     return getNawalaResults()?.[domain]?.[ispId] || null;
@@ -365,41 +378,54 @@ function simulateNawalaCheck(domain, ispId) {
 }
 
 async function checkOneDomain(domain, ispId, signal) {
-    const proxyUrl = getProxyUrl(ispId);
+    const nodes = await getAvailableProxyNodes(ispId);
     const timeout = parseInt(STATE.settings?.nawala_timeout || '5000', 10);
+    let lastError = null;
 
-    // Demo / no-backend mode: simulate results
-    if (STRICT_REAL_MODE && (!SUPABASE_ENABLED || proxyUrl.includes('vigor.internal'))) {
-        return { status: 'error', latency: 0, message: 'Missing real proxy URL in strict real mode', timestamp: new Date().toISOString() };
-    }
-    if (!SUPABASE_ENABLED || proxyUrl.includes('vigor.internal')) {
-        const delay = 400 + Math.floor(Math.random() * 1800);
-        await new Promise(resolve => {
-            const t = setTimeout(resolve, delay);
-            signal?.addEventListener('abort', () => clearTimeout(t));
-        });
-        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-        const sim = simulateNawalaCheck(domain, ispId);
-        return { ...sim, timestamp: new Date().toISOString(), domain, isp: ispId, proxy: proxyUrl };
-    }
+    for (const proxyUrl of nodes) {
+        // Demo / no-backend mode: simulate results
+        if (STRICT_REAL_MODE && (!SUPABASE_ENABLED || proxyUrl.includes('vigor.internal'))) {
+            lastError = { status: 'error', latency: 0, message: 'Missing real proxy URL in strict real mode', timestamp: new Date().toISOString() };
+            continue;
+        }
+        if (!SUPABASE_ENABLED || proxyUrl.includes('vigor.internal')) {
+            const delay = 400 + Math.floor(Math.random() * 1800);
+            await new Promise(resolve => {
+                const t = setTimeout(resolve, delay);
+                signal?.addEventListener('abort', () => clearTimeout(t));
+            });
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+            const sim = simulateNawalaCheck(domain, ispId);
+            return { ...sim, timestamp: new Date().toISOString(), domain, isp: ispId, proxy: proxyUrl };
+        }
 
-    // Real proxy check
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeout);
-    try {
-        const url = `${proxyUrl}?url=${encodeURIComponent('https://' + domain)}&t=${Date.now()}`;
-        const t0 = performance.now();
-        const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-        const latency = Math.round(performance.now() - t0);
-        clearTimeout(timer);
-        if (!res.ok) return { status: 'error', latency, message: `HTTP ${res.status}`, timestamp: new Date().toISOString() };
-        const json = await res.json();
-        return { status: json.accessible === false ? 'blocked' : 'accessible', latency: json.latency || latency, timestamp: new Date().toISOString(), redirectUrl: json.redirectUrl };
-    } catch (e) {
-        clearTimeout(timer);
-        if (e.name === 'AbortError') return { status: 'timeout', latency: timeout, timestamp: new Date().toISOString() };
-        return { status: 'error', latency: 0, message: e.message, timestamp: new Date().toISOString() };
+        // Real proxy check
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        try {
+            const url = `${proxyUrl}?url=${encodeURIComponent('https://' + domain)}&t=${Date.now()}`;
+            const t0 = performance.now();
+            const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+            const latency = Math.round(performance.now() - t0);
+            clearTimeout(timer);
+            if (!res.ok) {
+                console.warn(`Proxy ${proxyUrl} failed with HTTP ${res.status}`);
+                continue; 
+            }
+            const json = await res.json();
+            return { status: json.accessible === false ? 'blocked' : 'accessible', latency: json.latency || latency, timestamp: new Date().toISOString(), redirectUrl: json.redirectUrl, proxy: proxyUrl };
+        } catch (e) {
+            clearTimeout(timer);
+            if (e.name === 'AbortError') {
+                console.warn(`Proxy ${proxyUrl} timed out`);
+            } else {
+                console.warn(`Proxy ${proxyUrl} error: ${e.message}`);
+            }
+            lastError = { status: e.name === 'AbortError' ? 'timeout' : 'error', latency: timeout, timestamp: new Date().toISOString(), message: e.message };
+            continue;
+        }
     }
+    return lastError || { status: 'error', message: 'No proxies available' };
 }
 
 // ── Scan a single target (all 5 ISPs in parallel) ──

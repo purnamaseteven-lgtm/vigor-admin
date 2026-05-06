@@ -398,6 +398,20 @@
                 class="nav-label">Member Logs</span></div>
           </div>
         </div>
+        
+        <div class="sidebar-menu-label">Autonomous Evolution</div>
+        <div class="nav-item">
+          <div class="nav-link" onclick="toggleMenu('autoMenu', this)">
+            <i class="fa-solid fa-brain nav-icon" style="color:var(--acc)"></i>
+            <span class="nav-label">Autonomous OS</span>
+            <i class="fa-solid fa-chevron-right nav-arrow"></i>
+          </div>
+          <div class="nav-submenu" id="autoMenu">
+            <div class="nav-link" onclick="go('autonomous-dashboard')"><i class="fa-solid fa-gauge-high nav-icon"></i><span class="nav-label">Overview</span></div>
+            <div class="nav-link" onclick="go('autonomous-agents')"><i class="fa-solid fa-robot nav-icon"></i><span class="nav-label">Active Agents</span></div>
+            <div class="nav-link" onclick="go('autonomous-plans')"><i class="fa-solid fa-map-location-dot nav-icon"></i><span class="nav-label">Strategic Plans</span></div>
+          </div>
+        </div>
 
         <div class="sidebar-menu-label">Account</div>
         <div class="nav-item">

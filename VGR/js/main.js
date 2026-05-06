@@ -53,6 +53,7 @@ const lazyPageModules = [
     { loaded: false, match: (p) => p.includes('crm'), load: () => import('./pages/crm.js') },
     { loaded: false, match: (p) => p.includes('manual'), load: () => import('./pages/manual.js') },
     { loaded: false, match: (p) => p.includes('nawala') || p.includes('sawala'), load: () => import('./pages/nawala.js') },
+    { loaded: false, match: (p) => p.includes('autonomous') || p.startsWith('agent-'), load: () => import('./pages/autonomous.js') },
     { loaded: false, match: (p) => p.includes('simulator'), load: () => import('./pages/simulator.js') },
     { loaded: false, match: () => true, load: () => import('./pages/missing-pages.js') },
 ];

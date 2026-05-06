@@ -276,6 +276,14 @@ pages['vip-designer'] = () => {
                 </label>
                 <span style="font-size:.78rem;color:var(--text2);margin-left:.5rem">${crmSync ? 'On — VIP tiers create CRM segments automatically' : 'Off'}</span>
             </div>
+            <div style="border-left:1px solid var(--border);padding-left:2rem">
+                <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">Auto-Evaluation</div>
+                <label class="toggle" style="transform:scale(.9)">
+                    <input type="checkbox" ${STATE.settings?.vipAutoEval ? 'checked' : ''} onchange="window.setVipAutoEval(this.checked)"/>
+                    <div class="toggle-slider"></div>
+                </label>
+                <span style="font-size:.78rem;color:var(--text2);margin-left:.5rem">${STATE.settings?.vipAutoEval ? 'On — System re-evaluates all tiers periodically' : 'Off'}</span>
+            </div>
             <div style="border-left:1px solid var(--border);padding-left:2rem;flex:1">
                 <div style="font-size:.75rem;color:var(--text3);margin-bottom:.5rem">Member Distribution</div>
                 <div style="display:flex;gap:.75rem;flex-wrap:wrap">
@@ -350,6 +358,17 @@ window.setVipCrmSync = (val) => {
     if (!STATE.settings) STATE.settings = {};
     STATE.settings.vipCrmSync = val;
     saveState();
+};
+
+window.setVipAutoEval = (val) => {
+    if (!STATE.settings) STATE.settings = {};
+    STATE.settings.vipAutoEval = val;
+    saveState();
+    toast(`Tier Auto-Evaluation: ${val ? 'Enabled' : 'Disabled'}`, val ? 'success' : 'warning');
+    go('custom-vip');
+
+    // Trigger main.js to update its timer if needed
+    if (window.refreshAutomations) window.refreshAutomations();
 };
 
 window.createVipCrmSegment = (tierId) => {

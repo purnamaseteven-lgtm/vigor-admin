@@ -333,12 +333,32 @@ window.appendLiveFeed = (htmlStr) => {
 
 
 // Global Hotkey Listener
-document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        window.openQuickSearch();
-    }
-    if (e.key === 'Escape') {
-        window.closeQuickSearch();
-    }
 });
+
+// ── AUTOMATION WORKERS (Feature #21) ──
+window.refreshAutomations = () => {
+    // 1. VIP Tier Automation
+    if (STATE.settings?.vipAutoEval) {
+        if (!window._vipAutoTimer) {
+            console.log('[Automation] Starting VIP Tier Evaluation Worker...');
+            // Run every 10 minutes for demo, or 1 hour for production
+            const interval = 10 * 60 * 1000; 
+            window._vipAutoTimer = setInterval(() => {
+                if (window.evaluateAllMemberTiers) {
+                    console.log('[Automation] Triggering VIP Tier Recalculation...');
+                    window.evaluateAllMemberTiers();
+                }
+            }, interval);
+        }
+    } else {
+        if (window._vipAutoTimer) {
+            console.log('[Automation] Stopping VIP Tier Worker...');
+            clearInterval(window._vipAutoTimer);
+            window._vipAutoTimer = null;
+        }
+    }
+};
+
+// Start automations after state is loaded
+setTimeout(window.refreshAutomations, 2000);
+

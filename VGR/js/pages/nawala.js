@@ -135,8 +135,17 @@ pages['nawala-scan'] = () => {
 
     return `
     ${pageHeader('Nawala Scanner', '<span>Tools</span><span class="sep">›</span><span>Nawala Scanner</span>', `
-        <div style="display:flex;gap:.5rem;align-items:center">
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
             <span style="font-size:.72rem;color:var(--text3)">Last: ${lastScan}</span>
+            <div style="display:flex;align-items:center;gap:.35rem;background:var(--bg2);padding:.25rem .5rem;border-radius:8px;border:1px solid var(--border)">
+                <i class="fa-solid fa-clock-rotate-left" style="font-size:.75rem;color:var(--text3)"></i>
+                <select id="nawala_auto_interval" class="form-control" style="width:110px;height:24px;font-size:.72rem;padding:0 .3rem;border:none" onchange="window.updateNawalaInterval(this.value)">
+                    ${[1, 2, 5, 10, 15, 30, 45, 60].map(m => `<option value="${m}" ${STATE._nawalaAutoInterval == m ? 'selected' : ''}>Every ${m}m</option>`).join('')}
+                </select>
+                <button class="btn btn-sm btn-${STATE._nawalaAutoRunning ? 'danger' : 'success'}" style="width:24px;height:24px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:4px" onclick="window.toggleNawalaAutoScan()" title="${STATE._nawalaAutoRunning ? 'Stop Auto-Scan' : 'Start Auto-Scan'}">
+                    <i class="fa-solid fa-${STATE._nawalaAutoRunning ? 'pause' : 'play'}" style="font-size:.7rem"></i>
+                </button>
+            </div>
             <button class="btn btn-secondary btn-sm" onclick="window.openNawalaSettings()"><i class="fa-solid fa-gear"></i> Proxy Config</button>
             <button class="btn btn-secondary btn-sm" onclick="window.openAddNawalaTarget()"><i class="fa-solid fa-plus"></i> Add Target</button>
             <button class="btn btn-secondary btn-sm" onclick="window.exportNawalaCSV()"><i class="fa-solid fa-download"></i> Export</button>
@@ -493,6 +502,40 @@ window.stopNawalaScan = () => {
     STATE._nawalaAbort?.abort();
     STATE._nawalaScanning = false;
     toast('Scan stopped', 'warning');
+    window.go('nawala-scan');
+};
+
+// ── Auto Scan Logic ──
+window.updateNawalaInterval = (val) => {
+    STATE._nawalaAutoInterval = parseInt(val, 10);
+    saveState();
+    if (STATE._nawalaAutoRunning) {
+        window.toggleNawalaAutoScan(); // Stop
+        window.toggleNawalaAutoScan(); // Restart with new interval
+    }
+};
+
+window.toggleNawalaAutoScan = () => {
+    if (STATE._nawalaAutoRunning) {
+        clearInterval(window._nawalaAutoTimer);
+        STATE._nawalaAutoRunning = false;
+        toast('Auto-Scan disabled', 'warning');
+    } else {
+        const interval = (STATE._nawalaAutoInterval || 5) * 60 * 1000;
+        STATE._nawalaAutoRunning = true;
+        
+        // Immediate first scan
+        window.startNawalaScanAll();
+        
+        window._nawalaAutoTimer = setInterval(() => {
+            if (!STATE._nawalaScanning) {
+                window.startNawalaScanAll();
+            }
+        }, interval);
+        
+        toast(`Auto-Scan enabled: every ${STATE._nawalaAutoInterval || 5}m`, 'success');
+    }
+    saveState();
     window.go('nawala-scan');
 };
 

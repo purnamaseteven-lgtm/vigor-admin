@@ -1,3 +1,4 @@
+﻿/* â”€â”€â”€ COMPANY, WHITELABEL, MASTER & BANK PAGES â”€â”€â”€ */
 /* ─── COMPANY, WHITELABEL, MASTER & BANK PAGES ─── */
 import { STATE, addLog, fmtCur, stateAdd, stateUpdate, stateDelete } from '../core/state.js';
 import { pages } from '../core/router.js';
@@ -5,71 +6,13 @@ import { pageHeader, filterCard, fsInput, fsSelect, fsActions, tableWrap, badge,
 import { filterData, paginate, getCurPage, getPerPage, rnd, fmt, COMPANIES } from '../utils/helpers.js';
 import { getMyCompany, getDirectDownlines, getDownlineType } from '../utils/scope.js';
 
-/* ─── MASTER PAGE ─── */
+/* ─── MASTER route ─── REDIRECTED to company-list (was duplicate of Agent-type listing) */
 pages['master'] = () => {
-  const masters = STATE.companies.filter(c => c.type === 'Master');
-  const totalCredit = masters.reduce((s, c) => s + c.credit, 0);
-  const totalMembers = masters.reduce((s, c) => s + c.members, 0);
-
-  return `
-    ${pageHeader('Master Agent Management', '<span>Main</span><span class="sep">›</span><span>Master Agent</span>', `
-      <button class="btn btn-primary" onclick="window.openCompanyTypeForm('Master')"><i class="fa-solid fa-plus"></i> Add Master Agent</button>`)}
-
-    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="stat-card">
-        <div class="stat-icon" style="background:rgba(139,92,246,.12);color:#8b5cf6"><i class="fa-solid fa-crown"></i></div>
-        <div class="stat-info"><div class="stat-label">Total Masters</div><div class="stat-value">${masters.length}</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:rgba(16,185,129,.1);color:var(--green)"><i class="fa-solid fa-coins"></i></div>
-        <div class="stat-info"><div class="stat-label">Total Credit</div><div class="stat-value" style="font-size:1.1rem">${fmtCur(totalCredit)}</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:rgba(14,165,233,.1);color:var(--acc)"><i class="fa-solid fa-users"></i></div>
-        <div class="stat-info"><div class="stat-label">Total Members</div><div class="stat-value">${fmt(totalMembers)}</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon" style="background:rgba(245,158,11,.1);color:var(--yellow)"><i class="fa-solid fa-check-circle"></i></div>
-        <div class="stat-info"><div class="stat-label">Active Masters</div><div class="stat-value">${masters.filter(c => c.status === 'Active').length}</div></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><span class="card-title">Master Agent List</span></div>
-      <div class="card-body">
-        ${tableWrap(`
-          <table>
-            <thead>
-              <tr><th>#</th><th>Username</th><th>Agent Name</th><th>Email</th><th>Credit</th><th>Members</th><th>Status</th><th>Joined</th><th>Action</th></tr>
-            </thead>
-            <tbody>
-              ${masters.map((c, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td><strong style="color:var(--acc)">${c.username}</strong></td>
-                  <td>${c.name}</td>
-                  <td style="font-size:.75rem">${c.email}</td>
-                  <td style="font-weight:700">${fmtCur(c.credit)}</td>
-                  <td>${fmt(c.members)}</td>
-                  <td>
-                    <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
-                      class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
-                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
-                  </td>
-                  <td style="font-size:.75rem">${c.joined}</td>
-                  <td>${actionBtns(
-    `window.openFormModal('company','${c.id}')`,
-    `confirmAction('Delete Master','Delete master [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','master'),'Delete','danger')`
-  )}</td>
-                </tr>
-              `).join('')}
-              ${masters.length === 0 ? '<tr><td colspan="9" style="text-align:center;color:var(--text3)">No master accounts found</td></tr>' : ''}
-            </tbody>
-          </table>
-        `)}
-      </div>
-    </div>`;
+  // Legacy route: redirect to Agent list (same data)
+  if (window.go) setTimeout(() => window.go('company-list'), 0);
+  return `<div style="padding:2rem;text-align:center;color:var(--text3)"><i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;color:var(--acc)"></i><div style="margin-top:1rem">Redirecting to Agent List...</div></div>`;
 };
+
 
 /* ─── COMPANY CREATE ─── */
 pages['company-create'] = () => {
@@ -203,7 +146,7 @@ pages['company-create'] = () => {
         }
     </style>
 
-    ${pageHeader('Create Company', '<span>Master</span><span class="sep">›</span><span>Company</span>', '')}
+    ${pageHeader('Create Company', '<span>Master</span><span class="sep">â€º</span><span>Company</span>', '')}
 
     <div class="cc-container">
         <div class="cc-header">Create New Agent Account</div>
@@ -301,13 +244,13 @@ pages['company-create'] = () => {
   `;
 };
 
-/* ─── COMPANY LIST ─── */
+/* â”€â”€â”€ COMPANY LIST â”€â”€â”€ */
 pages['company-list'] = () => {
   const PG = 'company-list';
-  // Scope: SuperAdmin sees all Company-type; Company role sees only their direct downlines
+  // Scope: SuperAdmin sees all Agent-type; Whitelabel sees only their direct downlines
   const role = STATE.currentAdmin.role;
   const myCompany = role !== 'SuperAdmin' ? getMyCompany() : null;
-  const all = STATE.companies.filter(c => c.type === 'Company' && (role === 'SuperAdmin' || !myCompany || c.parentId === myCompany.id));
+  const all = STATE.companies.filter(c => c.type === 'Agent' && (role === 'SuperAdmin' || !myCompany || c.parentId === myCompany.id));
   const filtered = filterData(all, PG);
   const total = filtered.length;
   const pp = getPerPage(PG);
@@ -315,7 +258,7 @@ pages['company-list'] = () => {
   const rows = paginate(filtered, cp, pp);
 
   return `
-    ${pageHeader('Agent List', '<span>Agent</span><span class="sep">›</span><span>List</span>', `
+    ${pageHeader('Agent List', '<span>Agent</span><span class="sep">â€º</span><span>List</span>', `
       <div style="display:flex;gap:.5rem">
         <button class="btn btn-secondary btn-sm" onclick="window.exportCSV(STATE.companies,'agents.csv')"><i class="fa-solid fa-download"></i> Export</button>
         <button class="btn btn-primary" onclick="go('company-create')"><i class="fa-solid fa-plus"></i> Create Agent Account</button>
@@ -350,7 +293,7 @@ pages['company-list'] = () => {
                   <td>
                     <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
                       class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
-                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? 'âœ“ Active' : 'âœ— Inactive'}</button>
                   </td>
                   <td style="font-size:.75rem">${c.joined}</td>
                   <td>${actionBtns(
@@ -368,10 +311,10 @@ pages['company-list'] = () => {
     ${renderPagerHTML(PG, total, pp, cp)} `;
 };
 
-/* ─── MASTER WHITELABEL LIST ─── */
+/* â”€â”€â”€ MASTER WHITELABEL LIST â”€â”€â”€ */
 pages['master-whitelabel-list'] = () => {
   const PG = 'master-whitelabel-list';
-  const all = STATE.companies.filter(c => c.type === 'Whitelabel' || c.type === 'Master');
+  const all = STATE.companies.filter(c => c.type === 'Whitelabel');
   const filtered = filterData(all, PG);
   const total = filtered.length;
   const pp = getPerPage(PG);
@@ -379,13 +322,12 @@ pages['master-whitelabel-list'] = () => {
   const rows = paginate(filtered, cp, pp);
 
   return `
-    ${pageHeader('Master Whitelabel List', '<span>Whitelabel</span><span class="sep">›</span><span>Master WL</span>', `
-      <button class="btn btn-primary" onclick="window.openCompanyTypeForm('Master')"><i class="fa-solid fa-plus"></i> Add Master WL</button>`)
+    ${pageHeader('Whitelabel List', '<span>Whitelabel</span><span class="sep">â€º</span><span>List</span>', `
+      <button class="btn btn-primary" onclick="window.openCompanyTypeForm('Whitelabel')"><i class="fa-solid fa-plus"></i> Add Whitelabel</button>`)
     }
 
     ${filterCard(`
       ${fsInput(PG, 'username', 'Username', 'Search...')}
-      ${fsSelect(PG, 'type', 'Type', ['All', 'Master', 'Whitelabel'])}
       ${fsSelect(PG, 'status', 'Status', ['All', 'Active', 'Inactive'])}
       ${fsActions(PG)}
     `)
@@ -404,13 +346,13 @@ pages['master-whitelabel-list'] = () => {
                   <td>${(cp - 1) * pp + i + 1}</td>
                   <td><strong style="color:var(--acc)">${c.username}</strong></td>
                   <td>${c.name}</td>
-                  <td>${badge(c.type, c.type === 'Master' ? 'purple' : 'indigo')}</td>
+                  <td>${badge(c.type, 'indigo')}</td>
                   <td style="font-weight:700">${fmtCur(c.credit)}</td>
                   <td>${fmt(c.members)}</td>
                   <td>
                     <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
                       class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
-                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? 'âœ“ Active' : 'âœ— Inactive'}</button>
                   </td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
@@ -428,9 +370,13 @@ pages['master-whitelabel-list'] = () => {
 };
 
 // Alias: nav uses 'master-wl-list'
+// ─── CONSOLIDATED: master-wl-list points to the same whitelabel-list page ─────
+// With 3-level hierarchy, there is only 1 type of Whitelabel.
 pages['master-wl-list'] = pages['master-whitelabel-list'];
+pages['whitelabel-list'] = pages['master-whitelabel-list'];
 
-/* ─── WHITELABEL LIST ─── */
+
+/* â”€â”€â”€ WHITELABEL LIST â”€â”€â”€ */
 pages['whitelabel-list'] = () => {
   const PG = 'whitelabel-list';
   const all = STATE.companies.filter(c => c.type === 'Whitelabel');
@@ -441,7 +387,7 @@ pages['whitelabel-list'] = () => {
   const rows = paginate(filtered, cp, pp);
 
   return `
-    ${pageHeader('Whitelabel List', '<span>Whitelabel</span><span class="sep">›</span><span>List</span>', `
+    ${pageHeader('Whitelabel List', '<span>Whitelabel</span><span class="sep">â€º</span><span>List</span>', `
       <button class="btn btn-primary" onclick="window.openCompanyTypeForm('Whitelabel')"><i class="fa-solid fa-plus"></i> Add Whitelabel</button>`)
     }
 
@@ -473,7 +419,7 @@ pages['whitelabel-list'] = () => {
                   <td>
                     <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
                       class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700"
-                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}</button>
+                      title="${c.status === 'Active' ? 'Deactivate' : 'Activate'}">${c.status === 'Active' ? 'âœ“ Active' : 'âœ— Inactive'}</button>
                   </td>
                   <td>${actionBtns(
       `window.openFormModal('company','${c.id}')`,
@@ -492,41 +438,40 @@ pages['whitelabel-list'] = () => {
 
 // tier-history is defined in members.js (authoritative version)
 
-/* ─── MY DOWNLINES — scoped to current admin's own downline tree ─── */
+/* â”€â”€â”€ MY DOWNLINES â€” scoped to current admin's own downline tree â”€â”€â”€ */
 pages['my-downlines'] = () => {
-    const role      = STATE.currentAdmin.role;
-    const myCompany = getMyCompany();
-    const all       = getDirectDownlines();
-    const dlType    = getDownlineType();
+  const role = STATE.currentAdmin.role;
+  const myCompany = getMyCompany();
+  const all = getDirectDownlines();
+  const dlType = getDownlineType();
 
-    const roleLabel  = { Company: 'Whitelabel / Brand', Master: 'Master Agent', Shop: 'Agent / Shop', Agent: 'Agent' }[role] || role;
-    const typeLabel  = { Company: 'Sub-Company', Master: 'Master Agent', Agent: 'Sub-Agent' }[dlType] || dlType;
-    const pageTitleMap = { Company: 'My Sub-Companies', Master: 'My Master Agents', Shop: 'My Sub-Agents', Agent: 'My Sub-Agents' };
-    const pageTitle  = pageTitleMap[role] || 'My Downlines';
+  const roleLabel = { Whitelabel: 'Whitelabel', Agent: 'Agent' }[role] || role;
+  const typeLabel = 'Agent';
+  const pageTitle = role === 'Whitelabel' ? 'My Agents' : 'My Downlines';
 
-    const PG = 'my-downlines';
-    const filtered = filterData(all, PG);
-    const total = filtered.length;
-    const pp  = getPerPage(PG);
-    const cp  = getCurPage(PG);
-    const rows = paginate(filtered, cp, pp);
+  const PG = 'my-downlines';
+  const filtered = filterData(all, PG);
+  const total = filtered.length;
+  const pp = getPerPage(PG);
+  const cp = getCurPage(PG);
+  const rows = paginate(filtered, cp, pp);
 
-    const totalCredit  = all.reduce((s, c) => s + (c.credit || 0), 0);
-    const totalMembers = all.reduce((s, c) => s + (c.members || 0), 0);
-    const activeCount  = all.filter(c => c.status === 'Active').length;
+  const totalCredit = all.reduce((s, c) => s + (c.credit || 0), 0);
+  const totalMembers = all.reduce((s, c) => s + (c.members || 0), 0);
+  const activeCount = all.filter(c => c.status === 'Active').length;
 
-    return `
-    ${pageHeader(pageTitle, `<span>${roleLabel}</span><span class="sep">›</span><span>My Downlines</span>`, `
+  return `
+    ${pageHeader(pageTitle, `<span>${roleLabel}</span><span class="sep">â€º</span><span>My Downlines</span>`, `
         <button class="btn btn-primary" onclick="window.openFormModal('company')"><i class="fa-solid fa-plus"></i> Add ${typeLabel}</button>`)}
 
     <!-- Stats row -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem">
         ${[
-            { icon: 'sitemap',          label: 'Total Downlines',   val: all.length,                      color: '#6366f1' },
-            { icon: 'circle-check',     label: 'Active',            val: activeCount,                     color: '#10b981' },
-            { icon: 'coins',            label: 'Total Credit',      val: fmtCur(totalCredit),             color: '#f59e0b' },
-            { icon: 'users',            label: 'Total Members',     val: fmt(totalMembers),               color: '#8b5cf6' },
-        ].map(s => `
+      { icon: 'sitemap', label: 'Total Downlines', val: all.length, color: '#6366f1' },
+      { icon: 'circle-check', label: 'Active', val: activeCount, color: '#10b981' },
+      { icon: 'coins', label: 'Total Credit', val: fmtCur(totalCredit), color: '#f59e0b' },
+      { icon: 'users', label: 'Total Members', val: fmt(totalMembers), color: '#8b5cf6' },
+    ].map(s => `
         <div class="card" style="border-left:3px solid ${s.color}20">
             <div class="card-body" style="display:flex;align-items:center;gap:1rem;padding:1rem">
                 <div style="width:40px;height:40px;border-radius:10px;background:${s.color}18;display:flex;align-items:center;justify-content:center">
@@ -544,12 +489,12 @@ pages['my-downlines'] = () => {
     ${myCompany ? `
     <div style="background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:.75rem 1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;font-size:.83rem">
         <i class="fa-solid fa-building-user" style="color:#6366f1;font-size:1.1rem"></i>
-        <span style="color:#a5b4fc">Your company: <strong style="color:#fff">${myCompany.name}</strong> &nbsp;·&nbsp; All ${typeLabel.toLowerCase()}s listed below are direct downlines of your account.</span>
+        <span style="color:#a5b4fc">Your company: <strong style="color:#fff">${myCompany.name}</strong> &nbsp;Â·&nbsp; All ${typeLabel.toLowerCase()}s listed below are direct downlines of your account.</span>
     </div>` : ''}
 
     ${filterCard(`
-        ${fsInput('my-downlines', 'username', 'Username', 'Search username…')}
-        ${fsInput('my-downlines', 'name', 'Name', 'Search name…')}
+        ${fsInput('my-downlines', 'username', 'Username', 'Search usernameâ€¦')}
+        ${fsInput('my-downlines', 'name', 'Name', 'Search nameâ€¦')}
         ${fsSelect('my-downlines', 'status', 'Status', ['All Status', 'Active', 'Inactive'])}
         ${fsActions('my-downlines')}
     `)}
@@ -575,13 +520,13 @@ pages['my-downlines'] = () => {
                             <td>
                                 <button onclick="window.toggleCompanyStatus('${c.id}','${c.status === 'Active' ? 'Inactive' : 'Active'}','${c.username}')"
                                     class="btn btn-sm" style="background:${c.status === 'Active' ? 'rgba(16,185,129,.15)' : 'rgba(239,68,68,.12)'};color:${c.status === 'Active' ? 'var(--green)' : 'var(--red)'};border:1px solid ${c.status === 'Active' ? 'var(--green)' : 'var(--red)'}44;font-size:.72rem;padding:.2rem .6rem;border-radius:20px;font-weight:700">
-                                    ${c.status === 'Active' ? '✓ Active' : '✗ Inactive'}
+                                    ${c.status === 'Active' ? 'âœ“ Active' : 'âœ— Inactive'}
                                 </button>
                             </td>
                             <td>${actionBtns(
-                                `window.openFormModal('company','${c.id}')`,
-                                `confirmAction('Delete ${typeLabel}','Delete [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','my-downlines'),'Delete','danger')`
-                            )}</td>
+      `window.openFormModal('company','${c.id}')`,
+      `confirmAction('Delete ${typeLabel}','Delete [${c.username}]?',()=>window.deleteCompany('${c.id}','${c.username}','my-downlines'),'Delete','danger')`
+    )}</td>
                         </tr>`).join('')}
                         ${rows.length === 0 ? `<tr><td colspan="10" style="text-align:center;color:var(--text3)">No ${typeLabel.toLowerCase()}s found</td></tr>` : ''}
                     </tbody>
@@ -597,7 +542,7 @@ pages['bank-create'] = () => {
   const banks = ['BCA', 'BNI', 'BRI', 'MANDIRI', 'DANAMON', 'CIMB', 'PERMATA', 'MAYBANK', 'BTN', 'OCBC', 'PANIN', 'MEGA', 'SINARMAS'];
 
   return `
-    ${pageHeader('Create Bank Account', '<span>Bank Management</span><span class="sep">�</span><span>Create</span>', `
+    ${pageHeader('Create Bank Account', '<span>Bank Management</span><span class="sep">›</span><span>Create</span>', `
       <button class="btn btn-secondary" onclick="go('bank-list')"><i class="fa-solid fa-arrow-left"></i> Back to Bank List</button>
     `)}
 
@@ -694,18 +639,18 @@ pages['bank-create'] = () => {
       </div>
     </div>`;
 };
-/* ─── PROFILE ─── */
+/* â”€â”€â”€ PROFILE â”€â”€â”€ */
 pages['profile'] = () => {
   const p = STATE.profile;
   return `
-    ${pageHeader('My Profile', '<span>Account</span><span class="sep">›</span><span>Profile</span>')}
+    ${pageHeader('My Profile', '<span>Account</span><span class="sep">â€º</span><span>Profile</span>')}
 
 <div style="display:grid;grid-template-columns:340px 1fr;gap:1.25rem;align-items:start">
   <div class="card">
     <div class="card-body" style="text-align:center;padding:2.5rem 1.5rem">
       <div style="width:90px;height:90px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;color:#fff;margin:0 auto 1rem">AS</div>
       <div style="font-size:1.15rem;font-weight:700">${p.username}</div>
-      <div style="font-size:.82rem;color:var(--text3);margin-top:.25rem">SUBSTAG · Admin</div>
+      <div style="font-size:.82rem;color:var(--text3);margin-top:.25rem">SUBSTAG Â· Admin</div>
       ${badge('Active', 'success')}
       <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:.5rem">
         <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.5rem 0;border-bottom:1px solid var(--border)"><span style="color:var(--text3)">Language</span><strong>${p.language}</strong></div>
@@ -754,7 +699,7 @@ pages['profile'] = () => {
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
           <div class="form-group">
             <label class="form-label">Current Password</label>
-            <input type="password" id="cp_current" class="form-control" placeholder="••••••••" />
+            <input type="password" id="cp_current" class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
           </div>
           <div class="form-group">
             <label class="form-label">New Password</label>
@@ -762,7 +707,7 @@ pages['profile'] = () => {
           </div>
           <div class="form-group">
             <label class="form-label">Confirm Password</label>
-            <input type="password" id="cp_confirm" class="form-control" placeholder="••••••••" />
+            <input type="password" id="cp_confirm" class="form-control" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
           </div>
         </div>
         <div id="cp_strength_bar" style="height:4px;width:0;background:var(--green);border-radius:2px;margin:.5rem 0;transition:width .3s"></div>
@@ -773,36 +718,36 @@ pages['profile'] = () => {
 </div>`;
 };
 
-/* ─── CHANGE PASSWORD ─── */
+/* â”€â”€â”€ CHANGE PASSWORD â”€â”€â”€ */
 window.changeAdminPassword = async () => {
-    const current = document.getElementById('cp_current')?.value;
-    const newPass = document.getElementById('cp_new')?.value;
-    const confirm = document.getElementById('cp_confirm')?.value;
+  const current = document.getElementById('cp_current')?.value;
+  const newPass = document.getElementById('cp_new')?.value;
+  const confirm = document.getElementById('cp_confirm')?.value;
 
-    if (!current) { toast('Current password is required', 'error'); return; }
-    if (!newPass || newPass.length < 8) { toast('New password must be at least 8 characters', 'error'); return; }
-    if (newPass !== confirm) { toast('Passwords do not match', 'error'); return; }
+  if (!current) { toast('Current password is required', 'error'); return; }
+  if (!newPass || newPass.length < 8) { toast('New password must be at least 8 characters', 'error'); return; }
+  if (newPass !== confirm) { toast('Passwords do not match', 'error'); return; }
 
-    // Strength check
-    const hasUpper = /[A-Z]/.test(newPass);
-    const hasNum = /\d/.test(newPass);
-    const hasSpecial = /[!@#$%^&*]/.test(newPass);
-    const strength = (hasUpper ? 1 : 0) + (hasNum ? 1 : 0) + (hasSpecial ? 1 : 0) + (newPass.length >= 12 ? 1 : 0);
-    if (strength < 2) { toast('Password too weak. Use uppercase, numbers, or special characters.', 'warning'); return; }
+  // Strength check
+  const hasUpper = /[A-Z]/.test(newPass);
+  const hasNum = /\d/.test(newPass);
+  const hasSpecial = /[!@#$%^&*]/.test(newPass);
+  const strength = (hasUpper ? 1 : 0) + (hasNum ? 1 : 0) + (hasSpecial ? 1 : 0) + (newPass.length >= 12 ? 1 : 0);
+  if (strength < 2) { toast('Password too weak. Use uppercase, numbers, or special characters.', 'warning'); return; }
 
-    if (window.supabase && typeof window.supabase.auth?.updateUser === 'function') {
-        const { error } = await window.supabase.auth.updateUser({ password: newPass });
-        if (error) { toast('Failed: ' + error.message, 'error'); return; }
-    }
-    // Clear fields
-    ['cp_current', 'cp_new', 'cp_confirm'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
-    });
-    addLog('Profile', STATE.currentAdmin?.username || 'admin', 'Password changed');
-    toast('Password updated successfully', 'success');
+  if (window.supabase && typeof window.supabase.auth?.updateUser === 'function') {
+    const { error } = await window.supabase.auth.updateUser({ password: newPass });
+    if (error) { toast('Failed: ' + error.message, 'error'); return; }
+  }
+  // Clear fields
+  ['cp_current', 'cp_new', 'cp_confirm'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  addLog('Profile', STATE.currentAdmin?.username || 'admin', 'Password changed');
+  toast('Password updated successfully', 'success');
 };
 
-/* ─── HANDLERS ─── */
+/* â”€â”€â”€ HANDLERS â”€â”€â”€ */
 window.submitCompanyCreate = () => {
   const u = document.getElementById('cc_username')?.value.trim();
   const n = document.getElementById('cc_name')?.value.trim();
@@ -833,7 +778,7 @@ window.submitCompanyCreate = () => {
     credit: 0,
     members: 0,
     status: 'Active',
-    type: STATE.currentAdmin.role !== 'SuperAdmin' ? getDownlineType() : 'Company',
+    type: STATE.currentAdmin.role !== 'SuperAdmin' ? getDownlineType() : 'Whitelabel',
     template,
     country,
     whitelistIPs: ips,
@@ -903,14 +848,14 @@ window.openCompanyTypeForm = (type) => {
     // Ensure parentId is filled from scope helper for non-SuperAdmin
     const pidEl = document.getElementById('f_parentId');
     if (pidEl && !pidEl.value) {
-        const mc = getMyCompany();
-        if (mc) pidEl.value = mc.id;
+      const mc = getMyCompany();
+      if (mc) pidEl.value = mc.id;
     }
   });
 };
 
 
-// ── Company / Whitelabel / Master status toggle ──────────────────────
+// â”€â”€ Company / Whitelabel / Agent status toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 window.toggleCompanyStatus = async (id, newStatus, username) => {
   const label = newStatus === 'Active' ? 'activate' : 'deactivate';
   if (!confirm(`Are you sure you want to ${label} company [${username}]?`)) return;
@@ -921,12 +866,104 @@ window.toggleCompanyStatus = async (id, newStatus, username) => {
     if (error) { toast('Update failed: ' + error.message, 'error'); return; }
     if (window.db?.dbWriteLog) window.db.dbWriteLog(
       newStatus === 'Active' ? 'Activate Company' : 'Deactivate Company',
-      username, `Company [${username}] status → ${newStatus}`
+      username, `Company [${username}] status â†’ ${newStatus}`
     );
   } else {
     company.status = newStatus;
     stateUpdate('companies', id, { status: newStatus });
   }
-  toast(`Company [${username}] ${newStatus === 'Active' ? 'activated ✓' : 'deactivated ✗'}`, 'success');
+  toast(`Company [${username}] ${newStatus === 'Active' ? 'activated âœ“' : 'deactivated âœ—'}`, 'success');
   window.go('company-list');
 };
+
+/* ─── DYNAMIC COMPANY NETWORK TREE (MLM VISUALIZER) ─── */
+pages['company-tree'] = () => {
+  const companies = STATE.companies || [];
+  const members = STATE.members || [];
+
+  const treeMap = {};
+  companies.forEach(c => {
+    treeMap[c.id] = { ...c, children: [], membersCount: 0 };
+  });
+
+  const rootNodes = [];
+  companies.forEach(c => {
+    if (c.parentId && treeMap[c.parentId]) {
+      treeMap[c.parentId].children.push(treeMap[c.id]);
+    } else {
+      rootNodes.push(treeMap[c.id]);
+    }
+  });
+
+  members.forEach(m => {
+    if (m.companyId && treeMap[m.companyId]) {
+      treeMap[m.companyId].membersCount++;
+    }
+  });
+
+  const renderNode = (node) => {
+    const isWhitelabel = node.type === 'Whitelabel';
+    const color = isWhitelabel ? 'var(--acc)' : 'var(--green)';
+    const icon = isWhitelabel ? 'fa-globe' : 'fa-building';
+    const mCount = node.membersCount || 0;
+    const profit = Math.floor(Math.random() * 50) + 10;
+
+    return `
+        <li>
+            <div class="tree-node" style="border-top:3px solid ${color}">
+                <div class="node-icon" style="color:${color}; background:${color}22"><i class="fa-solid ${icon}"></i></div>
+                <div class="node-title">${node.name}</div>
+                <div class="node-badge" style="background:${color}22; color:${color}">${node.type}</div>
+                <div class="node-meta">
+                    <span title="Total Members"><i class="fa-solid fa-users"></i> ${mCount}</span>
+                    <span title="Est Profit" style="color:var(--green)"><i class="fa-solid fa-wallet"></i> ${profit}M</span>
+                </div>
+            </div>
+            ${node.children.length > 0 ? `<ul>${node.children.map(child => renderNode(child)).join('')}</ul>` : ''}
+        </li>
+      `;
+  };
+
+  return `
+    ${pageHeader('Network Tree', '<span>Company</span><span class="sep">›</span><span>Visual Network Tree</span>')}
+    
+    <style>
+      /* Base Tree Styles */
+      .tree-wrapper { padding: 4rem 2rem; overflow-x: auto; background: var(--bg2); border-radius: 12px; border: 1px solid var(--border); min-height: 500px; text-align: center; }
+      .tree-wrapper ul { padding-top: 20px; position: relative; transition: all 0.5s; display: inline-flex; gap: 20px; justify-content: center; }
+      .tree-wrapper li { display: flex; flex-direction: column; align-items: center; text-align: center; list-style-type: none; position: relative; padding: 20px 5px 0 5px; transition: all 0.5s; }
+      
+      /* Connectors */
+      .tree-wrapper li::before, .tree-wrapper li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--border); width: 50%; height: 20px; }
+      .tree-wrapper li::after { right: auto; left: 50%; border-left: 2px solid var(--border); }
+      .tree-wrapper li:only-child::after, .tree-wrapper li:only-child::before { display: none; }
+      .tree-wrapper li:only-child { padding-top: 0; }
+      .tree-wrapper li:first-child::before, .tree-wrapper li:last-child::after { border: 0 none; }
+      .tree-wrapper li:last-child::before { border-right: 2px solid var(--border); border-radius: 0 5px 0 0; }
+      .tree-wrapper li:first-child::after { border-radius: 5px 0 0 0; }
+      .tree-wrapper ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--border); width: 0; height: 20px; }
+      
+      /* Card Styling */
+      .tree-node {
+          background: var(--bg1); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; width: 140px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; z-index: 10;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s;
+      }
+      .tree-node:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(14,165,233,0.2); border-color: var(--acc); }
+      .node-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 1.2rem; margin-bottom: 0.5rem; }
+      .node-title { font-size: 0.85rem; font-weight: 700; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+      .node-badge { font-size: 0.6rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; }
+      .node-meta { margin-top: 0.75rem; display: flex; justify-content: space-between; width: 100%; font-size: 0.75rem; color: var(--text3); border-top: 1px dashed var(--border); padding-top: 0.5rem; }
+    </style>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-spider" style="color:var(--acc);margin-right:8px"></i> Visual Downline Hierarchy</span></div>
+      <div class="tree-wrapper">
+        <ul style="margin:0 auto">
+          ${rootNodes.length > 0 ? rootNodes.map(root => renderNode(root)).join('') : '<li><div class="tree-node"><div class="node-title">No Network Found</div></div></li>'}
+        </ul>
+      </div>
+    </div>
+  `;
+};
+

@@ -179,11 +179,20 @@ const toDbLotteryBet = d => ({
 // ══════════════════════════════════════════════════════════════════
 //  GENERIC FETCH WRAPPER
 // ══════════════════════════════════════════════════════════════════
-async function sbFetch(table, mapper, stateKey, query = null) {
+async function sbFetch(table, mapper, stateKey, query = null, options = {}) {
+    const { limit = 1000, offset = 0 } = options;
     if (!SUPABASE_ENABLED || !supabase) return;
     try {
-        let q = query || supabase.from(table).select('*').order('created_at', { ascending: false }).limit(500);
-        const { data, error } = await q;
+        let q = supabase.from(table).select('*', { count: 'exact' });
+        if (query) {
+            q = query(q);
+        } else {
+            q = q.order('created_at', { ascending: false });
+        }
+        
+        q = q.range(offset, offset + limit - 1);
+        
+        const { data, error, count } = await q;
         if (error) { console.error(`[DB] ${table}:`, error.message); return; }
         if (data) {
             if (stateKey.includes('.')) {
@@ -373,7 +382,7 @@ const PAGE_FETCHES = {
     // ── Bets & Results ────────────────────────────────────────
     'bets-list':                    [fetchLotteryBets],
     'bets-table':                   [fetchLotteryBets],
-    'bets-transferred':             [fetchLotteryBets],
+    'transferred-list':             [fetchLotteryBets],
     'results-list':                 [fetchLotteryResults],
     'results-scan':                 [fetchLotteryResults],
     'results-analyze':              [fetchLotteryResults, fetchLotteryBets],
@@ -386,30 +395,22 @@ const PAGE_FETCHES = {
     'bonus-pragmatic-frb':          [fetchBonuses],
 
     // ── Promotions ────────────────────────────────────────────
-    'custom-promotion-list':        [fetchPromotions],
     'promotions':                   [fetchPromotions],
-    'custom-promotions':            [fetchPromotions],
     'promotion-release':            [fetchPromotions],
     'promotion-rolling-release':    [fetchPromotions],
 
     // ── Announcements ─────────────────────────────────────────
-    'announcement-list':            [fetchAnnouncements],
     'announcements':                [fetchAnnouncements],
-    'custom-app-notification':      [fetchAnnouncements],
     'app-notification':             [fetchAnnouncements],
-    'custom-global-banner':         [fetchAnnouncements],
+    'global-banner':                [fetchPopupBanners],
 
     // ── Seamless ──────────────────────────────────────────────
-    'pgsoft-transactions':          [fetchSeamlessTransactions],
-    'pgsoft-games':                 [fetchSeamlessGames],
-    'pgsoft-api-logs':              [fetchSeamlessApiLogs],
     'seamless-transactions':        [fetchSeamlessTransactions],
     'seamless-games':               [fetchSeamlessGames],
     'seamless-api-logs':            [fetchSeamlessApiLogs],
     'seamless-config':              [fetchSeamlessGames],
 
     // ── CRM ───────────────────────────────────────────────────
-    // Use lazy wrappers for CRM fetchers (declared later in this module) to avoid TDZ on module init.
     'crm-dashboard':                [() => fetchCrmSegments(), () => fetchCrmMissions(), () => fetchCrmTournaments(), () => fetchCrmAutomation(), fetchMembers],
     'crm-segments':                 [() => fetchCrmSegments(), fetchMembers],
     'crm-missions':                 [() => fetchCrmMissions(), () => fetchCrmSegments()],
@@ -435,8 +436,7 @@ const PAGE_FETCHES = {
     'settings-pools':               [fetchSettings],
     'settings-togel-commission':    [fetchSettings],
     'settings-limit-credit-out':    [fetchSettings],
-    'settings-vip-designer':        [fetchSettings, fetchMembers], // alias → custom-vip
-    'settings-rebate-calc':         [fetchSettings],
+    'vip-designer':                 [fetchSettings, fetchMembers],
     'rebate-calc':                  [fetchSettings],
     'dev-menu-config':              [fetchSettings],
     'admin-management':             [fetchSettings],
@@ -444,11 +444,13 @@ const PAGE_FETCHES = {
     'settings-agent-games':         [fetchSeamlessGames],
 
     // ── Customization ─────────────────────────────────────────
-    'custom-site-config':           [fetchSettings],
-    'custom-theme':                 [fetchSettings],
-    'custom-seo':                   [fetchSettings],
-    'custom-vip':                   [fetchSettings, fetchMembers],
-    'custom-global-banner':         [fetchPopupBanners],
+    'site-config':                  [fetchSettings],
+    'system-theme':                 [fetchSettings],
+    'theme-presets':                [fetchSettings],
+    'seo-tools':                    [fetchSettings],
+    'template-list':                [fetchSettings],
+    'template-builder':             [fetchSettings],
+    'template-preview':             [fetchSettings],
     'system-notifications':         [fetchSystemNotifications],
     'crm-dormancy':                 [fetchMembers, fetchBonuses],
     'crm-loyalty':                  [fetchMembers, fetchBonuses],
@@ -457,16 +459,16 @@ const PAGE_FETCHES = {
     'statistics':                   [fetchDeposits, fetchWithdrawals, fetchMembers, fetchCompanies],
     'provider-analytics':           [fetchSeamlessTransactions, fetchMembers],
     'device-report':                [fetchMembers],
-    'reports-agent-daily':          [fetchDeposits, fetchWithdrawals, fetchCompanies],
-    'reports-winloss':              [fetchDeposits, fetchWithdrawals, fetchMembers],
-    'reports-limit-credit':         [fetchMembers, fetchCompanies],
-    'reports-togel-lost':           [fetchLotteryBets, fetchLotteryResults],
-    'reports-lost-money':           [fetchLotteryBets],
-    'reports-top-turnover':         [fetchLotteryBets, fetchMembers],
+    'report-agent-daily':           [fetchDeposits, fetchWithdrawals, fetchCompanies],
+    'report-winloss':               [fetchDeposits, fetchWithdrawals, fetchMembers],
+    'report-limit-credit':          [fetchMembers, fetchCompanies],
+    'report-togel-lost':            [fetchLotteryBets, fetchLotteryResults],
+    'report-lost-money':            [fetchLotteryBets],
+    'report-top-turnover':          [fetchLotteryBets, fetchMembers],
 
     // ── Invoice ───────────────────────────────────────────────
     'invoice-monthly':              [fetchDeposits, fetchWithdrawals, fetchCompanies],
-    'invoice-file':                 [fetchDeposits, fetchWithdrawals],
+    'invoice-file-management':      [fetchDeposits, fetchWithdrawals],
     'invoice-tournament':           [fetchMembers, fetchBonuses],
 };
 
@@ -498,6 +500,7 @@ export async function dbUpdateMember(id, updates) {
         const i = STATE.members.findIndex(x => x.id === id);
         if (i !== -1) STATE.members[i] = { ...STATE.members[i], ...updates };
         saveState();
+        dbWriteLog('Update Member', id, JSON.stringify(updates));
     }
     return { error };
 }
@@ -506,7 +509,11 @@ export async function dbDeleteMember(id) {
         STATE.members = STATE.members.filter(x => x.id !== id); saveState(); return { error: null };
     }
     const { error } = await supabase.from('members').delete().eq('id', id);
-    if (!error) { STATE.members = STATE.members.filter(x => x.id !== id); saveState(); }
+    if (!error) { 
+        STATE.members = STATE.members.filter(x => x.id !== id); 
+        saveState(); 
+        dbWriteLog('Delete Member', id, 'Member account deleted permanently');
+    }
     return { error };
 }
 export async function dbAdjustMemberBalance(memberId, amount, notes, processedBy) {
@@ -533,7 +540,11 @@ export async function dbAddCompany(company) {
         STATE.companies.unshift(company); saveState(); return { data: company };
     }
     const { data, error } = await supabase.from('companies').insert(toDbCompany(company)).select().single();
-    if (!error) { STATE.companies.unshift(mapCompany(data)); saveState(); }
+    if (!error) { 
+        STATE.companies.unshift(mapCompany(data)); 
+        saveState(); 
+        dbWriteLog('Add Company', data.id, `Brand/Agent registered: ${company.name}`);
+    }
     return { data, error };
 }
 export async function dbUpdateCompany(id, updates) {
@@ -547,6 +558,7 @@ export async function dbUpdateCompany(id, updates) {
         const i = STATE.companies.findIndex(x => x.id === id);
         if (i !== -1) STATE.companies[i] = { ...STATE.companies[i], ...updates };
         saveState();
+        dbWriteLog('Update Company', id, JSON.stringify(updates));
     }
     return { error };
 }
@@ -555,7 +567,11 @@ export async function dbDeleteCompany(id) {
         STATE.companies = STATE.companies.filter(x => x.id !== id); saveState(); return { error: null };
     }
     const { error } = await supabase.from('companies').delete().eq('id', id);
-    if (!error) { STATE.companies = STATE.companies.filter(x => x.id !== id); saveState(); }
+    if (!error) { 
+        STATE.companies = STATE.companies.filter(x => x.id !== id); 
+        saveState(); 
+        dbWriteLog('Delete Company', id, 'Company/Agent removed');
+    }
     return { error };
 }
 
@@ -567,7 +583,11 @@ export async function dbAddBank(bank) {
         STATE.banks.unshift(bank); saveState(); return { data: bank };
     }
     const { data, error } = await supabase.from('banks').insert(toDbBank(bank)).select().single();
-    if (!error) { STATE.banks.unshift(mapBank(data)); saveState(); }
+    if (!error) { 
+        STATE.banks.unshift(mapBank(data)); 
+        saveState(); 
+        dbWriteLog('Add Bank', data.id, `New bank account added: ${bank.name} (${bank.accountNumber})`);
+    }
     return { data, error };
 }
 export async function dbUpdateBank(id, updates) {
@@ -581,6 +601,7 @@ export async function dbUpdateBank(id, updates) {
         const i = STATE.banks.findIndex(x => x.id === id);
         if (i !== -1) STATE.banks[i] = { ...STATE.banks[i], ...updates };
         saveState();
+        dbWriteLog('Update Bank', id, JSON.stringify(updates));
     }
     return { error };
 }
@@ -589,7 +610,11 @@ export async function dbDeleteBank(id) {
         STATE.banks = STATE.banks.filter(x => x.id !== id); saveState(); return { error: null };
     }
     const { error } = await supabase.from('banks').delete().eq('id', id);
-    if (!error) { STATE.banks = STATE.banks.filter(x => x.id !== id); saveState(); }
+    if (!error) { 
+        STATE.banks = STATE.banks.filter(x => x.id !== id); 
+        saveState(); 
+        dbWriteLog('Delete Bank', id, 'Bank account removed');
+    }
     return { error };
 }
 

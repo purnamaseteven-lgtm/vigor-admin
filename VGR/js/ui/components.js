@@ -1,6 +1,7 @@
 /* ─── UI COMPONENTS ─── */
 import { fmt, getFilter, goToPage, setPerPage, setFilter } from '../utils/helpers.js';
 import { STATE, fmtCur, saveState } from '../core/state.js';
+import { t } from '../utils/i18n.js';
 
 export function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
@@ -16,6 +17,50 @@ export function toggleTheme() {
 }
 
 window.toggleTheme = toggleTheme;
+
+export function renderHeader() {
+    return `
+    <header class="header">
+        <button class="header-toggle" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+        <div class="header-user-info" style="margin-left: 1rem">
+            <div class="huser-name">${t('welcome_back')}, ${STATE.profile.name}</div>
+            <div class="huser-role">${STATE.profile.role}</div>
+        </div>
+        <div class="header-actions" style="margin-left:auto; display:flex; gap:1rem; align-items:center">
+            ${renderSystemHealth()}
+            <button class="header-icon-btn" onclick="window.openQuickSearch()" title="Global Search (Ctrl+K)">
+                <i class="fa-solid fa-magnifying-glass"></i>
+            </button>
+        </div>
+    </header>
+    ${renderQuickSearch()}
+    `;
+}
+
+function renderQuickSearch() {
+    return `
+    <div id="quickSearchOverlay" class="quick-search-overlay" onclick="window.closeQuickSearch()">
+        <div class="quick-search-modal" onclick="event.stopPropagation()">
+            <div class="quick-search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="globalSearchInput" placeholder="Search members, transactions, or pages... (Esc to close)" oninput="window.runGlobalSearch(this.value)">
+            </div>
+            <div id="globalSearchResults" class="quick-search-results">
+                <div class="search-hint">Type to start searching...</div>
+            </div>
+        </div>
+    </div>`;
+}
+
+export function renderSystemHealth() {
+    const isDbUp = window.SUPABASE_ENABLED;
+    return `
+    <div class="security-badge" title="System Health">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>${isDbUp ? 'SECURE' : 'MOCK'}</span>
+        <div style="width:6px;height:6px;border-radius:50%;background:${isDbUp ? 'var(--green)' : 'var(--yellow)'};margin-left:4px"></div>
+    </div>`;
+}
 
 export function toast(msg, type = 'info') {
     const container = document.getElementById('toast-container');
@@ -83,11 +128,11 @@ export function showMember(username, _tab) {
 
     // ── Data for each tab ──
     const memberDeps = (STATE.deposits || []).filter(d => d.member === m.username).slice(0, 20);
-    const memberWds  = (STATE.withdrawals || []).filter(w => w.member === m.username).slice(0, 20);
+    const memberWds = (STATE.withdrawals || []).filter(w => w.member === m.username).slice(0, 20);
     const memberBons = (STATE.bonuses || []).filter(b => b.member === m.username).slice(0, 20);
     const memberBets = (STATE.lotteryBets || []).filter(b => b.member === m.username).slice(0, 20);
-    const totalDep   = memberDeps.filter(d => d.status === 'Approved').reduce((s, d) => s + (d.amount || 0), 0);
-    const totalWd    = memberWds.filter(w => w.status === 'Approved').reduce((s, w) => s + (w.amount || 0), 0);
+    const totalDep = memberDeps.filter(d => d.status === 'Approved').reduce((s, d) => s + (d.amount || 0), 0);
+    const totalWd = memberWds.filter(w => w.status === 'Approved').reduce((s, w) => s + (w.amount || 0), 0);
     const totalBonus = memberBons.filter(b => b.status === 'Approved').reduce((s, b) => s + (b.bonusAmount || 0), 0);
 
     const tabs = [
@@ -99,7 +144,7 @@ export function showMember(username, _tab) {
     ];
 
     const tabBar = `<div style="display:flex;gap:.25rem;margin-bottom:1rem;border-bottom:1px solid var(--border);padding-bottom:.5rem">
-        ${tabs.map(t => `<button onclick="window.showMember('${username}','${t.id}')" style="padding:.35rem .7rem;border-radius:7px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;background:${activeTab===t.id?'var(--acc)':'transparent'};color:${activeTab===t.id?'#fff':'var(--text3)'}"><i class="fa-solid ${t.icon}" style="margin-right:.3rem"></i>${t.label}</button>`).join('')}
+        ${tabs.map(t => `<button onclick="window.showMember('${username}','${t.id}')" style="padding:.35rem .7rem;border-radius:7px;font-size:.75rem;font-weight:600;border:none;cursor:pointer;background:${activeTab === t.id ? 'var(--acc)' : 'transparent'};color:${activeTab === t.id ? '#fff' : 'var(--text3)'}"><i class="fa-solid ${t.icon}" style="margin-right:.3rem"></i>${t.label}</button>`).join('')}
     </div>`;
 
     const rowStyle = 'border-bottom:1px solid var(--border);padding:.5rem 0;font-size:.8rem;';
@@ -139,7 +184,7 @@ export function showMember(username, _tab) {
                 <td style="padding:.35rem .5rem;font-family:monospace;font-size:.7rem">${d.id}</td>
                 <td style="padding:.35rem .5rem;font-weight:700;color:var(--green)">${fmtCur(d.amount)}</td>
                 <td style="padding:.35rem .5rem">${d.bank || '-'}</td>
-                <td style="padding:.35rem .5rem"><span style="background:${d.status==='Approved'?'rgba(16,185,129,.15)':d.status==='Pending'?'rgba(245,158,11,.15)':'rgba(239,68,68,.12)'};color:${d.status==='Approved'?'var(--green)':d.status==='Pending'?'var(--yellow)':'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${d.status}</span></td>
+                <td style="padding:.35rem .5rem"><span style="background:${d.status === 'Approved' ? 'rgba(16,185,129,.15)' : d.status === 'Pending' ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.12)'};color:${d.status === 'Approved' ? 'var(--green)' : d.status === 'Pending' ? 'var(--yellow)' : 'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${d.status}</span></td>
                 <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${d.date || '-'}</td>
             </tr>`).join('') : emptyRow(5)}</tbody>
         </table></div>`;
@@ -150,7 +195,7 @@ export function showMember(username, _tab) {
                 <td style="padding:.35rem .5rem;font-family:monospace;font-size:.7rem">${w.id}</td>
                 <td style="padding:.35rem .5rem;font-weight:700;color:var(--red)">${fmtCur(w.amount)}</td>
                 <td style="padding:.35rem .5rem">${w.bank || '-'}</td>
-                <td style="padding:.35rem .5rem"><span style="background:${w.status==='Approved'?'rgba(16,185,129,.15)':w.status==='Pending'?'rgba(245,158,11,.15)':'rgba(239,68,68,.12)'};color:${w.status==='Approved'?'var(--green)':w.status==='Pending'?'var(--yellow)':'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${w.status}</span></td>
+                <td style="padding:.35rem .5rem"><span style="background:${w.status === 'Approved' ? 'rgba(16,185,129,.15)' : w.status === 'Pending' ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.12)'};color:${w.status === 'Approved' ? 'var(--green)' : w.status === 'Pending' ? 'var(--yellow)' : 'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${w.status}</span></td>
                 <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${w.date || '-'}</td>
             </tr>`).join('') : emptyRow(5)}</tbody>
         </table></div>`;
@@ -160,7 +205,7 @@ export function showMember(username, _tab) {
             <tbody>${memberBons.length ? memberBons.map(b => `<tr style="border-bottom:1px solid var(--border)">
                 <td style="padding:.35rem .5rem;font-weight:600">${b.type || '-'}</td>
                 <td style="padding:.35rem .5rem;font-weight:700;color:#f59e0b">${fmtCur(b.bonusAmount || 0)}</td>
-                <td style="padding:.35rem .5rem"><span style="background:${b.status==='Approved'?'rgba(16,185,129,.15)':b.status==='Pending'?'rgba(245,158,11,.15)':'rgba(239,68,68,.12)'};color:${b.status==='Approved'?'var(--green)':b.status==='Pending'?'var(--yellow)':'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${b.status}</span></td>
+                <td style="padding:.35rem .5rem"><span style="background:${b.status === 'Approved' ? 'rgba(16,185,129,.15)' : b.status === 'Pending' ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.12)'};color:${b.status === 'Approved' ? 'var(--green)' : b.status === 'Pending' ? 'var(--yellow)' : 'var(--red)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${b.status}</span></td>
                 <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${b.date || b.createdAt || '-'}</td>
             </tr>`).join('') : emptyRow(4)}</tbody>
         </table></div>`;
@@ -170,8 +215,8 @@ export function showMember(username, _tab) {
             <tbody>${memberBets.length ? memberBets.map(b => `<tr style="border-bottom:1px solid var(--border)">
                 <td style="padding:.35rem .5rem;font-weight:600">${b.gameType || b.game || '-'} ${b.betNumber || ''}</td>
                 <td style="padding:.35rem .5rem;color:var(--text2)">${fmtCur(b.betAmount || 0)}</td>
-                <td style="padding:.35rem .5rem;font-weight:700;color:${(b.winAmount||0)>0?'var(--green)':'var(--text3)'}">${fmtCur(b.winAmount || 0)}</td>
-                <td style="padding:.35rem .5rem"><span style="background:${b.status==='Won'?'rgba(16,185,129,.15)':b.status==='Lost'?'rgba(239,68,68,.12)':'rgba(245,158,11,.15)'};color:${b.status==='Won'?'var(--green)':b.status==='Lost'?'var(--red)':'var(--yellow)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${b.status||'-'}</span></td>
+                <td style="padding:.35rem .5rem;font-weight:700;color:${(b.winAmount || 0) > 0 ? 'var(--green)' : 'var(--text3)'}">${fmtCur(b.winAmount || 0)}</td>
+                <td style="padding:.35rem .5rem"><span style="background:${b.status === 'Won' ? 'rgba(16,185,129,.15)' : b.status === 'Lost' ? 'rgba(239,68,68,.12)' : 'rgba(245,158,11,.15)'};color:${b.status === 'Won' ? 'var(--green)' : b.status === 'Lost' ? 'var(--red)' : 'var(--yellow)'};border-radius:20px;padding:.1rem .5rem;font-size:.7rem;font-weight:700">${b.status || '-'}</span></td>
                 <td style="padding:.35rem .5rem;font-size:.7rem;color:var(--text3)">${b.date || '-'}</td>
             </tr>`).join('') : emptyRow(5)}</tbody>
         </table></div>`;
@@ -311,12 +356,13 @@ export function renderPagerHTML(key, total, perPage, curPage) {
 }
 
 export function renderSidebar() {
+    // 3-level hierarchy: SuperAdmin / Whitelabel / Agent
     const roleAliases = {
         superadmin: 'SuperAdmin',
-        company: 'Company',
-        whitelabel: 'Company',
-        master: 'Master',
-        shop: 'Shop',
+        company: 'Whitelabel',   // legacy
+        whitelabel: 'Whitelabel',
+        master: 'Agent',         // legacy
+        shop: 'Agent',         // legacy
         agent: 'Agent',
     };
     const rawRole = STATE.currentAdmin.role;
@@ -333,33 +379,32 @@ export function renderSidebar() {
 
     // Map permissionMatrix (mod.sub) → page key, for custom permission lookup
     const _P2PG = {
-        'home.dashboard':'dashboard','home.statistics':'statistics','home.providerAnalytics':'provider-analytics','home.deviceReport':'device-report',
-        'master.whitelist':'whitelist','master.blacklist':'blacklist','master.masterWhitelist':'master-whitelist',
-        'administrators.systemAdmins':'admin-management','administrators.rolePermissions':'dev-menu-config',
-        'companyManagement.whitelabelList':'company-list','companyManagement.regisNewCompany':'company-create','companyManagement.myDownlines':'my-downlines',
-        'whitelabel.whitelabelList':'whitelabel-list','whitelabel.masterWlList':'master-wl-list',
-        'members.memberList':'global-member-list','members.addMember':'global-member-list','members.tierHistory':'tier-history',
-        'bankManagement.bankList':'bank-list','bankManagement.createNewBank':'bank-create',
-        'finance.deposit':'deposit-list','finance.withdrawal':'withdrawal-list','finance.adjustment':'finance-adjustment','finance.adjustmentLogs':'finance-adjustment-logs',
-        'bets.betsListing':'bets-list','bets.bettingTable':'bets-table','bets.transferredList':'transferred-list',
-        'bonus.bonusReport':'bonus-report','bonus.agentFreebet':'bonus-agent-freebet','bonus.agentFreebetReport':'bonus-agent-freebet-report',
-        'bonus.pragmaticFrb':'bonus-pragmatic-frb','bonus.promotions':'custom-promotion-list','bonus.promotionRelease':'promotion-release','bonus.promotionRollingRelease':'promotion-rolling-release',
-        'results.resultsListing':'results-list','results.resultScan':'results-scan','results.resultsAnalyze':'results-analyze',
-        'integrations.providerSetup':'seamless-config','integrations.apiLogs':'seamless-api-logs','integrations.developerDocs':'seamless-docs',
-        'customization.templateBuilder':'template-builder','customization.templatePreview':'template-preview','customization.systemTheme':'custom-theme',
-        'customization.globalBanner':'custom-global-banner','customization.appNotification':'custom-app-notification','customization.pushAppNotification':'app-notification','customization.themePresets':'custom-theme-presets','customization.announcements':'announcement-list',
-        'customization.siteConfig':'custom-site-config','customization.seoTools':'custom-seo',
-        'settings.commission':'settings-commission','settings.referralRate':'settings-referral-rate','settings.poolsList':'settings-pools',
-        'settings.games':'settings-games','settings.agentGameSettings':'settings-agent-games','settings.togelCommission':'settings-togel-commission',
-        'settings.limitCreditOut':'settings-limit-credit-out','settings.vipDesigner':'custom-vip','settings.rebateCalc':'rebate-calc','settings.financeLimits':'settings-finance',
-        'tools.coin2pay':'tools-coin2pay','tools.hostManagement':'tools-host','tools.sawala':'tools-sawala','tools.unopay':'tools-unopay','tools.nawalaScan':'nawala-scan',
-        'crm.dashboard':'crm-dashboard','crm.segments':'crm-segments','crm.missions':'crm-missions','crm.tournaments':'crm-tournaments',
-        'crm.automation':'crm-automation','crm.push':'crm-push','crm.dormancy':'crm-dormancy','crm.loyalty':'crm-loyalty',
-        'memo.memoBox':'memo-list','memo.autoMemo':'memo-auto',
-        'reports.winloss':'reports-winloss','reports.agentDaily':'reports-agent-daily','reports.limitCredit':'reports-limit-credit',
-        'reports.lostMoney':'reports-lost-money','reports.togelLost':'reports-togel-lost','reports.topTurnover':'reports-top-turnover',
-        'invoice.monthly':'invoice-monthly','invoice.fileManagement':'invoice-file','invoice.tournamentWinners':'invoice-tournament',
-        'logs.adminLogs':'logs-admin','logs.companyLogs':'logs-company','logs.whitelabelLogs':'logs-whitelabel','logs.memberLogs':'logs-member','logs.masterWlLogs':'logs-master-wl',
+        'home.dashboard': 'dashboard', 'home.statistics': 'statistics', 'home.providerAnalytics': 'provider-analytics', 'home.deviceReport': 'device-report',
+        'master.whitelist': 'whitelist', 'master.blacklist': 'blacklist', 'master.masterWhitelist': 'master-whitelist',
+        'administrators.systemAdmins': 'admin-management', 'administrators.rolePermissions': 'dev-menu-config',
+        'companyManagement.whitelabelList': 'whitelabel-list', 'companyManagement.masterWlList': 'master-wl-list', 'companyManagement.regisNewCompany': 'company-create', 'companyManagement.myDownlines': 'my-downlines', 'companyManagement.companyTree': 'company-tree',
+        'members.memberList': 'global-member-list', 'members.addMember': 'global-member-list', 'members.tierHistory': 'tier-history',
+        'bankManagement.bankList': 'bank-list', 'bankManagement.createNewBank': 'bank-create',
+        'finance.deposit': 'deposit-list', 'finance.withdrawal': 'withdrawal-list', 'finance.adjustment': 'finance-adjustment', 'finance.adjustmentLogs': 'finance-adjustment-logs',
+        'bets.betsListing': 'bets-list', 'bets.bettingTable': 'bets-table', 'bets.transferredList': 'transferred-list',
+        'bonus.bonusReport': 'bonus-report', 'bonus.agentFreebet': 'bonus-agent-freebet', 'bonus.agentFreebetReport': 'bonus-agent-freebet-report',
+        'bonus.pragmaticFrb': 'bonus-pragmatic-frb', 'bonus.promotions': 'promotions', 'bonus.promotionRelease': 'promotion-release', 'bonus.promotionRollingRelease': 'promotion-rolling-release',
+        'results.resultsListing': 'results-list', 'results.resultScan': 'results-scan', 'results.resultsAnalyze': 'results-analyze',
+        'integrations.providerSetup': 'seamless-config', 'integrations.apiLogs': 'seamless-api-logs', 'integrations.developerDocs': 'seamless-docs', 'integrations.apiSandbox': 'seamless-sandbox',
+        'customization.templateBuilder': 'template-builder', 'customization.templatePreview': 'template-list', 'customization.systemTheme': 'system-theme',
+        'customization.globalBanner': 'global-banner', 'customization.appNotification': 'app-notification', 'customization.pushAppNotification': 'app-notification', 'customization.themePresets': 'theme-presets', 'customization.announcements': 'announcements',
+        'customization.branding': 'branding-settings', 'settings.securityCenter': 'security-center',
+        'settings.commission': 'settings-commission', 'settings.referralRate': 'settings-referral-rate', 'settings.poolsList': 'settings-pools',
+        'settings.games': 'settings-games', 'settings.agentGameSettings': 'settings-agent-games', 'settings.togelCommission': 'settings-togel-commission',
+        'settings.limitCreditOut': 'settings-limit-credit-out', 'settings.vipDesigner': 'vip-designer', 'settings.rebateCalc': 'rebate-calc', 'settings.financeLimits': 'settings-finance', 'settings.rbacManagement': 'rbac-management',
+        'tools.coin2pay': 'tools-coin2pay', 'tools.hostManagement': 'host-management', 'tools.sawala': 'tools-sawala', 'tools.unopay': 'tools-unopay', 'tools.nawalaScan': 'nawala-scan',
+        'crm.dashboard': 'crm-dashboard', 'crm.segments': 'crm-segments', 'crm.missions': 'crm-missions', 'crm.tournaments': 'crm-tournaments',
+        'crm.automation': 'crm-automation', 'crm.push': 'crm-push', 'crm.dormancy': 'crm-dormancy', 'crm.loyalty': 'crm-loyalty',
+        'memo.memoBox': 'memo-list', 'memo.autoMemo': 'memo-auto',
+        'reports.winloss': 'report-winloss', 'reports.agentDaily': 'report-agent-daily', 'reports.limitCredit': 'report-limit-credit',
+        'reports.lostMoney': 'report-lost-money', 'reports.togelLost': 'report-togel-lost', 'reports.topTurnover': 'report-top-turnover',
+        'invoice.monthly': 'invoice-monthly', 'invoice.fileManagement': 'invoice-file-management', 'invoice.tournamentWinners': 'invoice-tournament',
+        'logs.adminLogs': 'logs-admin', 'logs.companyLogs': 'logs-company', 'logs.whitelabelLogs': 'logs-whitelabel', 'logs.memberLogs': 'logs-member', 'logs.masterWlLogs': 'logs-master-wl',
     };
 
     const check = (mod, sub) => {
@@ -381,6 +426,13 @@ export function renderSidebar() {
 
     let html = '';
 
+    // 1. Dashboard
+    html += `
+    <div class="sidebar-menu-label">${t('dashboard')}</div>
+    <div class="nav-item">
+        <div class="nav-link" onclick="go('dashboard')"><i class="fa-solid fa-house nav-icon"></i><span class="nav-label">${t('dashboard')}</span></div>
+    </div>`;
+
     // 1. Home
     if (sectionActive('home')) {
         html += `<div class="sidebar-menu-label">${isSuper ? 'Whitelabel Console' : 'Management'}</div>`;
@@ -396,57 +448,42 @@ export function renderSidebar() {
         </div>`;
     }
 
-    // 3. Master Management
+    // 3. Security Tools (IP Management)
     if (sectionActive('master')) {
         html += `
         <div class="nav-item">
-            <div class="nav-link" onclick="toggleMenu('masterMenu', this)"><i class="fa-solid fa-crown nav-icon"></i><span class="nav-label">Master Agent</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-link" onclick="toggleMenu('masterMenu', this)"><i class="fa-solid fa-shield-halved nav-icon"></i><span class="nav-label">Security Tools</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="masterMenu">
-                <div class="nav-link" style="${check('master', 'whitelist') ? '' : 'display:none'}" onclick="go('whitelist')"><i class="fa-solid fa-shield-halved nav-icon"></i><span class="nav-label">IP Whitelist</span></div>
+                <div class="nav-link" style="${check('master', 'whitelist') ? '' : 'display:none'}" onclick="go('whitelist')"><i class="fa-solid fa-check-shield nav-icon"></i><span class="nav-label">IP Whitelist</span></div>
                 <div class="nav-link" style="${check('master', 'blacklist') ? '' : 'display:none'}" onclick="go('blacklist')"><i class="fa-solid fa-ban nav-icon"></i><span class="nav-label">IP/User Blacklist</span></div>
                 <div class="nav-link" style="${check('master', 'masterWhitelist') ? '' : 'display:none'}" onclick="go('master-whitelist')"><i class="fa-solid fa-check-double nav-icon"></i><span class="nav-label">Master Whitelist</span></div>
             </div>
         </div>`;
     }
 
-    // 4. Platform Matrix — SuperAdmin only, shown in Settings area later
-
-    // 5. Agent Management (Renamed from Company Management)
+    // 5. Company & Agent Management
     if (sectionActive('companyManagement')) {
         html += `
         <div class="nav-item">
-            <div class="nav-link" onclick="toggleMenu('compMenu', this)"><i class="fa-solid fa-building nav-icon"></i><span class="nav-label">Agent Management</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-link" onclick="toggleMenu('compMenu', this)"><i class="fa-solid fa-sitemap nav-icon"></i><span class="nav-label">Company Management</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="compMenu">
-                <div class="nav-link" style="${check('companyManagement', 'whitelabelList') ? '' : 'display:none'}" onclick="go('company-list')"><i class="fa-solid fa-list-ul nav-icon"></i><span class="nav-label">Agent List</span></div>
-                <div class="nav-link" style="${check('companyManagement', 'regisNewCompany') ? '' : 'display:none'}" onclick="go('company-create')"><i class="fa-solid fa-plus-circle nav-icon"></i><span class="nav-label">Create New Agent</span></div>
+                <div class="nav-link" style="${check('companyManagement', 'whitelabelList') ? '' : 'display:none'}" onclick="go('whitelabel-list')"><i class="fa-solid fa-tags nav-icon"></i><span class="nav-label">Whitelabel List</span></div>
+                <div class="nav-link" style="${check('companyManagement', 'masterWlList') ? '' : 'display:none'}" onclick="go('master-wl-list')"><i class="fa-solid fa-crown nav-icon"></i><span class="nav-label">Master List</span></div>
+                <div class="nav-link" style="${check('companyManagement', 'regisNewCompany') ? '' : 'display:none'}" onclick="go('company-create')"><i class="fa-solid fa-plus-circle nav-icon"></i><span class="nav-label">Register Brand</span></div>
+                <div class="nav-link" style="${check('companyManagement', 'myDownlines') ? '' : 'display:none'}" onclick="go('company-list')"><i class="fa-solid fa-list-ul nav-icon"></i><span class="nav-label">Agent List</span></div>
+                <div class="nav-link" style="${check('companyManagement', 'companyTree') ? '' : 'display:none'}" onclick="go('company-tree')"><i class="fa-solid fa-network-wired nav-icon"></i><span class="nav-label">Visual Network Tree</span></div>
             </div>
         </div>`;
     }
 
-    // 6. Whitelabel Management (Renamed to Master Whitelabel)
-    if (sectionActive('whitelabel')) {
+    // 6. My Agents — Whitelabel can manage their Agents (Contextual Shortcut)
+    if (!isSuper && role === 'Whitelabel') {
         html += `
         <div class="nav-item">
-            <div class="nav-link" onclick="toggleMenu('wlMenu', this)"><i class="fa-solid fa-tags nav-icon"></i><span class="nav-label">Master Agent WL</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
-            <div class="nav-submenu" id="wlMenu">
-                <div class="nav-link" style="${check('whitelabel', 'whitelabelList') ? '' : 'display:none'}" onclick="go('whitelabel-list')"><i class="fa-solid fa-list-ul nav-icon"></i><span class="nav-label">Agent WL List</span></div>
-                <div class="nav-link" style="${check('whitelabel', 'masterWlList') ? '' : 'display:none'}" onclick="go('master-wl-list')"><i class="fa-solid fa-crown nav-icon"></i><span class="nav-label">Master Agent List</span></div>
-            </div>
-        </div>`;
-    }
-
-    // 6b. My Downlines — visible to Company / Master / Shop / Agent (not SuperAdmin)
-    // Each non-SuperAdmin role can manage their own direct downline companies
-    if (!isSuper && ['Company', 'Master', 'Shop', 'Agent'].includes(role)) {
-        const dlIconMap   = { Company: 'building-user', Master: 'user-tie', Shop: 'store', Agent: 'user-tag' };
-        const dlLabelMap  = { Company: 'My Companies', Master: 'My Agents', Shop: 'My Sub-Agents', Agent: 'My Sub-Agents' };
-        const dlAddMap    = { Company: 'Add Company', Master: 'Add Agent', Shop: 'Add Sub-Agent', Agent: 'Add Sub-Agent' };
-        html += `
-        <div class="nav-item">
-            <div class="nav-link" onclick="toggleMenu('dlMenu', this)"><i class="fa-solid fa-${dlIconMap[role] || 'sitemap'} nav-icon"></i><span class="nav-label">${dlLabelMap[role] || 'My Downlines'}</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
+            <div class="nav-link" onclick="toggleMenu('dlMenu', this)"><i class="fa-solid fa-building-user nav-icon"></i><span class="nav-label">My Downlines</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="dlMenu">
-                <div class="nav-link" onclick="go('my-downlines')"><i class="fa-solid fa-list-tree nav-icon"></i><span class="nav-label">Downline List</span></div>
-                <div class="nav-link" onclick="window.openFormModal('company')"><i class="fa-solid fa-plus-circle nav-icon"></i><span class="nav-label">${dlAddMap[role] || 'Add Downline'}</span></div>
+                <div class="nav-link" onclick="go('my-downlines')"><i class="fa-solid fa-list-tree nav-icon"></i><span class="nav-label">Agent List</span></div>
+                <div class="nav-link" onclick="window.openFormModal('company')"><i class="fa-solid fa-plus-circle nav-icon"></i><span class="nav-label">Add Agent</span></div>
             </div>
         </div>`;
     }
@@ -501,7 +538,7 @@ export function renderSidebar() {
                 <div class="nav-submenu" id="betMenu">
                     <div class="nav-link" style="${check('bets', 'betsListing') ? '' : 'display:none'}" onclick="go('bets-list')"><i class="fa-solid fa-list nav-icon"></i><span class="nav-label">Bets Listing</span></div>
                     <div class="nav-link" style="${check('bets', 'bettingTable') ? '' : 'display:none'}" onclick="go('bets-table')"><i class="fa-solid fa-table nav-icon"></i><span class="nav-label">Betting Table</span></div>
-                    <div class="nav-link" style="${check('bets', 'transferredList') ? '' : 'display:none'}" onclick="go('bets-transferred')"><i class="fa-solid fa-arrow-right-arrow-left nav-icon"></i><span class="nav-label">Transferred List</span></div>
+                    <div class="nav-link" style="${check('bets', 'transferredList') ? '' : 'display:none'}" onclick="go('transferred-list')"><i class="fa-solid fa-arrow-right-arrow-left nav-icon"></i><span class="nav-label">Transferred List</span></div>
                 </div>
             </div>`;
         }
@@ -513,7 +550,7 @@ export function renderSidebar() {
                 <div class="nav-submenu" id="bonMenu">
                     <div class="nav-link" style="${check('bonus', 'promotionRelease') ? '' : 'display:none'}" onclick="go('promotion-release')"><i class="fa-solid fa-paper-plane nav-icon"></i><span class="nav-label">Promotion Release</span></div>
                     <div class="nav-link" style="${check('bonus', 'promotionRollingRelease') ? '' : 'display:none'}" onclick="go('promotion-rolling-release')"><i class="fa-solid fa-arrows-spin nav-icon"></i><span class="nav-label">Rolling Release</span></div>
-                    <div class="nav-link" style="${check('bonus', 'promotions') ? '' : 'display:none'}" onclick="go('custom-promotion-list')"><i class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Promotions List</span></div>
+                    <div class="nav-link" style="${check('bonus', 'promotions') ? '' : 'display:none'}" onclick="go('promotions')"><i class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Promotions List</span></div>
                     <div class="nav-link" style="${check('bonus', 'bonusReport') ? '' : 'display:none'}" onclick="go('bonus-report')"><i class="fa-solid fa-file-invoice nav-icon"></i><span class="nav-label">Bonus Report</span></div>
                     <div class="nav-link" style="${check('bonus', 'agentFreebet') ? '' : 'display:none'}" onclick="go('bonus-agent-freebet')"><i class="fa-solid fa-hand-holding-dollar nav-icon"></i><span class="nav-label">Agent Freebet</span></div>
                     <div class="nav-link" style="${check('bonus', 'agentFreebetReport') ? '' : 'display:none'}" onclick="go('bonus-agent-freebet-report')"><i class="fa-solid fa-file-contract nav-icon"></i><span class="nav-label">Agent Freebet Report</span></div>
@@ -548,6 +585,7 @@ export function renderSidebar() {
                         <div class="nav-link" style="${check('integrations', 'providerSetup') ? '' : 'display:none'}" onclick="go('seamless-transactions')"><i class="fa-solid fa-exchange-alt nav-icon"></i><span class="nav-label">Transactions</span></div>
                         <div class="nav-link" style="${check('integrations', 'providerSetup') ? '' : 'display:none'}" onclick="go('seamless-games')"><i class="fa-solid fa-gamepad nav-icon"></i><span class="nav-label">Game Catalog</span></div>
                         <div class="nav-link" style="${check('integrations', 'apiLogs') ? '' : 'display:none'}" onclick="go('seamless-api-logs')"><i class="fa-solid fa-file-code nav-icon"></i><span class="nav-label">API Logs</span></div>
+                <div class="nav-link" style="${check('integrations', 'apiSandbox') ? '' : 'display:none'}" onclick="go('seamless-sandbox')"><i class="fa-solid fa-flask-vial nav-icon"></i><span class="nav-label">API Sandbox</span></div>
                         <div class="nav-link" style="${check('integrations', 'developerDocs') ? '' : 'display:none'}" onclick="go('seamless-docs')"><i class="fa-solid fa-book nav-icon"></i><span class="nav-label">Developer Docs</span></div>
                     </div>
                 </div>`;
@@ -559,16 +597,16 @@ export function renderSidebar() {
                     <div class="nav-link" onclick="toggleMenu('customMenu', this)"><i class="fa-solid fa-palette nav-icon"></i><span class="nav-label">Customization</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
                     <div class="nav-submenu" id="customMenu">
                         <div class="nav-link" style="${check('customization', 'templateBuilder') ? '' : 'display:none'}" onclick="go('template-builder')"><i class="fa-solid fa-object-group nav-icon"></i><span class="nav-label">Template Builder</span></div>
-                        <div class="nav-link" style="${check('customization', 'templatePreview') ? '' : 'display:none'}" onclick="go('custom-template')"><i class="fa-solid fa-list-check nav-icon"></i><span class="nav-label">Templates List</span></div>
+                        <div class="nav-link" style="${check('customization', 'templatePreview') ? '' : 'display:none'}" onclick="go('template-list')"><i class="fa-solid fa-list-check nav-icon"></i><span class="nav-label">Templates List</span></div>
                         <div class="nav-link" style="${check('customization', 'templatePreview') ? '' : 'display:none'}" onclick="go('template-preview')"><i class="fa-solid fa-eye nav-icon"></i><span class="nav-label">Template Preview</span></div>
-                        <div class="nav-link" style="${check('customization', 'systemTheme') ? '' : 'display:none'}" onclick="go('custom-theme')"><i class="fa-solid fa-droplet nav-icon"></i><span class="nav-label">System Theme</span></div>
-                        <div class="nav-link" style="${check('customization', 'systemTheme') ? '' : 'display:none'}" onclick="go('custom-theme-presets')"><i class="fa-solid fa-palette nav-icon"></i><span class="nav-label">Theme Presets</span></div>
-                        <div class="nav-link" style="${check('customization', 'globalBanner') ? '' : 'display:none'}" onclick="go('custom-global-banner')"><i class="fa-solid fa-images nav-icon"></i><span class="nav-label">Global Banner</span></div>
+                        <div class="nav-link" style="${check('customization', 'systemTheme') ? '' : 'display:none'}" onclick="go('system-theme')"><i class="fa-solid fa-droplet nav-icon"></i><span class="nav-label">System Theme</span></div>
+                        <div class="nav-link" style="${check('customization', 'themePresets') ? '' : 'display:none'}" onclick="go('theme-presets')"><i class="fa-solid fa-palette nav-icon"></i><span class="nav-label">Theme Presets</span></div>
+                        <div class="nav-link" style="${check('customization', 'globalBanner') ? '' : 'display:none'}" onclick="go('global-banner')"><i class="fa-solid fa-images nav-icon"></i><span class="nav-label">Global Banner</span></div>
                         <div class="nav-link" style="${check('customization', 'appNotification') ? '' : 'display:none'}" onclick="go('app-notification')"><i class="fa-solid fa-mobile-screen-button nav-icon"></i><span class="nav-label">Push App Notification</span></div>
-                        <div class="nav-link" style="${check('customization', 'appNotification') ? '' : 'display:none'}" onclick="go('custom-app-notification')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">App Notification</span></div>
-                        <div class="nav-link" style="${check('customization', 'announcements') ? '' : 'display:none'}" onclick="go('announcement-list')"><i class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Announcements</span></div>
-                        <div class="nav-link" style="${check('customization', 'siteConfig') ? '' : 'display:none'}" onclick="go('custom-site-config')"><i class="fa-solid fa-sliders nav-icon"></i><span class="nav-label">Site Config</span></div>
-                        <div class="nav-link" style="${check('customization', 'seoTools') ? '' : 'display:none'}" onclick="go('custom-seo')"><i class="fa-solid fa-magnifying-glass-chart nav-icon"></i><span class="nav-label">SEO Settings</span></div>
+                        <div class="nav-link" style="${check('customization', 'announcements') ? '' : 'display:none'}" onclick="go('announcements')"><i class="fa-solid fa-bullhorn nav-icon"></i><span class="nav-label">Announcements</span></div>
+                        <div class="nav-link" style="${check('customization', 'branding') ? '' : 'display:none'}" onclick="go('branding-settings')"><i class="fa-solid fa-wand-magic-sparkles nav-icon"></i><span class="nav-label">Branding</span></div>
+                        <div class="nav-link" style="${check('customization', 'siteConfig') ? '' : 'display:none'}" onclick="go('site-config')"><i class="fa-solid fa-sliders nav-icon"></i><span class="nav-label">Site Config</span></div>
+                        <div class="nav-link" style="${check('customization', 'seoTools') ? '' : 'display:none'}" onclick="go('seo-tools')"><i class="fa-solid fa-magnifying-glass-chart nav-icon"></i><span class="nav-label">SEO Settings</span></div>
                     </div>
                 </div>`;
         }
@@ -585,7 +623,7 @@ export function renderSidebar() {
                     <div class="nav-link" style="${check('settings', 'agentGameSettings') ? '' : 'display:none'}" onclick="go('settings-agent-games')"><i class="fa-solid fa-user-gear nav-icon"></i><span class="nav-label">Agent Game Settings</span></div>
                     <div class="nav-link" style="${check('settings', 'togelCommission') ? '' : 'display:none'}" onclick="go('settings-togel-commission')"><i class="fa-solid fa-clover nav-icon"></i><span class="nav-label">Togel Commission</span></div>
                     <div class="nav-link" style="${check('settings', 'limitCreditOut') ? '' : 'display:none'}" onclick="go('settings-limit-credit-out')"><i class="fa-solid fa-gauge nav-icon"></i><span class="nav-label">Limit Credit Out</span></div>
-                    <div class="nav-link" style="${check('settings', 'vipDesigner') ? '' : 'display:none'}" onclick="go('custom-vip')"><i class="fa-solid fa-crown nav-icon"></i><span class="nav-label">VIP Tiers</span></div>
+                    <div class="nav-link" style="${check('settings', 'vipDesigner') ? '' : 'display:none'}" onclick="go('vip-designer')"><i class="fa-solid fa-crown nav-icon"></i><span class="nav-label">VIP Tiers</span></div>
                     <div class="nav-link" style="${check('settings', 'rebateCalc') ? '' : 'display:none'}" onclick="go('rebate-calc')"><i class="fa-solid fa-calculator nav-icon"></i><span class="nav-label">Weekly Rebate</span></div>
                     <div class="nav-link" style="${check('settings', 'financeLimits') ? '' : 'display:none'}" onclick="go('settings-finance')"><i class="fa-solid fa-sliders nav-icon"></i><span class="nav-label">Finance Limits</span></div>
                 </div>
@@ -600,7 +638,7 @@ export function renderSidebar() {
             <div class="nav-link" onclick="toggleMenu('toolsMenu', this)"><i class="fa-solid fa-screwdriver-wrench nav-icon"></i><span class="nav-label">Tools</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="toolsMenu">
                 <div class="nav-link" style="${check('tools', 'coin2pay') ? '' : 'display:none'}" onclick="go('tools-coin2pay')"><i class="fa-solid fa-coins nav-icon"></i><span class="nav-label">Coin2pay</span></div>
-                <div class="nav-link" style="${check('tools', 'hostManagement') ? '' : 'display:none'}" onclick="go('tools-host')"><i class="fa-solid fa-server nav-icon"></i><span class="nav-label">Host Management</span></div>
+                <div class="nav-link" style="${check('tools', 'hostManagement') ? '' : 'display:none'}" onclick="go('host-management')"><i class="fa-solid fa-server nav-icon"></i><span class="nav-label">Host Management</span></div>
                 <div class="nav-link" style="${check('tools', 'sawala') ? '' : 'display:none'}" onclick="go('tools-sawala')"><i class="fa-solid fa-comments nav-icon"></i><span class="nav-label">Sawala</span></div>
                 <div class="nav-link" style="${check('tools', 'unopay') ? '' : 'display:none'}" onclick="go('tools-unopay')"><i class="fa-solid fa-credit-card nav-icon"></i><span class="nav-label">Unopay Payment</span></div>
                 <div class="nav-link" style="${check('tools', 'nawalaScan') ? '' : 'display:none'}" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div>
@@ -617,6 +655,7 @@ export function renderSidebar() {
                 <div class="nav-link" onclick="go('system-notifications')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">System Notifications</span></div>
                 <div class="nav-link" onclick="go('nawala-scan')"><i class="fa-solid fa-satellite-dish nav-icon"></i><span class="nav-label">Nawala Scanner</span></div>
                 <div class="nav-link" onclick="go('seamless-config')"><i class="fa-solid fa-puzzle-piece nav-icon"></i><span class="nav-label">Seamless Setup</span></div>
+                <div class="nav-link" style="${check('settings', 'rbacManagement') ? '' : 'display:none'}" onclick="go('rbac-management')"><i class="fa-solid fa-user-lock nav-icon"></i><span class="nav-label">Role Management</span></div>
             </div>
         </div>`;
     }
@@ -657,12 +696,12 @@ export function renderSidebar() {
         <div class="nav-item">
             <div class="nav-link" onclick="toggleMenu('repMenu', this)"><i class="fa-solid fa-chart-column nav-icon"></i><span class="nav-label">Reports</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="repMenu">
-                <div class="nav-link" style="${check('reports', 'winloss') ? '' : 'display:none'}" onclick="go('reports-winloss')"><i class="fa-solid fa-chart-line nav-icon"></i><span class="nav-label">WinLoss Report</span></div>
-                <div class="nav-link" style="${check('reports', 'agentDaily') ? '' : 'display:none'}" onclick="go('reports-agent-daily')"><i class="fa-solid fa-calendar-day nav-icon"></i><span class="nav-label">Agent Daily Report</span></div>
-                <div class="nav-link" style="${check('reports', 'limitCredit') ? '' : 'display:none'}" onclick="go('reports-limit-credit')"><i class="fa-solid fa-gauge nav-icon"></i><span class="nav-label">Limit Credit</span></div>
-                <div class="nav-link" style="${check('reports', 'lostMoney') ? '' : 'display:none'}" onclick="go('reports-lost-money')"><i class="fa-solid fa-money-bill-trend-up nav-icon"></i><span class="nav-label">Lost Money Report</span></div>
-                <div class="nav-link" style="${check('reports', 'togelLost') ? '' : 'display:none'}" onclick="go('reports-togel-lost')"><i class="fa-solid fa-dice-five nav-icon"></i><span class="nav-label">Togel Lost Money</span></div>
-                <div class="nav-link" style="${check('reports', 'topTurnover') ? '' : 'display:none'}" onclick="go('reports-top-turnover')"><i class="fa-solid fa-trophy nav-icon"></i><span class="nav-label">Top Turnover</span></div>
+                <div class="nav-link" style="${check('reports', 'winloss') ? '' : 'display:none'}" onclick="go('report-winloss')"><i class="fa-solid fa-chart-line nav-icon"></i><span class="nav-label">WinLoss Report</span></div>
+                <div class="nav-link" style="${check('reports', 'agentDaily') ? '' : 'display:none'}" onclick="go('report-agent-daily')"><i class="fa-solid fa-calendar-day nav-icon"></i><span class="nav-label">Agent Daily Report</span></div>
+                <div class="nav-link" style="${check('reports', 'limitCredit') ? '' : 'display:none'}" onclick="go('report-limit-credit')"><i class="fa-solid fa-gauge nav-icon"></i><span class="nav-label">Limit Credit</span></div>
+                <div class="nav-link" style="${check('reports', 'lostMoney') ? '' : 'display:none'}" onclick="go('report-lost-money')"><i class="fa-solid fa-money-bill-trend-up nav-icon"></i><span class="nav-label">Lost Money Report</span></div>
+                <div class="nav-link" style="${check('reports', 'togelLost') ? '' : 'display:none'}" onclick="go('report-togel-lost')"><i class="fa-solid fa-dice-five nav-icon"></i><span class="nav-label">Togel Lost Money</span></div>
+                <div class="nav-link" style="${check('reports', 'topTurnover') ? '' : 'display:none'}" onclick="go('report-top-turnover')"><i class="fa-solid fa-trophy nav-icon"></i><span class="nav-label">Top Turnover</span></div>
             </div>
         </div>`;
     }
@@ -674,7 +713,7 @@ export function renderSidebar() {
             <div class="nav-link" onclick="toggleMenu('invMenu', this)"><i class="fa-solid fa-file-invoice nav-icon"></i><span class="nav-label">Monthly Invoice</span><i class="fa-solid fa-chevron-right nav-arrow"></i></div>
             <div class="nav-submenu" id="invMenu">
                 <div class="nav-link" style="${check('invoice', 'monthly') ? '' : 'display:none'}" onclick="go('invoice-monthly')"><i class="fa-solid fa-calendar-check nav-icon"></i><span class="nav-label">Monthly Invoice</span></div>
-                <div class="nav-link" style="${check('invoice', 'fileManagement') ? '' : 'display:none'}" onclick="go('invoice-file')"><i class="fa-solid fa-folder-open nav-icon"></i><span class="nav-label">File Management</span></div>
+                <div class="nav-link" style="${check('invoice', 'fileManagement') ? '' : 'display:none'}" onclick="go('invoice-file-management')"><i class="fa-solid fa-folder-open nav-icon"></i><span class="nav-label">File Management</span></div>
                 <div class="nav-link" style="${check('invoice', 'tournamentWinners') ? '' : 'display:none'}" onclick="go('invoice-tournament')"><i class="fa-solid fa-medal nav-icon"></i><span class="nav-label">Tournament Winners</span></div>
             </div>
         </div>`;
@@ -695,8 +734,8 @@ export function renderSidebar() {
         </div>`;
     }
 
-    // 14. System Notifications (visible to SuperAdmin + Master)
-    if (isSuper || role === 'Master') {
+    // 14. System Notifications (visible to SuperAdmin + Whitelabel)
+    if (isSuper || role === 'Whitelabel') {
         html += `
         <div class="nav-item">
             <div class="nav-link" onclick="go('system-notifications')"><i class="fa-solid fa-bell-concierge nav-icon"></i><span class="nav-label">Notifications</span></div>
@@ -742,10 +781,10 @@ export function renderProfileDisplay() {
     // Update Header Badges
     const memoBadge = document.querySelector('.header-icon-btn[onclick*="memo-list"] .badge');
     const bellBadge = document.querySelector('.header-icon-btn[onclick*="showNotifications"] .badge');
-    if (memoBadge) memoBadge.textContent = (STATE.memos?.inbox?.filter(m=>!m.read)?.length || 0) || '';
+    if (memoBadge) memoBadge.textContent = (STATE.memos?.inbox?.filter(m => !m.read)?.length || 0) || '';
     // Notification count: unread systemNotifications + pending deposits + pending withdrawals
-    const unreadNotifs = (STATE.systemNotifications||[]).filter(n=>!n.read).length;
-    const pendingFinance = (STATE.deposits||[]).filter(d=>d.status==='Pending').length + (STATE.withdrawals||[]).filter(w=>w.status==='Pending').length;
+    const unreadNotifs = (STATE.systemNotifications || []).filter(n => !n.read).length;
+    const pendingFinance = (STATE.deposits || []).filter(d => d.status === 'Pending').length + (STATE.withdrawals || []).filter(w => w.status === 'Pending').length;
     const totalBell = unreadNotifs + pendingFinance;
     if (bellBadge) {
         bellBadge.textContent = totalBell > 0 ? String(Math.min(totalBell, 99)) : '';
@@ -762,22 +801,22 @@ export function showNotifications() {
         alerts.push({
             icon: n.type === 'maintenance' ? 'fa-wrench' : n.type === 'warning' ? 'fa-triangle-exclamation' : 'fa-bell',
             color: n.type === 'maintenance' ? 'var(--yellow)' : n.type === 'warning' ? 'var(--red)' : 'var(--acc)',
-            msg: `<strong>[${n.type?.toUpperCase()||'INFO'}]</strong> ${n.message || n.title}`,
-            time: n.createdAt ? new Date(n.createdAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : 'now',
+            msg: `<strong>[${n.type?.toUpperCase() || 'INFO'}]</strong> ${n.message || n.title}`,
+            time: n.createdAt ? new Date(n.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'now',
             id: n.id,
         });
     });
 
     // Pending deposits
-    const pendDep = (STATE.deposits||[]).filter(d=>d.status==='Pending');
+    const pendDep = (STATE.deposits || []).filter(d => d.status === 'Pending');
     if (pendDep.length > 0) {
-        alerts.push({ icon: 'fa-arrow-down-to-bracket', color: 'var(--green)', msg: `<strong>${pendDep.length} deposit pending</strong> — latest: ${fmtCur(pendDep[0]?.amount||0)} dari @${pendDep[0]?.member||'?'}`, time: pendDep[0]?.date?.slice(-8)||'now', id: null });
+        alerts.push({ icon: 'fa-arrow-down-to-bracket', color: 'var(--green)', msg: `<strong>${pendDep.length} deposit pending</strong> — latest: ${fmtCur(pendDep[0]?.amount || 0)} dari @${pendDep[0]?.member || '?'}`, time: pendDep[0]?.date?.slice(-8) || 'now', id: null });
     }
 
     // Pending withdrawals
-    const pendWd = (STATE.withdrawals||[]).filter(w=>w.status==='Pending');
+    const pendWd = (STATE.withdrawals || []).filter(w => w.status === 'Pending');
     if (pendWd.length > 0) {
-        alerts.push({ icon: 'fa-arrow-up-from-bracket', color: 'var(--yellow)', msg: `<strong>${pendWd.length} withdrawal pending</strong> — ${fmtCur(pendWd[0]?.amount||0)} dari @${pendWd[0]?.member||'?'}`, time: pendWd[0]?.date?.slice(-8)||'now', id: null });
+        alerts.push({ icon: 'fa-arrow-up-from-bracket', color: 'var(--yellow)', msg: `<strong>${pendWd.length} withdrawal pending</strong> — ${fmtCur(pendWd[0]?.amount || 0)} dari @${pendWd[0]?.member || '?'}`, time: pendWd[0]?.date?.slice(-8) || 'now', id: null });
     }
 
     if (alerts.length === 0) {
@@ -786,7 +825,7 @@ export function showNotifications() {
 
     const body = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-            <span style="font-size:.75rem;color:var(--text3)">${alerts.length} notification${alerts.length!==1?'s':''}</span>
+            <span style="font-size:.75rem;color:var(--text3)">${alerts.length} notification${alerts.length !== 1 ? 's' : ''}</span>
             <div style="display:flex;gap:.5rem">
                 <button class="btn btn-xs btn-secondary" onclick="window.go('deposit-list');closeModalBtn()"><i class="fa-solid fa-arrow-down-to-bracket"></i> Deposits</button>
                 <button class="btn btn-xs btn-secondary" onclick="closeModalBtn();setTimeout(()=>window.openBroadcastNotifModal&&window.openBroadcastNotifModal(),120)"><i class="fa-solid fa-bullhorn"></i> Broadcast</button>
@@ -816,12 +855,12 @@ window.showNotifications = showNotifications;
 
 // ── Notification helpers (Feature #15) ──
 window.markNotifRead = (id) => {
-    const n = (STATE.systemNotifications||[]).find(x=>x.id===id);
+    const n = (STATE.systemNotifications || []).find(x => x.id === id);
     if (n) { n.read = true; saveState(); }
 };
 
 window.markAllNotifsRead = () => {
-    (STATE.systemNotifications||[]).forEach(n => { n.read = true; });
+    (STATE.systemNotifications || []).forEach(n => { n.read = true; });
     saveState();
     renderProfileDisplay();
 };

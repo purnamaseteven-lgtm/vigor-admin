@@ -12,5 +12,6 @@ export const WIDGET_DEFS = [
     { id: 'vip-progress', name: 'VIP Progress Bar', cat: 'Interaction', icon: 'fa-crown', color: '#facc15', bg: 'rgba(250,204,21,0.1)' },
     { id: 'login-form', name: 'Login Form', cat: 'Interaction', icon: 'fa-right-to-bracket', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
     { id: 'social-icons', name: 'Social Connect', cat: 'Info', icon: 'fa-share-nodes', color: '#ec4899', bg: 'rgba(236,72,153,0.1)' },
-    { id: 'promotion-list', name: 'Promotion List', cat: 'Banner', icon: 'fa-bullhorn', color: '#ff6b6b', bg: 'rgba(255,107,107,0.1)' }
+    { id: 'promotion-list', name: 'Promotion List', cat: 'Banner', icon: 'fa-bullhorn', color: '#ff6b6b', bg: 'rgba(255,107,107,0.1)' },
+    { id: 'system-feed', name: 'Live System Feed', cat: 'Info', icon: 'fa-terminal', color: '#10b981', bg: 'rgba(16,185,129,0.1)' }
 ];

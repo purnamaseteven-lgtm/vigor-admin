@@ -1,5 +1,5 @@
 /* CUSTOMIZATION PAGES */
-import { STATE, stateAdd, stateDelete, saveState, applyTheme } from '../core/state.js';
+import { STATE, stateAdd, stateDelete, saveState, applyTheme, fmt, fmtCur } from '../core/state.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, toast, openModal, closeModalBtn, closeModal, confirmAction } from '../ui/components.js';
 import { WIDGET_DEFS, WIDGET_CATS } from '../widgets/definitions.js';
@@ -32,7 +32,7 @@ ensureCustomizationState();
 
 // --- SITE CONFIG ---
 // --- SITE CONFIG (Overhauled with Tabs) ---
-pages['custom-site-config'] = () => {
+pages['site-config'] = () => {
     const activeTab = window._scActiveTab || 'favicon';
 
     return `
@@ -114,7 +114,7 @@ function renderConfigTab(tab) {
 }
 
 // --- THEME PRESETS (legacy quick-pick) ---
-pages['custom-theme-presets'] = () => {
+pages['theme-presets'] = () => {
     const t = STATE.theme;
     const presets = [
         { id: 'midnight', name: 'Midnight Blue', primary: '#0ea5e9', accent: '#8b5cf6', radius: '10px', font: 'Segoe UI' },
@@ -231,7 +231,7 @@ window.applyPreset = (id) => {
 };
 
 // --- VIP DESIGNER ---
-pages['custom-vip'] = () => {
+pages['vip-designer'] = () => {
     const calcMethod = STATE.settings?.vipCalcMethod || 'turnover';
     const crmSync = STATE.settings?.vipCrmSync !== false;
     const methodLabel = calcMethod === 'turnover' ? 'Min Turnover (TO)' : 'Min Deposit (Kumulatif)';
@@ -243,17 +243,18 @@ pages['custom-vip'] = () => {
     STATE.vipTiers.forEach(t => { memberVipCounts[t.id] = 0; });
     members.forEach(m => {
         const val = calcMethod === 'turnover'
-            ? (STATE.lotteryBets||[]).filter(b=>b.member===m.username).reduce((s,b)=>s+(b.betAmount||0),0)
-              + (STATE.seamless?.transactions||[]).filter(t=>t.player===m.username).reduce((s,t)=>s+(t.betAmount||0),0)
-            : (STATE.deposits||[]).filter(d=>d.member===m.username&&d.status==='Approved').reduce((s,d)=>s+(d.amount||0),0);
-        const tier = [...STATE.vipTiers].reverse().find(t => val >= (t[methodField]||t.turnover||0));
-        if (tier) memberVipCounts[tier.id] = (memberVipCounts[tier.id]||0) + 1;
+            ? (STATE.lotteryBets || []).filter(b => b.member === m.username).reduce((s, b) => s + (b.betAmount || 0), 0)
+            + (STATE.seamless?.transactions || []).filter(t => t.player === m.username).reduce((s, t) => s + (t.betAmount || 0), 0)
+            : (STATE.deposits || []).filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + (d.amount || 0), 0);
+        const tier = [...STATE.vipTiers].reverse().find(t => val >= (t[methodField] || t.turnover || 0));
+        if (tier) memberVipCounts[tier.id] = (memberVipCounts[tier.id] || 0) + 1;
     });
 
     return `
     ${pageHeader('VIP Tier Designer', '<span>Management</span><span class="sep">›</span><span>VIP Tiers</span>', `
         <div style="display:flex;gap:.5rem;align-items:center">
             <button class="btn btn-primary btn-sm" onclick="window.openAddVIPTier()"><i class="fa-solid fa-plus"></i> Add Tier</button>
+            <button class="btn btn-success btn-sm" onclick="window.evaluateAllMemberTiers()"><i class="fa-solid fa-gears"></i> Run Evaluation</button>
             <button class="btn btn-secondary btn-sm" onclick="go('rebate-calc')"><i class="fa-solid fa-calculator"></i> Rebate Calc</button>
         </div>`)}
 
@@ -263,25 +264,25 @@ pages['custom-vip'] = () => {
             <div>
                 <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">Metode Kalkulasi VIP</div>
                 <div style="display:flex;gap:.5rem">
-                    <button class="btn btn-sm ${calcMethod==='turnover'?'btn-primary':'btn-secondary'}" onclick="window.setVipCalcMethod('turnover')"><i class="fa-solid fa-rotate"></i> Turnover (TO)</button>
-                    <button class="btn btn-sm ${calcMethod==='deposit'?'btn-primary':'btn-secondary'}" onclick="window.setVipCalcMethod('deposit')"><i class="fa-solid fa-arrow-down-to-bracket"></i> Total Deposit</button>
+                    <button class="btn btn-sm ${calcMethod === 'turnover' ? 'btn-primary' : 'btn-secondary'}" onclick="window.setVipCalcMethod('turnover')"><i class="fa-solid fa-rotate"></i> Turnover (TO)</button>
+                    <button class="btn btn-sm ${calcMethod === 'deposit' ? 'btn-primary' : 'btn-secondary'}" onclick="window.setVipCalcMethod('deposit')"><i class="fa-solid fa-arrow-down-to-bracket"></i> Total Deposit</button>
                 </div>
             </div>
             <div style="border-left:1px solid var(--border);padding-left:2rem">
                 <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">CRM Segment Auto-Sync</div>
                 <label class="toggle" style="transform:scale(.9)">
-                    <input type="checkbox" ${crmSync?'checked':''} onchange="window.setVipCrmSync(this.checked)"/>
+                    <input type="checkbox" ${crmSync ? 'checked' : ''} onchange="window.setVipCrmSync(this.checked)"/>
                     <div class="toggle-slider"></div>
                 </label>
-                <span style="font-size:.78rem;color:var(--text2);margin-left:.5rem">${crmSync?'On — VIP tiers create CRM segments automatically':'Off'}</span>
+                <span style="font-size:.78rem;color:var(--text2);margin-left:.5rem">${crmSync ? 'On — VIP tiers create CRM segments automatically' : 'Off'}</span>
             </div>
             <div style="border-left:1px solid var(--border);padding-left:2rem;flex:1">
                 <div style="font-size:.75rem;color:var(--text3);margin-bottom:.5rem">Member Distribution</div>
                 <div style="display:flex;gap:.75rem;flex-wrap:wrap">
-                    ${STATE.vipTiers.map(t=>`
+                    ${STATE.vipTiers.map(t => `
                         <div style="display:flex;align-items:center;gap:.3rem">
                             <div style="width:10px;height:10px;border-radius:50%;background:${t.color}"></div>
-                            <span style="font-size:.72rem;color:var(--text2)">${t.name}: <strong>${memberVipCounts[t.id]||0}</strong></span>
+                            <span style="font-size:.72rem;color:var(--text2)">${t.name}: <strong>${memberVipCounts[t.id] || 0}</strong></span>
                         </div>`).join('')}
                 </div>
             </div>
@@ -289,37 +290,47 @@ pages['custom-vip'] = () => {
     </div>
 
     <div class="card">
-        <div class="card-header"><span class="card-title">VIP Tier Hierarchy</span><span style="margin-left:.5rem;font-size:.72rem;color:var(--text3)">Kalkulasi berdasarkan: <strong>${calcMethod==='turnover'?'Total Turnover':'Total Deposit'}</strong></span></div>
+        <div class="card-header"><span class="card-title">VIP Tier Hierarchy</span><span style="margin-left:.5rem;font-size:.72rem;color:var(--text3)">Kalkulasi berdasarkan: <strong>${calcMethod === 'turnover' ? 'Total Turnover' : 'Total Deposit'}</strong></span></div>
         <div class="card-body">
             ${tableWrap(`
                 <table>
                     <thead>
                         <tr>
-                            <th>Level</th><th>Name</th><th>${methodLabel}</th><th>Rebate (%)</th><th>Referral (%)</th><th>Members</th>${crmSync?'<th>CRM Segment</th>':''}
+                            <th>Level</th><th>Name</th><th>${methodLabel}</th>
+                            <th>Rebate</th><th>Referral</th><th>Cashback</th>
+                            <th>Wd Limit</th><th>Birthday Bonus</th><th>Freebet</th>
+                            <th>Priority</th><th>Members</th>
+                            ${crmSync ? '<th>CRM Seg</th>' : ''}
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${STATE.vipTiers.map((t, idx) => {
-                            const thresholdVal = t[methodField] || t.turnover || 0;
-                            const crmSeg = (STATE.crm?.segments||[]).find(s=>s.name?.toLowerCase().includes(t.name.toLowerCase()));
-                            return `
+        const thresholdVal = t[methodField] || t.turnover || 0;
+        const crmSeg = (STATE.crm?.segments || []).find(s => s.name?.toLowerCase().includes(t.name.toLowerCase()));
+        const wdLimitStr = t.withdrawLimit ? (t.withdrawLimit >= 1000000 ? (t.withdrawLimit / 1000000).toFixed(0) + 'M' : (t.withdrawLimit / 1000).toFixed(0) + 'K') : '-';
+        return `
                             <tr>
                                 <td>
                                   <div style="display:flex;align-items:center;gap:.5rem">
                                     <div style="width:24px;height:24px;border-radius:50%;background:${t.color};box-shadow:0 0 8px ${t.color}66"></div>
-                                    <span style="font-size:.7rem;color:var(--text3)">L${idx+1}</span>
+                                    <span style="font-size:.7rem;color:var(--text3)">L${idx + 1}</span>
                                   </div>
                                 </td>
                                 <td><strong style="color:${t.color}">${t.name}</strong></td>
-                                <td>${thresholdVal === 0 ? '<span style="color:var(--text3)">Start</span>' : (thresholdVal/1000000).toFixed(0)+'M'}</td>
+                                <td>${thresholdVal === 0 ? '<span style="color:var(--text3)">Start</span>' : (thresholdVal >= 1000000000 ? (thresholdVal / 1000000000).toFixed(1) + 'B' : (thresholdVal / 1000000).toFixed(0) + 'M')}</td>
                                 <td><span class="badge badge-success">${t.rebate}%</span></td>
                                 <td><span class="badge badge-primary">${t.referral}%</span></td>
-                                <td><span style="font-weight:700">${memberVipCounts[t.id]||0}</span> <span style="font-size:.7rem;color:var(--text3)">members</span></td>
-                                ${crmSync?`<td>${crmSeg?`<span class="badge badge-secondary" style="font-size:.65rem">${crmSeg.name}</span>`:'<button class="btn btn-xs btn-secondary" onclick="window.createVipCrmSegment(\''+t.id+'\')" style="font-size:.65rem">Create Segment</button>'}</td>`:''}
+                                <td>${t.cashbackPct ? `<span class="badge badge-warning">${t.cashbackPct}%</span>` : '<span style="color:var(--text3)">-</span>'}</td>
+                                <td style="font-size:.75rem">${wdLimitStr}</td>
+                                <td style="font-size:.75rem">${t.birthdayBonus ? fmtCur(t.birthdayBonus) : '<span style="color:var(--text3)">-</span>'}</td>
+                                <td style="font-size:.75rem">${t.freebet ? fmtCur(t.freebet) : '<span style="color:var(--text3)">-</span>'}</td>
+                                <td>${t.prioritySupport ? '<span class="badge badge-success" style="font-size:.6rem">✓ VIP</span>' : '<span style="color:var(--text3);font-size:.7rem">-</span>'}</td>
+                                <td><span style="font-weight:700">${memberVipCounts[t.id] || 0}</span> <span style="font-size:.7rem;color:var(--text3)">mbr</span></td>
+                                ${crmSync ? `<td>${crmSeg ? `<span class="badge badge-secondary" style="font-size:.65rem">${crmSeg.name}</span>` : '<button class="btn btn-xs btn-secondary" onclick="window.createVipCrmSegment(\'' + t.id + '\')" style="font-size:.65rem">Create</button>'}</td>` : ''}
                                 <td>${actionBtns(`window.editVIP('${t.id}')`, `window.deleteVIP('${t.id}')`)}</td>
                             </tr>`;
-                        }).join('')}
+    }).join('')}
                     </tbody>
                 </table>
             `)}
@@ -364,39 +375,101 @@ window.createVipCrmSegment = (tierId) => {
     toast(`CRM segment created: VIP ${tier.name}`, 'success');
 };
 
-window.openAddVIPTier = () => {
-    openModal('Add VIP Tier', `
-        <div class="form-grid">
-            <div class="form-field"><label>Tier Name</label><input id="vt_name" placeholder="e.g. Emerald"/></div>
-            <div class="form-field"><label>Color</label><input id="vt_color" type="color" value="#22c55e" style="height:40px;width:100%"/></div>
-            <div class="form-field"><label>Min Turnover (Rp)</label><input id="vt_to" type="number" value="0" min="0"/></div>
-            <div class="form-field"><label>Min Deposit (Rp)</label><input id="vt_dep" type="number" value="0" min="0"/></div>
-            <div class="form-field"><label>Rebate (%)</label><input id="vt_rebate" type="number" step="0.1" value="0.5" min="0" max="10"/></div>
-            <div class="form-field"><label>Referral (%)</label><input id="vt_referral" type="number" step="0.1" value="0.2" min="0" max="10"/></div>
-        </div>`,
-        `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
-         <button class="btn btn-primary" onclick="window.saveNewVIPTier()">Add Tier</button>`);
-};
+function _vipTierFormHtml(t = {}) {
+    return `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+            <div class="form-field"><label>Tier Name</label><input id="vt_name" placeholder="e.g. Emerald" value="${t.name || ''}"/></div>
+            <div class="form-field"><label>Color</label><input id="vt_color" type="color" value="${t.color || '#22c55e'}" style="height:40px;width:100%"/></div>
+            <div class="form-field"><label>Min Turnover (Rp)</label><input id="vt_to" type="number" value="${t.turnover || 0}" min="0"/></div>
+            <div class="form-field"><label>Min Deposit Kumulatif (Rp)</label><input id="vt_dep" type="number" value="${t.minDeposit || 0}" min="0"/></div>
+            <div class="form-field"><label>Rebate (%)</label><input id="vt_rebate" type="number" step="0.1" value="${t.rebate || 0.5}" min="0" max="10"/></div>
+            <div class="form-field"><label>Referral (%)</label><input id="vt_referral" type="number" step="0.1" value="${t.referral || 0.2}" min="0" max="10"/></div>
+        </div>
+        <div style="font-size:.8rem;font-weight:700;color:var(--text2);margin:1rem 0 .5rem;padding-top:.75rem;border-top:1px solid var(--border)">
+            <i class="fa-solid fa-star" style="color:var(--yellow)"></i> Benefits & Rewards
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem">
+            <div class="form-field"><label>Cashback (%)</label><input id="vt_cashback" type="number" step="0.5" value="${t.cashbackPct || 0}" min="0" max="20"/></div>
+            <div class="form-field"><label>Max Withdraw / Txn (Rp)</label><input id="vt_wdlimit" type="number" value="${t.withdrawLimit || 5000000}" min="0"/></div>
+            <div class="form-field"><label>Max Bonus (Rp)</label><input id="vt_maxbonus" type="number" value="${t.maxBonus || 0}" min="0"/></div>
+            <div class="form-field"><label>Bonus Deposit (%)</label><input id="vt_depbonus" type="number" step="0.5" value="${t.depositBonus || 0}" min="0" max="20"/></div>
+            <div class="form-field"><label>Birthday Bonus (Rp)</label><input id="vt_bday" type="number" value="${t.birthdayBonus || 0}" min="0"/></div>
+            <div class="form-field"><label>Freebet (Rp)</label><input id="vt_freebet" type="number" value="${t.freebet || 0}" min="0"/></div>
+        </div>
+        <div style="margin-top:.75rem;display:flex;align-items:center;gap:.75rem">
+            <label style="font-size:.8rem;color:var(--text2);font-weight:600">Priority Support</label>
+            <label class="toggle" style="transform:scale(.85)">
+                <input type="checkbox" id="vt_priority" ${t.prioritySupport ? 'checked' : ''}/>
+                <div class="toggle-slider"></div>
+            </label>
+        </div>`;
+}
 
-window.saveNewVIPTier = () => {
-    const name = document.getElementById('vt_name')?.value?.trim();
-    if (!name) { toast('Tier name required', 'error'); return; }
-    const tier = {
-        id: 'VIP' + (STATE.vipTiers.length + 1),
-        name,
+function _readVipTierForm() {
+    return {
+        name: document.getElementById('vt_name')?.value?.trim(),
         color: document.getElementById('vt_color')?.value || '#22c55e',
         turnover: parseInt(document.getElementById('vt_to')?.value || '0', 10),
         minDeposit: parseInt(document.getElementById('vt_dep')?.value || '0', 10),
         rebate: parseFloat(document.getElementById('vt_rebate')?.value || '0'),
         referral: parseFloat(document.getElementById('vt_referral')?.value || '0'),
+        cashbackPct: parseFloat(document.getElementById('vt_cashback')?.value || '0'),
+        withdrawLimit: parseInt(document.getElementById('vt_wdlimit')?.value || '0', 10),
+        maxBonus: parseInt(document.getElementById('vt_maxbonus')?.value || '0', 10),
+        depositBonus: parseFloat(document.getElementById('vt_depbonus')?.value || '0'),
+        birthdayBonus: parseInt(document.getElementById('vt_bday')?.value || '0', 10),
+        freebet: parseInt(document.getElementById('vt_freebet')?.value || '0', 10),
+        prioritySupport: document.getElementById('vt_priority')?.checked || false,
     };
+}
+
+window.openAddVIPTier = () => {
+    openModal('Add VIP Tier', _vipTierFormHtml(),
+        `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+         <button class="btn btn-primary" onclick="window.saveNewVIPTier()"><i class="fa-solid fa-plus"></i> Add Tier</button>`);
+};
+
+window.saveNewVIPTier = () => {
+    const data = _readVipTierForm();
+    if (!data.name) { toast('Tier name required', 'error'); return; }
+    const tier = { id: 'VIP' + (STATE.vipTiers.length + 1), ...data };
     STATE.vipTiers.push(tier);
     saveState();
     closeModalBtn(); go('custom-vip'); toast('VIP tier added', 'success');
 };
 
+window.editVIP = (tierId) => {
+    const t = STATE.vipTiers.find(v => v.id === tierId);
+    if (!t) return;
+    openModal(`Edit VIP — ${t.name}`, _vipTierFormHtml(t),
+        `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
+         <button class="btn btn-primary" onclick="window.saveEditVIPTier('${tierId}')"><i class="fa-solid fa-floppy-disk"></i> Save</button>`);
+};
+
+window.saveEditVIPTier = (tierId) => {
+    const idx = STATE.vipTiers.findIndex(v => v.id === tierId);
+    if (idx === -1) return;
+    const data = _readVipTierForm();
+    if (!data.name) { toast('Tier name required', 'error'); return; }
+    STATE.vipTiers[idx] = { ...STATE.vipTiers[idx], ...data };
+    saveState();
+    closeModalBtn(); go('custom-vip'); toast(`VIP tier "${data.name}" updated`, 'success');
+};
+
+window.deleteVIP = (tierId) => {
+    const t = STATE.vipTiers.find(v => v.id === tierId);
+    if (!t) return;
+    if (STATE.vipTiers.length <= 1) { toast('Must have at least one VIP tier', 'error'); return; }
+    confirmAction('Delete VIP Tier', `Delete <strong>${t.name}</strong> tier? Members in this tier will be reassigned on next evaluation.`, () => {
+        STATE.vipTiers = STATE.vipTiers.filter(v => v.id !== tierId);
+        saveState();
+        go('custom-vip');
+        toast(`Tier "${t.name}" deleted`, 'success');
+    }, 'Delete', 'danger');
+};
+
 // --- SEO SETTINGS ---
-pages['custom-seo'] = () => {
+pages['seo-tools'] = () => {
     const s = STATE.seo;
     const activeTab = window._seoActiveTab || 'general';
 
@@ -557,7 +630,7 @@ pages['custom-seo'] = () => {
                         <label class="form-label">OG Image URL</label>
                         <div style="display:flex;gap:.5rem">
                             <input class="form-control" value="${s.ogImage}" onchange="window.updateSEO('ogImage', this.value)" style="border-radius:12px" />
-                            <button class="btn btn-secondary" onclick="toast('Image library coming soon','info')"><i class="fa-solid fa-image"></i></button>
+                            <button class="btn btn-secondary" onclick="window.openSeoImageLibrary()"><i class="fa-solid fa-image"></i></button>
                         </div>
                     </div>
                 </div>
@@ -770,6 +843,34 @@ window.runKeywordAnalysis = () => {
     }, 2500);
 };
 
+window.openSeoImageLibrary = () => {
+    const templates = [
+        '/img/templates/template1.png',
+        '/img/templates/sports.png',
+        '/img/templates/crypto.png',
+        '/img/templates/esports.png',
+        '/img/templates/lottery.png',
+        '/img/templates/mobile.png',
+    ];
+    openModal('Select OG Image', `
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem;max-height:420px;overflow:auto">
+            ${templates.map(src => `
+                <button class="btn btn-secondary" style="padding:.35rem;background:var(--bg2);border:1px solid var(--border)" onclick="window.selectSeoImage('${src}')">
+                    <img src="${src}" alt="template" style="width:100%;height:110px;object-fit:cover;border-radius:8px" />
+                    <div style="font-size:.72rem;margin-top:.35rem;overflow:hidden;text-overflow:ellipsis">${src}</div>
+                </button>
+            `).join('')}
+        </div>
+    `, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`);
+};
+
+window.selectSeoImage = (src) => {
+    window.updateSEO('ogImage', src);
+    closeModalBtn();
+    go('custom-seo');
+    toast('OG image selected', 'success');
+};
+
 window.updateSEO = (key, val) => {
     STATE.seo[key] = val;
     saveState();
@@ -931,7 +1032,7 @@ window.handlePromoFile = (input, targetId) => {
 };
 
 // --- PROMOTIONS ---
-pages['custom-promotion-list'] = () => `
+pages['promotions'] = () => `
   ${pageHeader('Promotion List', '<span>Customization</span><span class="sep">›</span><span>Promotions</span>', `<button class="btn btn-primary" onclick="window.openPromotionForm()"><i class="fa-solid fa-plus"></i> Add Promo</button>`)}
   <div class="card">
     <div class="card-body">
@@ -1704,12 +1805,12 @@ function renderTemplateMockup(id, data) {
 }
 
 // Global Banner Page
-pages['custom-global-banner'] = () => {
+pages['global-banner'] = () => {
     ensureBannerLayoutState();
     if (!Array.isArray(STATE.popupBanners)) STATE.popupBanners = [];
     const banners = STATE.popupBanners;
     const TRIGGER_OPTS = ['On Login', 'On Deposit Success', 'On First Visit', 'Timed (Every X Hours)', 'Manual'];
-    const TARGET_OPTS  = ['All Players', 'New Members Only', 'VIP Members', 'By Company', 'By Agent'];
+    const TARGET_OPTS = ['All Players', 'New Members Only', 'VIP Members', 'By Company', 'By Agent'];
 
     return `
     ${pageHeader('Global Banner & Popup Manager', '<span>Customization</span><span class="sep">›</span><span>Global Banner</span>', `
@@ -1717,7 +1818,7 @@ pages['custom-global-banner'] = () => {
 
     <!-- Section tabs -->
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem">
-        ${BANNER_SECTIONS.map((s, i) => `<button class="btn btn-sm ${i===0?'btn-primary':'btn-secondary'}" onclick="window.selectBannerSection('${s}', this)">${s}</button>`).join('')}
+        ${BANNER_SECTIONS.map((s, i) => `<button class="btn btn-sm ${i === 0 ? 'btn-primary' : 'btn-secondary'}" onclick="window.selectBannerSection('${s}', this)">${s}</button>`).join('')}
         <button class="btn btn-sm btn-secondary" style="margin-left:auto;border-color:var(--purple);color:var(--purple)" onclick="window.openPopupBannerModal()"><i class="fa-solid fa-window-restore"></i> Popup Banners (${banners.length})</button>
     </div>
 
@@ -1725,7 +1826,7 @@ pages['custom-global-banner'] = () => {
     <div class="card" style="margin-bottom:1.25rem">
         <div class="card-header">
             <span class="card-title"><i class="fa-solid fa-window-restore" style="color:var(--purple);margin-right:.5rem"></i>Popup Banner List</span>
-            <span style="margin-left:auto;font-size:.75rem;color:var(--text3)">${banners.filter(b=>b.active).length} active</span>
+            <span style="margin-left:auto;font-size:.75rem;color:var(--text3)">${banners.filter(b => b.active).length} active</span>
         </div>
         <div class="card-body" style="padding:0">
             ${tableWrap(`
@@ -1733,7 +1834,7 @@ pages['custom-global-banner'] = () => {
                     <thead><tr><th>Title</th><th>Trigger</th><th>Target</th><th>Priority</th><th>Start</th><th>End</th><th>Status</th><th>Action</th></tr></thead>
                     <tbody>
                         ${banners.length === 0 ? '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:2rem">No popup banners. Click + Add to create one.</td></tr>' :
-                          banners.map(b => `
+            banners.map(b => `
                             <tr>
                                 <td>
                                   <div style="display:flex;align-items:center;gap:.5rem">
@@ -1771,10 +1872,10 @@ pages['custom-global-banner'] = () => {
         <div class="card-header"><span class="card-title" id="sectionBannerTitle">Homepage Section Banners</span></div>
         <div class="card-body">
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem" id="sectionBannerGrid">
-                ${BANNER_SECTIONS.slice(0,6).map((s,i) => `
+                ${BANNER_SECTIONS.slice(0, 6).map((s, i) => `
                     <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer" onclick="window.selectBannerSection('${s}', null)">
                         <div style="height:70px;background:linear-gradient(135deg,var(--acc)22,var(--bg2));display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--text2)">${s}</div>
-                        <div style="padding:.5rem .75rem;font-size:.7rem;color:var(--text3);border-top:1px solid var(--border)">${Math.floor(Math.random()*3)} banner(s)</div>
+                        <div style="padding:.5rem .75rem;font-size:.7rem;color:var(--text3);border-top:1px solid var(--border)">${Math.floor(Math.random() * 3)} banner(s)</div>
                     </div>`).join('')}
             </div>
         </div>
@@ -1786,24 +1887,24 @@ window.openPopupBannerModal = (id = null) => {
     if (!Array.isArray(STATE.popupBanners)) STATE.popupBanners = [];
     const b = id ? STATE.popupBanners.find(x => x.id === id) : null;
     const TRIGGER_OPTS = ['On Login', 'On Deposit Success', 'On First Visit', 'Timed (Every X Hours)', 'Manual'];
-    const TARGET_OPTS  = ['All Players', 'New Members Only', 'VIP Members', 'By Company', 'By Agent'];
+    const TARGET_OPTS = ['All Players', 'New Members Only', 'VIP Members', 'By Company', 'By Agent'];
     openModal(b ? 'Edit Popup Banner' : 'Add Popup Banner', `
         <div class="form-grid">
-            <div class="form-field" style="grid-column:1/-1"><label>Title</label><input id="pb_title" value="${b?.title||''}" placeholder="e.g. Welcome Bonus Popup"/></div>
-            <div class="form-field" style="grid-column:1/-1"><label>Image URL</label><input id="pb_image" value="${b?.imageUrl||''}" placeholder="https://cdn.example.com/popup.jpg" oninput="document.getElementById('pb_img_prev').src=this.value"/></div>
-            <div class="form-field" style="grid-column:1/-1;text-align:center"><img id="pb_img_prev" src="${b?.imageUrl||''}" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid var(--border);${b?.imageUrl?'':'display:none'}" onerror="this.style.display='none'" onload="this.style.display='block'"/></div>
-            <div class="form-field"><label>Link URL</label><input id="pb_link" value="${b?.linkUrl||''}" placeholder="https://... or /promo"/></div>
-            <div class="form-field"><label>Button Text</label><input id="pb_btn" value="${b?.buttonText||'Claim Now'}" /></div>
-            <div class="form-field"><label>Trigger</label><select id="pb_trigger">${TRIGGER_OPTS.map(o=>`<option ${b?.trigger===o?'selected':''}>${o}</option>`).join('')}</select></div>
-            <div class="form-field"><label>Target Audience</label><select id="pb_target">${TARGET_OPTS.map(o=>`<option ${b?.target===o?'selected':''}>${o}</option>`).join('')}</select></div>
-            <div class="form-field"><label>Company Filter (blank = all)</label><input id="pb_company" value="${b?.company||''}" placeholder="Leave blank for all"/></div>
-            <div class="form-field"><label>Priority (1=highest)</label><input id="pb_priority" type="number" min="1" max="99" value="${b?.priority||1}"/></div>
-            <div class="form-field"><label>Start Date</label><input id="pb_start" type="date" value="${b?.startDate||''}"/></div>
-            <div class="form-field"><label>End Date</label><input id="pb_end" type="date" value="${b?.endDate||''}"/></div>
-            <div class="form-field"><label>Show Close Button</label><select id="pb_closeable"><option ${b?.closeable!==false?'selected':''}>Yes</option><option ${b?.closeable===false?'selected':''}>No</option></select></div>
+            <div class="form-field" style="grid-column:1/-1"><label>Title</label><input id="pb_title" value="${b?.title || ''}" placeholder="e.g. Welcome Bonus Popup"/></div>
+            <div class="form-field" style="grid-column:1/-1"><label>Image URL</label><input id="pb_image" value="${b?.imageUrl || ''}" placeholder="https://cdn.example.com/popup.jpg" oninput="document.getElementById('pb_img_prev').src=this.value"/></div>
+            <div class="form-field" style="grid-column:1/-1;text-align:center"><img id="pb_img_prev" src="${b?.imageUrl || ''}" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid var(--border);${b?.imageUrl ? '' : 'display:none'}" onerror="this.style.display='none'" onload="this.style.display='block'"/></div>
+            <div class="form-field"><label>Link URL</label><input id="pb_link" value="${b?.linkUrl || ''}" placeholder="https://... or /promo"/></div>
+            <div class="form-field"><label>Button Text</label><input id="pb_btn" value="${b?.buttonText || 'Claim Now'}" /></div>
+            <div class="form-field"><label>Trigger</label><select id="pb_trigger">${TRIGGER_OPTS.map(o => `<option ${b?.trigger === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+            <div class="form-field"><label>Target Audience</label><select id="pb_target">${TARGET_OPTS.map(o => `<option ${b?.target === o ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
+            <div class="form-field"><label>Company Filter (blank = all)</label><input id="pb_company" value="${b?.company || ''}" placeholder="Leave blank for all"/></div>
+            <div class="form-field"><label>Priority (1=highest)</label><input id="pb_priority" type="number" min="1" max="99" value="${b?.priority || 1}"/></div>
+            <div class="form-field"><label>Start Date</label><input id="pb_start" type="date" value="${b?.startDate || ''}"/></div>
+            <div class="form-field"><label>End Date</label><input id="pb_end" type="date" value="${b?.endDate || ''}"/></div>
+            <div class="form-field"><label>Show Close Button</label><select id="pb_closeable"><option ${b?.closeable !== false ? 'selected' : ''}>Yes</option><option ${b?.closeable === false ? 'selected' : ''}>No</option></select></div>
         </div>`,
         `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
-         <button class="btn btn-primary" onclick="window.savePopupBanner('${b?.id||''}')"><i class="fa-solid fa-check"></i> Save</button>`
+         <button class="btn btn-primary" onclick="window.savePopupBanner('${b?.id || ''}')"><i class="fa-solid fa-check"></i> Save</button>`
     );
 };
 
@@ -1839,17 +1940,17 @@ window.savePopupBanner = (id) => {
 };
 
 window.togglePopupBanner = (id, val) => {
-    const b = (STATE.popupBanners||[]).find(x=>x.id===id);
+    const b = (STATE.popupBanners || []).find(x => x.id === id);
     if (b) { b.active = val; saveState(); }
 };
 
 window.deletePopupBanner = (id) => {
-    STATE.popupBanners = (STATE.popupBanners||[]).filter(x=>x.id!==id);
+    STATE.popupBanners = (STATE.popupBanners || []).filter(x => x.id !== id);
     saveState(); go('custom-global-banner'); toast('Deleted', 'success');
 };
 
 window.previewPopupBanner = (id) => {
-    const b = (STATE.popupBanners||[]).find(x=>x.id===id);
+    const b = (STATE.popupBanners || []).find(x => x.id === id);
     if (!b) return;
     openModal('Preview: ' + b.title, `
         <div style="background:#0f172a;border-radius:16px;overflow:hidden;max-width:400px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,.5)">
@@ -1857,7 +1958,7 @@ window.previewPopupBanner = (id) => {
             <div style="padding:1.5rem;text-align:center">
                 <div style="font-size:1.2rem;font-weight:800;margin-bottom:.75rem;color:#fff">${b.title}</div>
                 ${b.linkUrl ? `<a href="${b.linkUrl}" style="display:inline-block;background:var(--acc);color:#fff;border-radius:10px;padding:.6rem 2rem;font-weight:700;text-decoration:none">${b.buttonText}</a>` : ''}
-                ${b.closeable!==false ? '<div style="font-size:.7rem;color:rgba(255,255,255,.3);margin-top:.75rem;cursor:pointer">✕ Close</div>' : ''}
+                ${b.closeable !== false ? '<div style="font-size:.7rem;color:rgba(255,255,255,.3);margin-top:.75rem;cursor:pointer">✕ Close</div>' : ''}
             </div>
         </div>`, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button>`);
 };
@@ -1870,7 +1971,7 @@ window.selectBannerSection = (section, btn) => {
     toast('Section: ' + section, 'info');
 };
 // ─── BRANDING & THEME (LIVE PREVIEW) ───
-pages['custom-theme'] = () => {
+pages['system-theme'] = () => {
     const config = STATE.siteConfig || {};
     const primary = config.primaryColor || '#0ea5e9';
     const secondary = config.secondaryColor || '#0f172a';
@@ -2005,7 +2106,7 @@ window.updateLiveTheme = (key, val) => {
 // ─────────────────────────────────────────────
 //  ANNOUNCEMENT LIST + CRUD
 // ─────────────────────────────────────────────
-pages['announcement-list'] = () => {
+pages['announcements'] = () => {
     const PG = 'announcement-list';
     const anns = STATE.announcements || [];
     const filtered = filterData(anns, PG);
@@ -2050,9 +2151,9 @@ pages['announcement-list'] = () => {
                         </td>
                         <td style="font-size:.75rem;color:var(--text3)">${a.company || '<span style="opacity:.5">Global</span>'}</td>
                         <td>${actionBtns(
-                            `window.openAnnouncementForm('${a.id}')`,
-                            `confirmAction('Delete Announcement','Delete this announcement? Cannot be undone.',()=>window.deleteAnnouncement('${a.id}'),'Delete','danger')`
-                        )}</td>
+        `window.openAnnouncementForm('${a.id}')`,
+        `confirmAction('Delete Announcement','Delete this announcement? Cannot be undone.',()=>window.deleteAnnouncement('${a.id}'),'Delete','danger')`
+    )}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -2070,28 +2171,28 @@ window.openAnnouncementForm = (id = null) => {
             <div class="form-field" style="grid-column:1/-1"><label>Content</label><textarea id="an2_content" rows="4" placeholder="Announcement content...">${a?.content || ''}</textarea></div>
             <div class="form-field"><label>Type</label>
                 <select id="an2_type">
-                    ${['info','success','warning','danger'].map(t => `<option value="${t}" ${(a?.type||'info')===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+                    ${['info', 'success', 'warning', 'danger'].map(t => `<option value="${t}" ${(a?.type || 'info') === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
                 </select>
             </div>
             <div class="form-field"><label>Priority (higher = shown first)</label><input type="number" id="an2_priority" value="${a?.priority || 0}" min="0" max="100"/></div>
             <div class="form-field"><label>Company (blank = Global)</label><input id="an2_company" value="${a?.company || ''}" placeholder="Leave blank for all companies"/></div>
             <div class="form-field" style="display:flex;align-items:center;gap:.75rem;padding-top:1.2rem">
-                <label class="toggle"><input type="checkbox" id="an2_active" ${(a?.isActive!==false&&a?.is_active!==false)?'checked':''}/><div class="toggle-slider"></div></label>
+                <label class="toggle"><input type="checkbox" id="an2_active" ${(a?.isActive !== false && a?.is_active !== false) ? 'checked' : ''}/><div class="toggle-slider"></div></label>
                 <span style="font-size:.85rem">Active (visible to users)</span>
             </div>
         </div>
     `, `
         <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
-        <button class="btn btn-primary" onclick="window.saveAnnouncement('${id||''}')">Save Announcement</button>
+        <button class="btn btn-primary" onclick="window.saveAnnouncement('${id || ''}')">Save Announcement</button>
     `);
 };
 
 window.saveAnnouncement = async (id) => {
-    const title    = document.getElementById('an2_title')?.value?.trim();
-    const content  = document.getElementById('an2_content')?.value?.trim();
-    const type     = document.getElementById('an2_type')?.value;
+    const title = document.getElementById('an2_title')?.value?.trim();
+    const content = document.getElementById('an2_content')?.value?.trim();
+    const type = document.getElementById('an2_type')?.value;
     const priority = parseInt(document.getElementById('an2_priority')?.value) || 0;
-    const company  = document.getElementById('an2_company')?.value?.trim() || null;
+    const company = document.getElementById('an2_company')?.value?.trim() || null;
     const isActive = document.getElementById('an2_active')?.checked;
     if (!title) { toast('Title is required', 'error'); return; }
     const payload = { title, content, type, priority, company, isActive };
@@ -2102,7 +2203,7 @@ window.saveAnnouncement = async (id) => {
             if (error) { toast('Update failed: ' + error.message, 'error'); return; }
             if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Announcement', id, `Updated: ${title}`);
         } else {
-            const i = (STATE.announcements||[]).findIndex(x => x.id === id);
+            const i = (STATE.announcements || []).findIndex(x => x.id === id);
             if (i !== -1) STATE.announcements[i] = { ...STATE.announcements[i], ...payload };
             saveState();
         }
@@ -2199,7 +2300,7 @@ window.openFBPixelModal = () => {
             <div class="form-field" style="grid-column:1/-1">
                 <label>Events to Track</label>
                 <div style="display:flex;gap:1rem;flex-wrap:wrap">
-                    ${['PageView','ViewContent','AddToCart','Purchase','Lead'].map(e => `
+                    ${['PageView', 'ViewContent', 'AddToCart', 'Purchase', 'Lead'].map(e => `
                         <label style="display:flex;align-items:center;gap:.3rem;font-size:.82rem;cursor:pointer">
                             <input type="checkbox" checked name="fb_event" value="${e}" /> ${e}
                         </label>
@@ -2261,4 +2362,3 @@ window.saveHotjarConfig = async () => {
     toast(`Hotjar Site ${id} installed`, 'success');
     window.go('seo-tools');
 };
-

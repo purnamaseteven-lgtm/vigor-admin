@@ -115,3 +115,33 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION handle_new_admin();
+
+-- --- Restricted Data Access (Task 1: Hierarchy Enforcement) ------
+-- Helper to get user's company
+CREATE OR REPLACE FUNCTION get_admin_company()
+RETURNS TEXT AS 
+BEGIN
+    RETURN (SELECT company FROM admin_profiles WHERE id = auth.uid());
+END;
+ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Update Policies to check company
+-- Members
+DROP POLICY IF EXISTS "Admins read members" ON members;
+CREATE POLICY "Admins read members" ON members FOR SELECT
+    USING (is_active_admin() AND (get_admin_company() = 'Global' OR company = get_admin_company()));
+
+-- Deposits
+DROP POLICY IF EXISTS "Admins read deposits" ON deposits;
+CREATE POLICY "Admins read deposits" ON deposits FOR SELECT
+    USING (is_active_admin() AND (get_admin_company() = 'Global' OR company = get_admin_company()));
+
+-- Withdrawals
+DROP POLICY IF EXISTS "Admins read withdrawals" ON withdrawals;
+CREATE POLICY "Admins read withdrawals" ON withdrawals FOR SELECT
+    USING (is_active_admin() AND (get_admin_company() = 'Global' OR company = get_admin_company()));
+
+-- Seamless Transactions
+DROP POLICY IF EXISTS "Admins read seamless_tx" ON seamless_transactions;
+CREATE POLICY "Admins read seamless_tx" ON seamless_transactions FOR SELECT
+    USING (is_active_admin() AND (get_admin_company() = 'Global' OR company = get_admin_company()));

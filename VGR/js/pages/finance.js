@@ -3,15 +3,17 @@ import { STATE, fmtCur, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, renderPagerHTML } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, BANKS, STATUSES } from '../utils/helpers.js';
+import { scopedDeposits, scopedWithdrawals, getScopeSummary } from '../utils/scope.js';
 
 pages['deposit-list'] = () => {
   const PG = 'deposit-list';
-  const filtered = filterData(STATE.deposits, PG);
+  const allDeposits = scopedDeposits();
+  const filtered = filterData(allDeposits, PG);
   const total = filtered.length;
   const pp = getPerPage(PG);
   const cp = getCurPage(PG);
   const rows = paginate(filtered, cp, pp);
-  const pending = STATE.deposits.filter(d => d.status === 'Pending').length;
+  const pending = allDeposits.filter(d => d.status === 'Pending').length;
   const totalApprovedAmt = filtered.reduce((s, d) => s + (d.status === 'Approved' ? d.amount : 0), 0);
 
   return `
@@ -79,12 +81,13 @@ pages['deposit-list'] = () => {
 
 pages['withdrawal-list'] = () => {
   const PG = 'withdrawal-list';
-  const filtered = filterData(STATE.withdrawals, PG);
+  const allWithdrawals = scopedWithdrawals();
+  const filtered = filterData(allWithdrawals, PG);
   const total = filtered.length;
   const pp = getPerPage(PG);
   const cp = getCurPage(PG);
   const rows = paginate(filtered, cp, pp);
-  const pending = STATE.withdrawals.filter(w => w.status === 'Pending').length;
+  const pending = allWithdrawals.filter(w => w.status === 'Pending').length;
 
   return `
     ${pageHeader('Withdrawal Management', '<span>Finance</span><span class="sep">›</span><span>Withdrawal</span>', `

@@ -273,3 +273,29 @@ CREATE TABLE IF NOT EXISTS lottery_bets (
 
 CREATE INDEX IF NOT EXISTS idx_lottery_bets_member ON lottery_bets(member);
 CREATE INDEX IF NOT EXISTS idx_lottery_bets_pool ON lottery_bets(pool);
+
+-- --- Roles & Permissions Matrix (Task 1) --------------------------
+CREATE TABLE IF NOT EXISTS admin_roles (
+    role_name   TEXT PRIMARY KEY,
+    permissions JSONB NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Default Roles
+INSERT INTO admin_roles (role_name, permissions) VALUES
+    ('SuperAdmin', '{"all": true}'),
+    ('Admin',      '{"dashboard": true, "members": true, "finance": true, "reports": true}'),
+    ('Finance',    '{"dashboard": true, "finance": true}'),
+    ('CS',         '{"dashboard": true, "members": true, "memo": true}')
+ON CONFLICT (role_name) DO NOTHING;
+
+-- --- Log Retention Policy (Task 3) --------------------------
+-- Automatically clean logs older than 90 days
+CREATE OR REPLACE FUNCTION clean_old_logs()
+RETURNS void AS 
+BEGIN
+    DELETE FROM admin_logs WHERE created_at < NOW() - INTERVAL '90 days';
+    DELETE FROM seamless_api_logs WHERE created_at < NOW() - INTERVAL '30 days';
+END;
+ LANGUAGE plpgsql;

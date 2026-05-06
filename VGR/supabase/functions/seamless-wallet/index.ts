@@ -72,7 +72,7 @@ serve(async (req) => {
             const { data: existingTx } = await supabase
                 .from('seamless_transactions')
                 .select('*')
-                .eq('trace_id', txId)
+                .eq('transaction_id', txId)
                 .single();
 
             if (existingTx) {
@@ -104,8 +104,10 @@ serve(async (req) => {
             await supabase.from('members').update({ balance: newBal }).eq('id', member.id);
 
             // Log Transaction
-            await supabase.from('seamless_transactions').insert({
+            const txRow = {
+                id: crypto.randomUUID(),
                 trace_id: txId,
+                transaction_id: txId,
                 player: member.username,
                 provider: provider,
                 game_id: params.game_id || 0,
@@ -113,8 +115,13 @@ serve(async (req) => {
                 win_amount: Number(params.win_amount || 0),
                 transfer_amount: tAmt,
                 status: 'Completed',
-                balance_after: newBal
-            });
+                balance_after: newBal,
+                create_time: new Date().toISOString()
+            };
+            const { error: txErr } = await supabase.from('seamless_transactions').insert(txRow);
+            if (txErr) {
+                return formatError("1200", `Transaction log insert failed: ${txErr.message}`);
+            }
 
             responsePayload = endpoint === '/Cash/Adjustment' ? formatResponse({
                 adjust_amount: Math.abs(tAmt),

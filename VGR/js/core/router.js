@@ -28,6 +28,8 @@ export async function go(page) {
         return;
     }
     if (!pages[page] && typeof ensurePageForRoute === 'function') {
+        content.classList.add('page-entering');
+        content.innerHTML = renderSkeletonUI();
         try {
             await ensurePageForRoute(page);
         } catch (e) {
@@ -215,3 +217,31 @@ window.maintenanceToggle = (val) => {
     window.maintenanceMode = val;
     toast(`Maintenance Mode: ${val ? 'ON' : 'OFF'}`, val ? 'warning' : 'success');
 };
+
+function renderSkeletonUI() {
+    return `
+        <div class="page-header" style="margin-bottom:1.5rem">
+            <div>
+                <div class="skeleton" style="width:120px;height:12px;margin-bottom:.5rem"></div>
+                <div class="skeleton" style="width:250px;height:32px"></div>
+            </div>
+            <div style="display:flex;gap:.5rem">
+                <div class="skeleton" style="width:80px;height:32px;border-radius:8px"></div>
+                <div class="skeleton" style="width:80px;height:32px;border-radius:8px"></div>
+            </div>
+        </div>
+        <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-bottom: 1.5rem">
+            <div class="stat-card"><div class="skeleton" style="width:44px;height:44px;border-radius:10px"></div><div style="flex:1"><div class="skeleton" style="width:60%;height:10px;margin-bottom:.5rem"></div><div class="skeleton" style="width:80%;height:18px"></div></div></div>
+            <div class="stat-card"><div class="skeleton" style="width:44px;height:44px;border-radius:10px"></div><div style="flex:1"><div class="skeleton" style="width:60%;height:10px;margin-bottom:.5rem"></div><div class="skeleton" style="width:80%;height:18px"></div></div></div>
+            <div class="stat-card"><div class="skeleton" style="width:44px;height:44px;border-radius:10px"></div><div style="flex:1"><div class="skeleton" style="width:60%;height:10px;margin-bottom:.5rem"></div><div class="skeleton" style="width:80%;height:18px"></div></div></div>
+        </div>
+        <div class="card">
+            <div class="card-header"><div class="skeleton" style="width:150px;height:14px"></div></div>
+            <div class="card-body">
+                <div class="skeleton" style="height:20px;margin-bottom:1rem"></div>
+                <div class="skeleton" style="height:20px;margin-bottom:1rem"></div>
+                <div class="skeleton" style="height:20px;margin-bottom:1rem"></div>
+                <div class="skeleton" style="height:20px;margin-bottom:1rem"></div>
+            </div>
+        </div>`;
+}

@@ -30,11 +30,10 @@ export const PG_CURRENCIES = ['IDR', 'CNY', 'THB', 'VND', 'BRL', 'INR', 'KRW', '
 export const STATE = {
     members: [],
     admins: [
-        { id: 'adm-1', username: 'super_root',     name: 'Master System',      role: 'SuperAdmin', company: 'Global',     status: 'Active', lastLogin: '2026-04-29 10:00', parentId: null, customPermissions: null },
-        { id: 'adm-2', username: 'owner_vigor88',  name: 'Vigor88 Owner',       role: 'Company',    company: 'vigor88',    status: 'Active', lastLogin: '2026-04-28 15:30', parentId: 'adm-1', customPermissions: null },
-        { id: 'adm-3', username: 'master_budi',    name: 'Budi Master Agent',   role: 'Master',     company: 'budi',       status: 'Active', lastLogin: '2026-04-29 08:15', parentId: 'adm-2', customPermissions: null },
-        { id: 'adm-4', username: 'agent_casino88', name: 'Casino888 Agent',     role: 'Shop',       company: 'casino888',  status: 'Active', lastLogin: '2026-04-29 09:00', parentId: 'adm-3', customPermissions: null },
-        { id: 'adm-5', username: 'agent_play77',   name: 'Play77 Agent',        role: 'Agent',      company: 'play77',     status: 'Active', lastLogin: '2026-04-29 07:30', parentId: 'adm-3', customPermissions: null },
+        { id: 'adm-1', username: 'super_root', name: 'Master System', role: 'SuperAdmin', company: 'Global', status: 'Active', lastLogin: '2026-04-29 10:00', parentId: null, customPermissions: null },
+        { id: 'adm-2', username: 'owner_vigor88', name: 'Vigor88 Owner', role: 'Whitelabel', company: 'vigor88', status: 'Active', lastLogin: '2026-04-28 15:30', parentId: 'adm-1', customPermissions: null },
+        { id: 'adm-3', username: 'agent_casino88', name: 'Casino888 Agent', role: 'Agent', company: 'casino888', status: 'Active', lastLogin: '2026-04-29 09:00', parentId: 'adm-2', customPermissions: null },
+        { id: 'adm-4', username: 'agent_play77', name: 'Play77 Agent', role: 'Agent', company: 'play77', status: 'Active', lastLogin: '2026-04-29 07:30', parentId: 'adm-2', customPermissions: null },
     ],
     currentAdmin: {
         id: 'adm-1',
@@ -74,11 +73,11 @@ export const STATE = {
         presets: 'default'
     },
     vipTiers: [
-        { id: 'VIP1', name: 'Bronze',   turnover: 0,            minDeposit: 0,         rebate: 0.3, referral: 0.1, color: '#cd7f32', cashbackPct: 0,   withdrawLimit: 5000000,   maxBonus: 100000,    depositBonus: 0,  birthdayBonus: 0,       prioritySupport: false, freebet: 0 },
-        { id: 'VIP2', name: 'Silver',   turnover: 100000000,    minDeposit: 5000000,   rebate: 0.5, referral: 0.2, color: '#c0c0c0', cashbackPct: 1,   withdrawLimit: 20000000,  maxBonus: 500000,    depositBonus: 1,  birthdayBonus: 50000,   prioritySupport: false, freebet: 25000 },
-        { id: 'VIP3', name: 'Gold',     turnover: 500000000,    minDeposit: 25000000,  rebate: 0.7, referral: 0.3, color: '#ffd700', cashbackPct: 2,   withdrawLimit: 50000000,  maxBonus: 2000000,   depositBonus: 2,  birthdayBonus: 150000,  prioritySupport: false, freebet: 50000 },
-        { id: 'VIP4', name: 'Platinum', turnover: 2500000000,   minDeposit: 100000000, rebate: 0.9, referral: 0.4, color: '#e5e4e2', cashbackPct: 3,   withdrawLimit: 150000000, maxBonus: 5000000,   depositBonus: 3,  birthdayBonus: 500000,  prioritySupport: true,  freebet: 100000 },
-        { id: 'VIP5', name: 'Diamond',  turnover: 10000000000,  minDeposit: 500000000, rebate: 1.2, referral: 0.5, color: '#b9f2ff', cashbackPct: 5,   withdrawLimit: 500000000, maxBonus: 20000000,  depositBonus: 5,  birthdayBonus: 2000000, prioritySupport: true,  freebet: 250000 }
+        { id: 'VIP1', name: 'Bronze', turnover: 0, minDeposit: 0, rebate: 0.3, referral: 0.1, color: '#cd7f32', cashbackPct: 0, withdrawLimit: 5000000, maxBonus: 100000, depositBonus: 0, birthdayBonus: 0, prioritySupport: false, freebet: 0 },
+        { id: 'VIP2', name: 'Silver', turnover: 100000000, minDeposit: 5000000, rebate: 0.5, referral: 0.2, color: '#c0c0c0', cashbackPct: 1, withdrawLimit: 20000000, maxBonus: 500000, depositBonus: 1, birthdayBonus: 50000, prioritySupport: false, freebet: 25000 },
+        { id: 'VIP3', name: 'Gold', turnover: 500000000, minDeposit: 25000000, rebate: 0.7, referral: 0.3, color: '#ffd700', cashbackPct: 2, withdrawLimit: 50000000, maxBonus: 2000000, depositBonus: 2, birthdayBonus: 150000, prioritySupport: false, freebet: 50000 },
+        { id: 'VIP4', name: 'Platinum', turnover: 2500000000, minDeposit: 100000000, rebate: 0.9, referral: 0.4, color: '#e5e4e2', cashbackPct: 3, withdrawLimit: 150000000, maxBonus: 5000000, depositBonus: 3, birthdayBonus: 500000, prioritySupport: true, freebet: 100000 },
+        { id: 'VIP5', name: 'Diamond', turnover: 10000000000, minDeposit: 500000000, rebate: 1.2, referral: 0.5, color: '#b9f2ff', cashbackPct: 5, withdrawLimit: 500000000, maxBonus: 20000000, depositBonus: 5, birthdayBonus: 2000000, prioritySupport: true, freebet: 250000 }
     ],
     seo: {
         title: 'VIGOR - Modern Online Gaming Experience',
@@ -126,17 +125,16 @@ export const STATE = {
     ], // History of manual balance adjustments (deposit/withdrawal)
     _filters: {}, _page: {}, _perPage: {},
 
-    // Global Permission Matrix for Granular Menu Access
+    // ── Permission Matrix — 3-level hierarchy: SuperAdmin / Whitelabel / Agent ──
     permissionMatrix: {
         SuperAdmin: {
             home: { dashboard: true, statistics: true, providerAnalytics: true, deviceReport: true },
             master: { whitelist: true, blacklist: true, masterWhitelist: true },
             administrators: { systemAdmins: true, rolePermissions: true },
-            companyManagement: { whitelabelList: true, regisNewCompany: true },
-            whitelabel: { whitelabelList: true, masterWlList: true },
+            companyManagement: { whitelabelList: true, masterWlList: true, regisNewCompany: true, myDownlines: true },
             members: { memberList: true, addMember: true, tierHistory: true },
             bankManagement: { bankList: true, createNewBank: true },
-            finance: { deposit: true, withdrawal: true },
+            finance: { deposit: true, withdrawal: true, adjustment: true, adjustmentLogs: true },
             bets: { betsListing: true, bettingTable: true, transferredList: true },
             bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: true, promotions: true, promotionRelease: true, promotionRollingRelease: true },
             results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
@@ -150,91 +148,45 @@ export const STATE = {
             invoice: { monthly: true, fileManagement: true, tournamentWinners: true },
             logs: { adminLogs: true, companyLogs: true, whitelabelLogs: true, memberLogs: true, masterWlLogs: true }
         },
-        Company: {
+        Whitelabel: {
             home: { dashboard: true, statistics: true, providerAnalytics: true, deviceReport: true },
             master: { whitelist: false, blacklist: false, masterWhitelist: false },
             administrators: { systemAdmins: true, rolePermissions: false },
-            companyManagement: { whitelabelList: true, regisNewCompany: true },
-            whitelabel: { whitelabelList: true, masterWlList: true },
+            companyManagement: { whitelabelList: true, masterWlList: true, regisNewCompany: true, myDownlines: true },
             members: { memberList: true, addMember: true, tierHistory: true },
             bankManagement: { bankList: true, createNewBank: true },
-            finance: { deposit: true, withdrawal: true },
+            finance: { deposit: true, withdrawal: true, adjustment: true, adjustmentLogs: true },
             bets: { betsListing: true, bettingTable: true, transferredList: true },
             bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: true, promotions: true, promotionRelease: true, promotionRollingRelease: true },
             results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
             integrations: { providerSetup: true, apiLogs: true, developerDocs: true },
-            customization: { siteConfig: true, promotions: false, templateBuilder: true, templatePreview: true, seoTools: true, systemTheme: true, globalBanner: true, appNotification: true },
+            customization: { siteConfig: true, templateBuilder: true, templatePreview: true, seoTools: true, systemTheme: true, globalBanner: true, appNotification: true, announcements: false },
             settings: { commission: true, referralRate: true, poolsList: true, games: true, agentGameSettings: true, togelCommission: true, limitCreditOut: true, vipDesigner: true, rebateCalc: true },
             tools: { coin2pay: true, hostManagement: false, sawala: true, unopay: true, nawalaScan: true },
-            crm: { dashboard: true, segments: true, missions: true, tournaments: true, automation: true, push: true },
+            crm: { dashboard: true, segments: true, missions: true, tournaments: true, automation: true, push: true, dormancy: true, loyalty: true },
             memo: { memoBox: true, autoMemo: true },
             reports: { winloss: true, agentDaily: true, limitCredit: true, lostMoney: true, togelLost: true, topTurnover: true },
             invoice: { monthly: true, fileManagement: true, tournamentWinners: true },
             logs: { adminLogs: false, companyLogs: true, whitelabelLogs: true, memberLogs: true, masterWlLogs: true }
         },
-        Master: {
+        Agent: {
             home: { dashboard: true, statistics: true, providerAnalytics: false, deviceReport: false },
             master: { whitelist: false, blacklist: false, masterWhitelist: false },
-            administrators: { systemAdmins: true, rolePermissions: false },
-            companyManagement: { whitelabelList: false, regisNewCompany: false, myDownlines: true },
-            whitelabel: { whitelabelList: true, masterWlList: false },
-            members: { memberList: true, addMember: true, tierHistory: true },
-            bankManagement: { bankList: true, createNewBank: true },
-            finance: { deposit: true, withdrawal: true },
-            bets: { betsListing: true, bettingTable: true, transferredList: true },
-            bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: false, promotions: true, promotionRelease: true, promotionRollingRelease: true },
-            results: { resultsListing: true, resultScan: true, resultsAnalyze: true },
-            integrations: { providerSetup: false, apiLogs: false, developerDocs: false },
-            customization: { promotions: false, templateBuilder: false, seoTools: false, systemTheme: false },
-            settings: { commission: false, referralRate: false, poolsList: false, games: false, agentGameSettings: false, togelCommission: false, limitCreditOut: false },
-            tools: { coin2pay: true, hostManagement: false, sawala: false, unopay: false, nawalaScan: true },
-            crm: { dashboard: true, segments: false, missions: false, tournaments: true, automation: false, push: false, dormancy: false, loyalty: false },
-            memo: { memoBox: true, autoMemo: false },
-            reports: { winloss: true, agentDaily: true, limitCredit: false, lostMoney: false, togelLost: false, topTurnover: false },
-            invoice: { monthly: false, fileManagement: false, tournamentWinners: false },
-            logs: { adminLogs: false, companyLogs: false, whitelabelLogs: false, memberLogs: true, masterWlLogs: false }
-        },
-        Shop: {
-            home: { dashboard: true, statistics: true, providerAnalytics: false, deviceReport: false },
-            master: { whitelist: false, blacklist: false, masterWhitelist: false },
-            administrators: { systemAdmins: true, rolePermissions: false },
-            companyManagement: { whitelabelList: false, regisNewCompany: false, myDownlines: true },
-            whitelabel: { whitelabelList: false, masterWlList: false },
+            administrators: { systemAdmins: false, rolePermissions: false },  // Agent cannot manage admins
+            companyManagement: { whitelabelList: false, masterWlList: false, regisNewCompany: false, myDownlines: false },
             members: { memberList: true, addMember: true, tierHistory: true },
             bankManagement: { bankList: true, createNewBank: false },
-            finance: { deposit: true, withdrawal: true },
+            finance: { deposit: true, withdrawal: true, adjustment: false, adjustmentLogs: false },
             bets: { betsListing: true, bettingTable: true, transferredList: false },
             bonus: { bonusReport: true, agentFreebet: true, agentFreebetReport: true, pragmaticFrb: false, promotions: false, promotionRelease: false, promotionRollingRelease: false },
             results: { resultsListing: true, resultScan: false, resultsAnalyze: false },
             integrations: { providerSetup: false, apiLogs: false, developerDocs: false },
-            customization: { promotions: false, templateBuilder: false, seoTools: false, systemTheme: false },
+            customization: { siteConfig: false, templateBuilder: false, templatePreview: false, seoTools: false, systemTheme: false, globalBanner: false, appNotification: false },
             settings: { commission: false, referralRate: false, poolsList: false, games: false, agentGameSettings: false, togelCommission: false, limitCreditOut: false },
             tools: { coin2pay: false, hostManagement: false, sawala: false, unopay: false, nawalaScan: true },
             crm: { dashboard: true, segments: false, missions: false, tournaments: false, automation: false, push: false, dormancy: false, loyalty: false },
             memo: { memoBox: true, autoMemo: false },
             reports: { winloss: true, agentDaily: true, limitCredit: false, lostMoney: false, togelLost: false, topTurnover: false },
-            invoice: { monthly: false, fileManagement: false, tournamentWinners: false },
-            logs: { adminLogs: false, companyLogs: false, whitelabelLogs: false, memberLogs: true, masterWlLogs: false }
-        },
-        Agent: {
-            home: { dashboard: true, statistics: true, providerAnalytics: false, deviceReport: false },
-            master: { whitelist: false, blacklist: false, masterWhitelist: false },
-            administrators: { systemAdmins: true, rolePermissions: false },
-            companyManagement: { whitelabelList: false, regisNewCompany: false, myDownlines: true },
-            whitelabel: { whitelabelList: false, masterWlList: false },
-            members: { memberList: true, addMember: true, tierHistory: true },
-            bankManagement: { bankList: false, createNewBank: false },
-            finance: { deposit: true, withdrawal: true },
-            bets: { betsListing: true, bettingTable: false, transferredList: false },
-            bonus: { bonusReport: true, agentFreebet: false, agentFreebetReport: false, pragmaticFrb: false, promotions: false, promotionRelease: false, promotionRollingRelease: false },
-            results: { resultsListing: true, resultScan: false, resultsAnalyze: false },
-            integrations: { providerSetup: false, apiLogs: false, developerDocs: false },
-            customization: { promotions: false, templateBuilder: false, seoTools: false, systemTheme: false },
-            settings: { commission: false, referralRate: false, poolsList: false, games: false, agentGameSettings: false, togelCommission: false, limitCreditOut: false },
-            tools: { coin2pay: false, hostManagement: false, sawala: false, unopay: false, nawalaScan: true },
-            crm: { dashboard: true, segments: false, missions: false, tournaments: false, automation: false, push: false, dormancy: false, loyalty: false },
-            memo: { memoBox: true, autoMemo: false },
-            reports: { winloss: true, agentDaily: false, limitCredit: false, lostMoney: false, togelLost: false, topTurnover: false },
             invoice: { monthly: false, fileManagement: false, tournamentWinners: false },
             logs: { adminLogs: false, companyLogs: false, whitelabelLogs: false, memberLogs: true, masterWlLogs: false }
         }
@@ -270,13 +222,14 @@ export function initState() {
             }
             Object.assign(STATE, parsed);
             // Normalize legacy/stored role labels so RBAC/menu rendering remains stable.
+            // 3-level hierarchy: SuperAdmin / Whitelabel / Agent
             const roleAliases = {
                 superadmin: 'SuperAdmin',
                 superadmins: 'SuperAdmin',
-                company: 'Company',
-                whitelabel: 'Company',
-                master: 'Master',
-                shop: 'Shop',
+                company: 'Whitelabel',   // legacy
+                whitelabel: 'Whitelabel',
+                master: 'Agent',         // legacy → Agent
+                shop: 'Agent',         // legacy → Agent
                 agent: 'Agent',
             };
             const rawRole = String(STATE.currentAdmin?.role || '').toLowerCase().replace(/[\s_-]+/g, '');
@@ -325,15 +278,15 @@ export function initState() {
     //   [18-19] Master    → under dedek  C106  (jackpot1=C118, lucky88=C119)
     COMPANIES.forEach((c, i) => {
         let parentId = null;
-        if (i >= 5  && i < 10)  parentId = 'C100';  // under vigor88
-        if (i >= 10 && i < 15)  parentId = 'C101';  // under s88pw
-        if (i >= 15 && i < 18)  parentId = 'C105';  // under budi
-        if (i >= 18)             parentId = 'C106';  // under dedek
+        if (i >= 5 && i < 10) parentId = 'C100';  // under vigor88
+        if (i >= 10 && i < 15) parentId = 'C101';  // under s88pw
+        if (i >= 15 && i < 18) parentId = 'C105';  // under budi
+        if (i >= 18) parentId = 'C106';  // under dedek
         STATE.companies.push({
             id: 'C' + (100 + i), username: c, name: c.toUpperCase() + ' Group', email: c + '@gaming.io',
             phone: '021' + rnd(1000000, 9999999), credit: rnd(10, 500) * 1000000, members: rnd(100, 1000),
             status: i % 10 === 0 ? 'Inactive' : 'Active',
-            type: i < 5 ? 'Whitelabel' : i < 15 ? 'Company' : 'Master',
+            type: i < 5 ? 'Whitelabel' : 'Agent',
             parentId,
             joined: '2023-12-07'
         });

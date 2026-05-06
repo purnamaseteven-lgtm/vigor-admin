@@ -3,19 +3,21 @@ import { STATE, fmt, fmtCur, addLog, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, toast, openModal, closeModalBtn } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, rnd, MEMBERS, COMPANIES } from '../utils/helpers.js';
+const STRICT_REAL_MODE = String(import.meta.env.VITE_STRICT_REAL_MODE || '').toLowerCase() === 'true';
+const DOMAIN_RE = /^(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,}$/i;
 
 function ensureToolsState() {
   if (!STATE.tools) STATE.tools = {};
 
   // UnoPay transactions: derive from real STATE.deposits/withdrawals filtered by VA/QRIS/e-wallet methods
-  const UNOPAY_METHODS = ['VA BCA', 'VA BNI', 'VA BRI', 'QRIS', 'Gopay', 'OVO', 'Dana'];
-  const realDeposits = (STATE.deposits || []).filter(d => UNOPAY_METHODS.some(m => (d.method || '').includes(m.split(' ').pop())));
-  const realWithdrawals = (STATE.withdrawals || []).filter(w => UNOPAY_METHODS.some(m => (w.method || '').includes(m.split(' ').pop())));
+  const UNOPAY_METHODS = ['va_bca', 'va_bni', 'va_bri', 'qris', 'gopay', 'ovo', 'dana', 'unopay'];
+  const realDeposits = (STATE.deposits || []).filter(d => UNOPAY_METHODS.some(m => String(d.paymentMethod || d.method || '').toLowerCase().includes(m)));
+  const realWithdrawals = (STATE.withdrawals || []).filter(w => UNOPAY_METHODS.some(m => String(w.paymentMethod || w.method || '').toLowerCase().includes(m)));
   if (!Array.isArray(STATE.tools.unopayTx) || STATE.tools.unopayTx.length === 0) {
     if (realDeposits.length > 0 || realWithdrawals.length > 0) {
       STATE.tools.unopayTx = [
-        ...realDeposits.slice(0, 10).map(d => ({ id: d.id, member: d.username, amount: d.amount, fee: 0, method: d.method || 'VA', status: d.status === 'Approved' ? 'Success' : d.status === 'Pending' ? 'Pending' : 'Failed', date: d.date })),
-        ...realWithdrawals.slice(0, 5).map(w => ({ id: w.id, member: w.username, amount: w.amount, fee: 0, method: w.method || 'VA', status: w.status === 'Approved' ? 'Success' : w.status === 'Pending' ? 'Pending' : 'Failed', date: w.date })),
+        ...realDeposits.slice(0, 10).map(d => ({ id: d.id, member: d.member || d.username, amount: d.amount, fee: 0, method: d.paymentMethod || d.method || 'VA', status: d.status === 'Approved' ? 'Success' : d.status === 'Pending' ? 'Pending' : 'Failed', date: d.date })),
+        ...realWithdrawals.slice(0, 5).map(w => ({ id: w.id, member: w.member || w.username, amount: w.amount, fee: 0, method: w.paymentMethod || w.method || 'VA', status: w.status === 'Approved' ? 'Success' : w.status === 'Pending' ? 'Pending' : 'Failed', date: w.date })),
       ];
     }
   }
@@ -25,11 +27,11 @@ function ensureToolsState() {
 
   // Coin2Pay: derive from deposits/withdrawals with crypto methods
   const CRYPTO_METHODS = ['BTC', 'ETH', 'USDT', 'BNB', 'LTC', 'crypto', 'Crypto'];
-  const realCrypto = (STATE.deposits || []).filter(d => CRYPTO_METHODS.some(m => (d.method || '').toLowerCase().includes(m.toLowerCase())));
+  const realCrypto = (STATE.deposits || []).filter(d => CRYPTO_METHODS.some(m => String(d.paymentMethod || d.method || '').toLowerCase().includes(m.toLowerCase())));
   if (!Array.isArray(STATE.tools.coin2payTx) || STATE.tools.coin2payTx.length === 0) {
     if (realCrypto.length > 0) {
       STATE.tools.coin2payTx = realCrypto.slice(0, 10).map(d => ({
-        id: d.id, member: d.username, crypto: d.method || 'USDT',
+        id: d.id, member: d.member || d.username, crypto: d.paymentMethod || d.method || 'USDT',
         cryptoAmt: (d.amount / 16000).toFixed(4), idrAmt: d.amount,
         type: 'Deposit', status: d.status === 'Approved' ? 'Confirmed' : 'Pending',
         txHash: '0x' + d.id.replace(/\D/g, '').padEnd(16, '0') + '...',
@@ -191,7 +193,7 @@ pages['tools-sawala'] = () => {
     </div></div>`;
 };
 
-pages['tools-host'] = () => {
+pages['host-management'] = () => {
   const hosts = STATE.tools.hosts;
   const deleted = STATE.tools.deletedHosts || [];
   return `
@@ -309,7 +311,7 @@ pages['invoice-tournament'] = () => {
 pages['invoice-monthly'] = () => {
   // Month/Year selector state
   const now = new Date();
-  const selYear  = STATE._invoiceYear  || now.getFullYear();
+  const selYear = STATE._invoiceYear || now.getFullYear();
   const selMonth = STATE._invoiceMonth !== undefined ? STATE._invoiceMonth : now.getMonth();
   const periodLabel = new Date(selYear, selMonth, 1).toLocaleString('id-ID', { month: 'long', year: 'numeric' });
 
@@ -339,18 +341,18 @@ pages['invoice-monthly'] = () => {
 
   const invoices = companies.map((c, i) => {
     const compDeps = allDeps.filter(d => d.company === c);
-    const compWds  = allWds.filter(w => w.company === c);
+    const compWds = allWds.filter(w => w.company === c);
     const depTotal = compDeps.reduce((s, d) => s + (d.amount || 0), 0);
-    const wdTotal  = compWds.reduce((s, w) => s + (w.amount || 0), 0);
-    const txCount  = compDeps.length + compWds.length;
+    const wdTotal = compWds.reduce((s, w) => s + (w.amount || 0), 0);
+    const txCount = compDeps.length + compWds.length;
     if (depTotal === 0 && txCount === 0) return null;
-    const platformFee   = Math.round(depTotal * 0.02) || 0;
-    const licenseFee    = 500000;
+    const platformFee = Math.round(depTotal * 0.02) || 0;
+    const licenseFee = 500000;
     const transactionFee = txCount * 2500;
     const total = platformFee + licenseFee + transactionFee;
     const existingInv = (STATE.tools.monthlyInvoices || []).find(x => x.company === c && x.period === periodLabel);
     return {
-      id: existingInv?.id || `INV-${selYear}-${String(selMonth+1).padStart(2,'0')}-${String(i+1).padStart(3,'0')}`,
+      id: existingInv?.id || `INV-${selYear}-${String(selMonth + 1).padStart(2, '0')}-${String(i + 1).padStart(3, '0')}`,
       company: c, period: periodLabel, depTotal, wdTotal, txCount,
       platformFee, licenseFee, transactionFee, total, dueDate,
       status: existingInv?.status || (total === 0 ? 'N/A' : 'Unpaid'),
@@ -358,24 +360,24 @@ pages['invoice-monthly'] = () => {
   }).filter(Boolean);
 
   const grandTotal = invoices.reduce((s, inv) => s + inv.total, 0);
-  const paidTotal  = invoices.filter(i => i.status === 'Paid').reduce((s, inv) => s + inv.total, 0);
+  const paidTotal = invoices.filter(i => i.status === 'Paid').reduce((s, inv) => s + inv.total, 0);
   const unpaidCount = invoices.filter(i => i.status === 'Unpaid' || i.status === 'Overdue').length;
 
   return `
     ${pageHeader('Monthly Invoice', '<span>Monthly Invoice</span><span class="sep">›</span><span>Invoices</span>', `
       <div style="display:flex;gap:.5rem;align-items:center">
         <select class="form-control" style="width:180px" onchange="(function(v){const p=v.split('-');STATE._invoiceYear=parseInt(p[0]);STATE._invoiceMonth=parseInt(p[1]);go('invoice-monthly');})(this.value)">${monthOpts}</select>
-        <button class="btn btn-secondary btn-sm" onclick="window.exportTableCSV(null,'invoice_${periodLabel.replace(/ /g,'_')}.csv')"><i class="fa-solid fa-download"></i> Export</button>
+        <button class="btn btn-secondary btn-sm" onclick="window.exportTableCSV(null,'invoice_${periodLabel.replace(/ /g, '_')}.csv')"><i class="fa-solid fa-download"></i> Export</button>
         <button class="btn btn-primary btn-sm" onclick="window.sendAllInvoices()"><i class="fa-solid fa-paper-plane"></i> Send All</button>
       </div>`)}
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">
       ${[
-        { label: 'Period', val: periodLabel, icon: 'fa-calendar', color: 'var(--acc)' },
-        { label: 'Total Invoices', val: invoices.length, icon: 'fa-file-invoice', color: '#8b5cf6' },
-        { label: 'Grand Total', val: fmtCur(grandTotal), icon: 'fa-money-bill', color: 'var(--green)' },
-        { label: 'Unpaid', val: unpaidCount + ' invoice' + (unpaidCount !== 1 ? 's' : ''), icon: 'fa-clock', color: 'var(--yellow)' },
-      ].map(s => `
+      { label: 'Period', val: periodLabel, icon: 'fa-calendar', color: 'var(--acc)' },
+      { label: 'Total Invoices', val: invoices.length, icon: 'fa-file-invoice', color: '#8b5cf6' },
+      { label: 'Grand Total', val: fmtCur(grandTotal), icon: 'fa-money-bill', color: 'var(--green)' },
+      { label: 'Unpaid', val: unpaidCount + ' invoice' + (unpaidCount !== 1 ? 's' : ''), icon: 'fa-clock', color: 'var(--yellow)' },
+    ].map(s => `
         <div class="card"><div class="card-body" style="display:flex;align-items:center;gap:.75rem;padding:1rem">
           <div style="width:38px;height:38px;border-radius:10px;background:${s.color}18;display:flex;align-items:center;justify-content:center;color:${s.color}"><i class="fa-solid ${s.icon}"></i></div>
           <div><div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">${s.label}</div><div style="font-weight:800;font-size:.95rem">${s.val}</div></div>
@@ -401,7 +403,7 @@ pages['invoice-monthly'] = () => {
               <td style="font-size:.8rem">${fmtCur(inv.transactionFee)}</td>
               <td style="font-weight:700;color:var(--acc)">${fmtCur(inv.total)}</td>
               <td style="font-size:.75rem">${inv.dueDate}</td>
-              <td>${badge(inv.status, inv.status==='Paid'?'success':inv.status==='Overdue'?'danger':inv.status==='N/A'?'secondary':'warning')}</td>
+              <td>${badge(inv.status, inv.status === 'Paid' ? 'success' : inv.status === 'Overdue' ? 'danger' : inv.status === 'N/A' ? 'secondary' : 'warning')}</td>
               <td>
                 <div style="display:flex;gap:.25rem">
                   <button class="btn btn-xs btn-secondary" onclick="window.viewInvoiceDetail('${inv.id}','${inv.company}','${inv.period}',${inv.total})" title="View"><i class="fa-solid fa-eye"></i></button>
@@ -416,12 +418,12 @@ pages['invoice-monthly'] = () => {
           </tr>
         </tbody>
       </table>
-    `, `invoice_${periodLabel.replace(/ /g,'_')}.csv`)}`;
+    `, `invoice_${periodLabel.replace(/ /g, '_')}.csv`)}`;
 };
 
 window.viewInvoiceDetail = (id, company, period, total) => {
-  const deps = (STATE.deposits||[]).filter(d=>d.company===company&&d.status==='Approved');
-  const wds  = (STATE.withdrawals||[]).filter(w=>w.company===company&&w.status==='Approved');
+  const deps = (STATE.deposits || []).filter(d => d.company === company && d.status === 'Approved');
+  const wds = (STATE.withdrawals || []).filter(w => w.company === company && w.status === 'Approved');
   openModal(`Invoice Detail: ${company}`, `
     <div style="font-size:.82rem">
       <div style="display:flex;justify-content:space-between;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)">
@@ -429,20 +431,20 @@ window.viewInvoiceDetail = (id, company, period, total) => {
         <div style="text-align:right"><div style="font-size:.65rem;color:var(--text3)">Total Due</div><div style="font-size:1.2rem;font-weight:800;color:var(--acc)">${fmtCur(total)}</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">
-        <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem"><div style="font-size:.65rem;color:var(--text3)">Deposits (${deps.length})</div><div style="font-weight:700;color:var(--green)">${fmtCur(deps.reduce((s,d)=>s+d.amount,0))}</div></div>
-        <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem"><div style="font-size:.65rem;color:var(--text3)">Withdrawals (${wds.length})</div><div style="font-weight:700;color:var(--red)">${fmtCur(wds.reduce((s,w)=>s+w.amount,0))}</div></div>
+        <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem"><div style="font-size:.65rem;color:var(--text3)">Deposits (${deps.length})</div><div style="font-weight:700;color:var(--green)">${fmtCur(deps.reduce((s, d) => s + d.amount, 0))}</div></div>
+        <div style="background:var(--bg3);border-radius:8px;padding:.6rem .75rem"><div style="font-size:.65rem;color:var(--text3)">Withdrawals (${wds.length})</div><div style="font-weight:700;color:var(--red)">${fmtCur(wds.reduce((s, w) => s + w.amount, 0))}</div></div>
       </div>
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem">
-        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>Platform Fee (2% of deposits)</span><span style="font-weight:600">${fmtCur(Math.round(deps.reduce((s,d)=>s+d.amount,0)*0.02))}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>Platform Fee (2% of deposits)</span><span style="font-weight:600">${fmtCur(Math.round(deps.reduce((s, d) => s + d.amount, 0) * 0.02))}</span></div>
         <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>License Fee</span><span style="font-weight:600">${fmtCur(500000)}</span></div>
-        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>Transaction Fee (${deps.length+wds.length} × Rp 2,500)</span><span style="font-weight:600">${fmtCur((deps.length+wds.length)*2500)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.25rem 0"><span>Transaction Fee (${deps.length + wds.length} × Rp 2,500)</span><span style="font-weight:600">${fmtCur((deps.length + wds.length) * 2500)}</span></div>
         <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-top:1px solid var(--border);margin-top:.25rem;font-weight:800;color:var(--acc)"><span>Total</span><span>${fmtCur(total)}</span></div>
       </div>
     </div>
   `, `<button class="btn btn-secondary" onclick="closeModalBtn()">Close</button><button class="btn btn-primary" onclick="window.markInvoicePaid('${id}');closeModalBtn()"><i class="fa-solid fa-check"></i> Mark Paid</button>`);
 };
 
-pages['invoice-file'] = () => {
+pages['invoice-file-management'] = () => {
   const files = STATE.tools.files;
   const iconMap = { pdf: 'fa-file-pdf', xlsx: 'fa-file-excel', csv: 'fa-file-csv' };
   return `
@@ -477,8 +479,8 @@ function makeLogPage(title, breadcrumbLabel, actorType) {
     const typeLogs = actorType === 'member'
       ? allLogs.filter(l => memberUsernames.has(l.actor))
       : actorType === 'admin'
-      ? allLogs.filter(l => !memberUsernames.has(l.actor) && !companyNames.has(l.actor))
-      : allLogs.filter(l => companyNames.has(l.actor));
+        ? allLogs.filter(l => !memberUsernames.has(l.actor) && !companyNames.has(l.actor))
+        : allLogs.filter(l => companyNames.has(l.actor));
     const filtered = filterData(typeLogs.length ? typeLogs : allLogs, PG);
     const pp = getPerPage(PG);
     const cp = getCurPage(PG);
@@ -545,8 +547,8 @@ window.editSawala = () => {
 };
 window.saveSawala = async () => {
   const s = STATE.tools.sawala;
-  s.endpoint  = document.getElementById('sw_endpoint')?.value || s.endpoint;
-  s.webhook   = document.getElementById('sw_webhook')?.value || s.webhook;
+  s.endpoint = document.getElementById('sw_endpoint')?.value || s.endpoint;
+  s.webhook = document.getElementById('sw_webhook')?.value || s.webhook;
   s.callbackIp = document.getElementById('sw_ip')?.value || s.callbackIp;
   saveState();
   if (window.db?.dbSaveSetting) {
@@ -604,15 +606,16 @@ window.openHostForm = (id = null) => {
 
 window.saveHostDetail = async (id) => {
   const data = {
-    host:     document.getElementById('hs_host').value,
-    company:  document.getElementById('hs_company').value,
+    host: document.getElementById('hs_host').value,
+    company: document.getElementById('hs_company').value,
     redirect: document.getElementById('hs_redirect').value,
-    code:     document.getElementById('hs_code').value,
-    ssl:      document.getElementById('hs_ssl').value,
-    isApp:    document.getElementById('hs_isApp').checked,
+    code: document.getElementById('hs_code').value,
+    ssl: document.getElementById('hs_ssl').value,
+    isApp: document.getElementById('hs_isApp').checked,
   };
 
   if (!data.host) return toast('Host name is required', 'error');
+  if (!DOMAIN_RE.test(data.host)) return toast('Invalid domain format', 'error');
 
   if (id) {
     // Update existing host config
@@ -627,7 +630,7 @@ window.saveHostDetail = async (id) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ zoneId: h.zoneId, from: data.host, to: data.redirect, code: parseInt(data.code) }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
       if (window.db?.dbWriteLog) window.db.dbWriteLog('Update Host', data.host, `Updated host config for ${data.host}`);
@@ -636,12 +639,12 @@ window.saveHostDetail = async (id) => {
   } else {
     // Provision new host — call Cloudflare backend to create zone
     const newHost = {
-      id:      'H' + Date.now().toString().slice(-4),
+      id: 'H' + Date.now().toString().slice(-4),
       ...data,
-      ns:      'Pending...',
+      ns: 'Pending...',
       created: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      build:   'Pending',
-      zoneId:  null,
+      build: 'Pending',
+      zoneId: null,
     };
     STATE.tools.hosts.push(newHost);
     saveState();
@@ -652,20 +655,20 @@ window.saveHostDetail = async (id) => {
     const API_BASE = import.meta.env.VITE_API_SERVER_URL || '';
     if (API_BASE) {
       try {
-        const res  = await fetch(`${API_BASE}/api/cloudflare/add-domain`, {
-          method:  'POST',
+        const res = await fetch(`${API_BASE}/api/cloudflare/add-domain`, {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ domain: data.host, company: data.company }),
+          body: JSON.stringify({ domain: data.host, company: data.company }),
         });
         const json = await res.json();
-        const h    = STATE.tools.hosts.find(x => x.host === data.host);
+        const h = STATE.tools.hosts.find(x => x.host === data.host);
         if (h) {
           if (json.ns) {
-            h.ns      = Array.isArray(json.ns) ? json.ns.join(', ') : json.ns;
-            h.zoneId  = json.zoneId || null;
-            h.build   = 'Built';
+            h.ns = Array.isArray(json.ns) ? json.ns.join(', ') : json.ns;
+            h.zoneId = json.zoneId || null;
+            h.build = 'Built';
           } else {
-            h.build   = json.error ? 'Error' : 'Built';
+            h.build = json.error ? 'Error' : 'Built';
           }
           saveState();
           go('tools-host');
@@ -677,12 +680,9 @@ window.saveHostDetail = async (id) => {
         toast('Cloudflare API unreachable', 'error');
       }
     } else {
-      // No backend URL — simulate
-      setTimeout(() => {
-        const h = STATE.tools.hosts.find(x => x.host === data.host);
-        if (h) { h.build = 'Built'; h.ns = 'ram.ns.cloudflare.com, sue.ns.cloudflare.com'; saveState(); go('tools-host'); }
-        toast(`Build complete for ${data.host}`, 'success');
-      }, 3000);
+      const h = STATE.tools.hosts.find(x => x.host === data.host);
+      if (h) { h.build = 'Error'; saveState(); go('tools-host'); }
+      toast(STRICT_REAL_MODE ? 'Cloudflare backend URL is required in strict real mode' : 'Cloudflare backend URL is not configured', 'error');
     }
     if (window.db?.dbWriteLog) window.db.dbWriteLog('Provision Host', data.host, `Provisioned domain: ${data.host} [${data.company}]`);
     return; // already called go() above
@@ -711,10 +711,10 @@ window.confirmDeleteHost = async (id) => {
   const API_BASE = import.meta.env.VITE_API_SERVER_URL || '';
   if (API_BASE && h.zoneId) {
     fetch(`${API_BASE}/api/cloudflare/remove-domain`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ zoneId: h.zoneId }),
-    }).catch(() => {});
+      body: JSON.stringify({ zoneId: h.zoneId }),
+    }).catch(() => { });
   }
 
   STATE.tools.deletedHosts.unshift({ host: h.host, ns: h.ns, deletedAt: new Date().toLocaleString('en-GB') });

@@ -55,6 +55,14 @@ export function renderWidgetPreview(id) {
           </div>
         </div>
       `).join('')}
+    </div>`,
+    'system-feed': `<div style="background:#000;color:#10b981;font-family:monospace;padding:1rem;border-radius:8px;height:250px;overflow-y:auto;font-size:.75rem" id="liveFeedContainer">
+      <div style="opacity:.5">// Real-time system monitoring active...</div>
+      <div style="margin-top:.5rem">[${new Date().toLocaleTimeString()}] System: Connection to Supabase SECURE</div>
+      <div style="color:#fff">[${new Date().toLocaleTimeString()}] INFO: New deposit request received (ID: 8372)</div>
+      <div style="color:#f59e0b">[${new Date().toLocaleTimeString()}] WARN: Failed login attempt detected for user 'admin'</div>
+      <div style="color:#ef4444">[${new Date().toLocaleTimeString()}] ERR: Provider PG_SOFT API latency > 500ms</div>
+      <div style="color:#10b981">[${new Date().toLocaleTimeString()}] OK: System health check PASSED</div>
     </div>`
   };
   return previews[id] || `<div style="padding:2rem;text-align:center;color:var(--text3)">Preview not available</div>`;

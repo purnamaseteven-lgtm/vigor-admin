@@ -5,13 +5,14 @@ import { STATE } from './state.js';
 const DEMO_USERNAME    = 'adminsub40';
 const DEMO_PASSWORD    = 'vgr-demo-2026';
 const DEMO_SESSION_KEY = 'VGR_DEMO_SESSION';
+// 3-level hierarchy: SuperAdmin → Whitelabel → Agent
 const ROLE_ALIAS_MAP = {
     superadmin: 'SuperAdmin',
-    company: 'Company',
-    whitelabel: 'Company',
-    master: 'Master',
-    shop: 'Shop',
-    agent: 'Agent',
+    company:    'Whitelabel',   // legacy alias
+    whitelabel: 'Whitelabel',
+    master:     'Agent',        // legacy → merged into Agent
+    shop:       'Agent',        // legacy → merged into Agent
+    agent:      'Agent',
 };
 
 function normalizeRole(role) {
@@ -136,8 +137,8 @@ export function onAuthChange(callback) {
 window.logout = () => signOut();
 
 // ══════════════════════════════════════════════════════════════════
-//  RBAC — uses permissionMatrix from state.js (5 roles)
-//  SuperAdmin / Company / Master / Shop / Agent
+//  RBAC — uses permissionMatrix from state.js (3 roles)
+//  SuperAdmin / Whitelabel / Agent
 // ══════════════════════════════════════════════════════════════════
 
 // ── Page key → module mapping (reverse of MODULE_MAP in applyRBAC) ───────────

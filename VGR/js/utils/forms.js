@@ -1,6 +1,7 @@
 /* ─── FORM & CRUD INFRASTRUCTURE ─── */
 import { STATE, addLog, stateAdd, stateUpdate, stateDelete, BANKS, COMPANIES, STATUSES } from '../core/state.js';
 import { openModal, closeModalBtn, toast } from '../ui/components.js';
+import { getMyCompany, getDownlineType } from './scope.js';
 
 export function fmVal(id) { return document.getElementById(id)?.value; }
 
@@ -66,15 +67,37 @@ export function openFormModal(type, id = null) {
       </div>`;
         footer = `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.saveMember('${id}')">Save Member</button>`;
     } else if (type === 'company') {
-        title = isEdit ? 'Edit Company' : 'Add New Company';
+        // Role-aware: restrict which types a non-SuperAdmin can create
+        const role = STATE.currentAdmin?.role || 'SuperAdmin';
+        const isSuperAdmin = role === 'SuperAdmin';
+        // Non-SuperAdmin downline creation: type is fixed by role
+        const downlineType = getDownlineType();
+        const myCompany = isEdit ? null : getMyCompany();
+        const parentIdVal = isEdit ? (data?.parentId || '') : (myCompany?.id || '');
+
+        // Build type options — 3-level: SuperAdmin chooses Whitelabel or Agent; others fixed
+        const allTypes = ['Whitelabel', 'Agent'];
+        let typeOptions;
+        if (isSuperAdmin) {
+            typeOptions = allTypes.map(t => `<option ${data?.type === t ? 'selected' : ''}>${t}</option>`).join('');
+        } else if (isEdit) {
+            // On edit: show current type (locked)
+            typeOptions = `<option selected>${data?.type || downlineType}</option>`;
+        } else {
+            typeOptions = `<option selected>${downlineType}</option>`;
+        }
+
+        title = isEdit ? 'Edit Company' : (isSuperAdmin ? 'Add New Company' : `Add New ${downlineType}`);
         body = `
+      <input type="hidden" id="f_parentId" value="${parentIdVal}"/>
       <div class="form-grid">
         <div class="form-field"><label>Username</label><input id="f_user" value="${data?.username || ''}" ${isEdit ? 'disabled' : ''}/></div>
         <div class="form-field"><label>Company Name</label><input id="f_name" value="${data?.name || ''}"/></div>
         <div class="form-field"><label>Email</label><input id="f_email" value="${data?.email || ''}"/></div>
         <div class="form-field"><label>Initial Credit</label><input type="number" id="f_credit" value="${data?.credit || 0}"/></div>
-        <div class="form-field"><label>Type</label><select id="f_type"><option ${data?.type === 'Company' ? 'selected' : ''}>Company</option><option ${data?.type === 'Whitelabel' ? 'selected' : ''}>Whitelabel</option><option ${data?.type === 'Master' ? 'selected' : ''}>Master</option></select></div>
+        <div class="form-field"><label>Type</label><select id="f_type" ${(!isSuperAdmin && !isEdit) ? 'disabled' : ''}>${typeOptions}</select></div>
         <div class="form-field"><label>Status</label><select id="f_status"><option ${data?.status === 'Active' ? 'selected' : ''}>Active</option><option ${data?.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></div>
+        ${!isSuperAdmin && !isEdit ? `<div class="form-field" style="grid-column:1/-1"><div style="background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:.6rem 1rem;font-size:.8rem;color:#a78bfa"><i class="fa-solid fa-sitemap" style="margin-right:.5rem"></i>Will be created under <strong>${myCompany?.name || STATE.currentAdmin.company}</strong></div></div>` : ''}
         <div class="form-field" style="grid-column: 1/-1"><label>Pools Access</label>
           <div style="max-height: 120px; overflow-y: auto; background: var(--bg2); padding: .5rem; border: 1px solid var(--border); border-radius: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: .25rem">
             ${['4D Togel External', '4D Togel Vigor', '4D Togel Global', '6D Togel Vigor', 'SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA', 'MAGNUM', 'DAMACAI', 'TOTO'].map(p => `
@@ -158,10 +181,12 @@ export function saveCompany(id) {
         { id: 'f_credit', label: 'Credit', rules: ['required', 'number', 'min:0'] },
     ])) return;
     const pools = Array.from(document.querySelectorAll('input[name="f_pools"]:checked')).map(el => el.value);
+    const parentId = fmVal('f_parentId') || null;
     const payload = {
         username: fmVal('f_user'), name: fmVal('f_name'), email: fmVal('f_email'),
         credit: parseInt(fmVal('f_credit')), type: fmVal('f_type'), status: fmVal('f_status'),
-        togelMarkets: pools
+        togelMarkets: pools,
+        ...(parentId ? { parentId } : {}),
     };
     if (isEdit) {
         if (window.db?.dbUpdateCompany) {
@@ -177,7 +202,8 @@ export function saveCompany(id) {
         }
     } else {
         const newId = 'C' + Date.now();
-        const newCompany = { id: newId, ...payload, members: 0, joined: new Date().toISOString().split('T')[0] };
+        const createdBy = STATE.currentAdmin?.id || null;
+        const newCompany = { id: newId, ...payload, members: 0, joined: new Date().toISOString().split('T')[0], createdBy };
         if (window.db?.dbAddCompany) {
             window.db.dbAddCompany(newCompany).then(({ error }) => {
                 if (error) { toast('Failed: ' + error.message, 'error'); return; }

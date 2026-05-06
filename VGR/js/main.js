@@ -20,20 +20,33 @@ Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs,
 
 const lazyPageModules = [
     { loaded: false, match: (p) => p === 'dashboard', load: () => import('./pages/dashboard.js') },
-    { loaded: false, match: (p) => p.includes('member'), load: () => import('./pages/members.js') },
+    // tools.js: logs-company, logs-whitelabel, logs-master-wl, logs-member, invoice-*, tools-*
+    // MUST come before logs-memo (which also matches 'log') and before reports (which matches 'invoice')
+    { loaded: false, match: (p) => p.startsWith('logs-company') || p.startsWith('logs-whitelabel') || p.startsWith('logs-master') || p.startsWith('logs-member') || p.startsWith('invoice') || p.startsWith('tools-'), load: () => import('./pages/tools.js') },
+    // members.js: tier-history MUST come before customization (which matches 'tier')
+    { loaded: false, match: (p) => p.includes('member') || p === 'tier-history', load: () => import('./pages/members.js') },
     { loaded: false, match: (p) => p.includes('finance') || p.includes('deposit') || p.includes('withdraw') || p.includes('bank'), load: () => import('./pages/finance.js') },
     { loaded: false, match: (p) => p.includes('setting') || p === 'profile', load: () => import('./pages/settings.js') },
-    { loaded: false, match: (p) => p.includes('betting') || p.includes('lottery') || p.includes('game'), load: () => import('./pages/betting.js') },
-    { loaded: false, match: (p) => p.includes('custom') || p.includes('template') || p.includes('widget') || p.includes('vip') || p.includes('tier'), load: async () => { await import('./pages/customization.js'); await import('./builder/engine.js'); } },
-    { loaded: false, match: (p) => p.includes('memo') || p.includes('log'), load: () => import('./pages/logs-memo.js') },
-    { loaded: false, match: (p) => p.includes('company') || p.includes('whitelabel') || p.includes('agent') || p.includes('shop') || p === 'my-downlines' || p === 'master', load: () => import('./pages/company.js') },
+    // betting: also covers transferred-list
+    { loaded: false, match: (p) => p.includes('bet') || p.includes('lottery') || p.includes('game') || p.includes('transfer'), load: () => import('./pages/betting.js') },
+    // admins: system-notifications MUST come before customization (which matches 'notif')
+    { loaded: false, match: (p) => p.includes('admin') || p === 'dev-menu-config' || p.startsWith('system-'), load: () => import('./pages/admins.js') },
+    // customization: also covers announcement-list, app-notification, rebate-calc
+    { loaded: false, match: (p) => p.includes('custom') || p.includes('template') || p.includes('widget') || p.includes('vip') || p.includes('tier') || p.includes('announc') || p.includes('rebate') || p.includes('seo') || p === 'site-config', load: async () => { await import('./pages/customization.js'); await import('./builder/engine.js'); } },
+    // logs-memo: memo + logs-admin only (specific log pages are routed to tools.js above)
+    { loaded: false, match: (p) => p.includes('memo') || p === 'logs-admin' || p.includes('notif'), load: () => import('./pages/missing-pages.js') },
+    { loaded: false, match: (p) => p.includes('company') || p.includes('whitelabel') || p.includes('agent') || p === 'my-downlines' || p === 'master', load: () => import('./pages/company.js') },
     { loaded: false, match: (p) => p.includes('result'), load: () => import('./pages/results.js') },
-    { loaded: false, match: (p) => p.includes('admin'), load: () => import('./pages/admins.js') },
     { loaded: false, match: (p) => p.includes('bonus') || p.includes('promo'), load: () => import('./pages/bonus.js') },
-    { loaded: false, match: (p) => p.includes('report') || p.includes('invoice'), load: () => import('./pages/reports.js') },
-    { loaded: false, match: (p) => p.includes('tools'), load: () => import('./pages/tools.js') },
+    // reports: statistics, provider-analytics, device-report, reports-*
+    { loaded: false, match: (p) => p.includes('report') || p === 'statistics' || p.includes('analytic') || p.startsWith('provider-') || p === 'device-report', load: () => import('./pages/reports.js') },
+    { loaded: false, match: (p) => p === 'seamless-sandbox', load: () => import('./pages/seamless-sandbox.js') },
     { loaded: false, match: (p) => p.includes('seamless') || p.includes('pgsoft'), load: () => import('./pages/seamless.js') },
-    { loaded: false, match: (p) => p.includes('master'), load: () => import('./pages/master.js') },
+    // master.js: also covers whitelist, blacklist
+    { loaded: false, match: (p) => p.includes('master') || p === 'whitelist' || p === 'blacklist', load: () => import('./pages/master.js') },
+    { loaded: false, match: (p) => p === 'rbac-management', load: () => import('./pages/rbac.js') },
+    { loaded: false, match: (p) => p === 'branding-settings', load: () => import('./pages/branding.js') },
+    { loaded: false, match: (p) => p === 'security-center', load: () => import('./pages/security.js') },
     { loaded: false, match: (p) => p.includes('crm'), load: () => import('./pages/crm.js') },
     { loaded: false, match: (p) => p.includes('manual'), load: () => import('./pages/manual.js') },
     { loaded: false, match: (p) => p.includes('nawala') || p.includes('sawala'), load: () => import('./pages/nawala.js') },
@@ -209,11 +222,11 @@ function showRoleSimulator() {
         box-shadow: 0 4px 15px rgba(0,0,0,.5);
     `;
 
+    // 3-level hierarchy: SuperAdmin / Whitelabel / Agent
     const roles = [
-        { r: 'SuperAdmin', c: 'Global',    label: '⚡ Super Admin',  verified: true },
-        { r: 'Company',    c: 'vigor88',   label: '🌐 Whitelabel'               },
-        { r: 'Master',     c: 'budi',      label: '👑 Master Agent'              },
-        { r: 'Shop',       c: 'casino888', label: '🏪 Agent/Toko'               },
+        { r: 'SuperAdmin', c: 'Global', label: '⚡ Super Admin', verified: true },
+        { r: 'Whitelabel', c: 'vigor88', label: '🌐 Whitelabel' },
+        { r: 'Agent', c: 'casino888', label: '🏪 Agent' },
     ];
 
     bar.innerHTML = `
@@ -232,14 +245,13 @@ function showRoleSimulator() {
 }
 
 window.switchSimulatedRole = (role, company, shop = '', verified = false) => {
-    const idMap = { SuperAdmin: 'adm-1', Company: 'adm-2', Master: 'adm-3', Shop: 'adm-4', Agent: 'adm-5' };
+    const idMap = { SuperAdmin: 'adm-1', Whitelabel: 'adm-2', Agent: 'adm-3' };
     STATE.currentAdmin = {
         id: idMap[role] || 'adm-1',
         username: role.toLowerCase() + '_sim',
         name: role + ' Simulator',
         role: role,
         company: company,
-        shop: shop || null,
         is2FAVerified: verified,
         permissions: role === 'SuperAdmin' ? ['*'] : []
     };
@@ -254,3 +266,66 @@ window.switchSimulatedRole = (role, company, shop = '', verified = false) => {
     if (oldBar) oldBar.remove();
     showRoleSimulator();
 };
+
+/* --- GLOBAL SEARCH LOGIC (Task 2) --- */
+window.openQuickSearch = () => {
+    const overlay = document.getElementById('quickSearchOverlay');
+    overlay.classList.add('active');
+    document.getElementById('globalSearchInput').focus();
+};
+
+window.closeQuickSearch = () => {
+    document.getElementById('quickSearchOverlay').classList.remove('active');
+};
+
+window.runGlobalSearch = (val) => {
+    const results = document.getElementById('globalSearchResults');
+    if (!val || val.length < 2) {
+        results.innerHTML = '<div class="search-hint">Type at least 2 characters...</div>';
+        return;
+    }
+
+    const q = val.toLowerCase();
+    const matches = [];
+
+    // 1. Match Pages
+    const pMatches = [
+        { t: 'Dashboard', p: 'dashboard', i: 'fa-chart-line' },
+        { t: 'Member List', p: 'global-member-list', i: 'fa-users' },
+        { t: 'Deposit List', p: 'deposit-list', i: 'fa-arrow-down' },
+        { t: 'Withdrawal List', p: 'withdrawal-list', i: 'fa-arrow-up' },
+        { t: 'Site Config', p: 'site-config', i: 'fa-sliders' },
+        { t: 'Template Builder', p: 'template-builder', i: 'fa-object-group' },
+    ].filter(x => x.t.toLowerCase().includes(q));
+    pMatches.forEach(m => matches.push({ ...m, type: 'Page' }));
+
+    // 2. Match Members (from STATE)
+    const mMatches = STATE.members.filter(m => m.username.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)).slice(0, 5);
+    mMatches.forEach(m => matches.push({ t: m.username, p: 'global-member-list', i: 'fa-user', sub: `ID: ${m.id}`, type: 'Member' }));
+
+    if (matches.length === 0) {
+        results.innerHTML = '<div class="search-hint">No results found for "' + val + '"</div>';
+        return;
+    }
+
+    results.innerHTML = matches.map(m => `
+        <div class="search-item" onclick="window.closeQuickSearch(); go('${m.p}')">
+            <div class="search-item-icon"><i class="fa-solid ${m.i}"></i></div>
+            <div class="search-item-info">
+                <div class="title">${m.t}</div>
+                <div class="subtitle">${m.sub} • ${m.type}</div>
+            </div>
+        </div>
+    `).join('');
+};
+
+// Global Hotkey Listener
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        window.openQuickSearch();
+    }
+    if (e.key === 'Escape') {
+        window.closeQuickSearch();
+    }
+});

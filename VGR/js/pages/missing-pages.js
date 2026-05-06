@@ -74,7 +74,7 @@ function renderTplPreview(t) {
 }
 
 /* ─── Template List Page ─── */
-pages['custom-template'] = () => {
+pages['template-list'] = () => {
     // Group templates by family
     const groups = {};
     TEMPLATES.forEach(t => {
@@ -214,18 +214,18 @@ window.filterTplGroup = (group, btn) => {
 };
 
 // ────────────────────────────────────────────────────
-// APP NOTIFICATION (custom-app-notification)
+// APP NOTIFICATION (app-notification)
 // ────────────────────────────────────────────────────
-pages['custom-app-notification'] = () => {
+pages['app-notification'] = () => {
     const notifs = STATE.notifications || [];
     return `
-    ${pageHeader('App Notification', '<span>Customization</span><span class="sep">\u203A</span><span>App Notification</span>', '<button class="btn btn-primary btn-sm" onclick="window.addAppNotif()"><i class="fa-solid fa-plus"></i> Add Notification</button>')}
+    ${pageHeader('App Notification', '<span>Customization</span><span class="sep">›</span><span>App Notification</span>', '<button class="btn btn-primary btn-sm" onclick="window.addAppNotif()"><i class="fa-solid fa-plus"></i> Add Notification</button>')}
     <div class="card">
         <div class="card-header"><span class="card-title">App Notification List</span></div>
         <div class="card-body">
-            ${tableWrap('<table><thead><tr><th>#</th><th>Created Date</th><th>Title</th><th>Content</th><th>Target</th><th>Action</th></tr></thead><tbody>' +
+            ${tableWrap(`<table><thead><tr><th>#</th><th>Created Date</th><th>Title</th><th>Content</th><th>Target</th><th>Action</th></tr></thead><tbody>` +
         (notifs.length ? notifs.map((n, i) =>
-            '<tr><td>' + (i + 1) + '</td><td style="font-size:.75rem">' + (n.date || '-') + '</td><td style="color:var(--acc)">' + (n.title || '-') + '</td><td style="font-size:.75rem;max-width:300px;color:var(--text3)">' + (n.content || '-') + '</td><td>' + badge(n.target || 'All', 'secondary') + '</td><td><div style="display:flex;gap:.25rem"><button class="btn btn-success btn-xs" onclick="toast(\'Edit\',\'info\')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-xs" onclick="window.delAppNotif(\'' + n.id + '\')"><i class="fa-solid fa-trash"></i></button></div></td></tr>'
+            `<tr><td>${i + 1}</td><td style="font-size:.75rem">${n.date || '-'}</td><td style="color:var(--acc)">${n.title || '-'}</td><td style="font-size:.75rem;max-width:300px;color:var(--text3)">${n.content || '-'}</td><td>${badge(n.target || 'All', 'secondary')}</td><td><div style="display:flex;gap:.25rem"><button class="btn btn-success btn-xs" onclick="toast('Edit','info')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-xs" onclick="window.delAppNotif('${n.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`
         ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:2rem">No notifications</td></tr>') +
         '</tbody></table>')}
         </div>

@@ -3,18 +3,13 @@ import { STATE, fmt, fmtCur, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, actionBtns, renderPagerHTML, exportBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, COMPANIES, STATUSES, BANKS } from '../utils/helpers.js';
+import { scopedMembers, getScopeSummary } from '../utils/scope.js';
 
 pages['global-member-list'] = () => {
   const PG = 'global-member-list';
-  const curAdmin = STATE.currentAdmin;
 
-  // Authorization Logic: Filter members based on admin level
-  let rawData = STATE.members;
-  if (curAdmin.role === 'Company') {
-    rawData = STATE.members.filter(m => m.company === curAdmin.company);
-  } else if (curAdmin.role === 'Shop') {
-    rawData = STATE.members.filter(m => m.company === curAdmin.company && m.shopId === curAdmin.shop);
-  }
+  // Scoped: each role only sees their own tree
+  const rawData = scopedMembers();
 
   const filtered = filterData(rawData, PG);
   const total = filtered.length;
@@ -161,7 +156,7 @@ window.toggleMemberStatus = async (id, newStatus, username) => {
 pages['tier-history'] = () => {
   const PG = 'tier-history';
   const tiers = STATE.vipTiers || [];
-  const members = STATE.members;
+  const members = scopedMembers();
 
   // Build synthetic tier history from member data (or use STATE.tierHistory if it exists)
   if (!STATE.tierHistory || STATE.tierHistory.length === 0) {
@@ -180,7 +175,10 @@ pages['tier-history'] = () => {
         company: m.company,
         prevTier: tierNames[prevTierIdx],
         newTier: tierNames[currentTierIdx],
+        fromTier: tierNames[prevTierIdx],
+        toTier: tierNames[currentTierIdx],
         change: changes[idx % changes.length],
+        reason: changes[idx % changes.length],
         actor: actors[idx % actors.length],
         turnoverReq: fmt(tiers[currentTierIdx]?.turnover || 0),
         turnoverAchieved: fmt(m.balance * 2),

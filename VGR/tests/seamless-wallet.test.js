@@ -3,11 +3,12 @@
 // Mock test suite assuming running via node and testing live Supabase instance
 import assert from 'assert';
 
-// You should populate these before executing the test
-const EDGE_FUNCTION_URL = process.env.VITE_SUPABASE_URL + '/functions/v1/seamless-wallet';
-const OPERATOR_TOKEN = process.env.VITE_PG_OPERATOR_TOKEN || 'VGR-OPR-2024-ABCD';
-const SECRET_KEY = process.env.VITE_PG_SECRET_KEY || 'sk_live_a1b25cde5f3gh46ijkl';
-const TEST_PLAYER = 'adminsub40'; // Ensure this player exists in dev Supabase members table
+// Required env for integration tests (no insecure defaults)
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const OPERATOR_TOKEN = process.env.VITE_PG_OPERATOR_TOKEN;
+const SECRET_KEY = process.env.VITE_PG_SECRET_KEY;
+const TEST_PLAYER = process.env.VITE_SEAMLESS_TEST_PLAYER;
+const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/seamless-wallet`;
 
 async function sendRequest(endpoint, payload) {
     const urlParams = new URLSearchParams({
@@ -102,8 +103,14 @@ async function runTests() {
 // Execute tests if running directly
 import { fileURLToPath } from 'url';
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    if (!process.env.VITE_SUPABASE_URL) {
-        console.warn('⚠️ Missing VITE_SUPABASE_URL in env. Run with VITE_SUPABASE_URL=your_url node tests/seamless-wallet.test.js');
+    const missing = [];
+    if (!SUPABASE_URL) missing.push('VITE_SUPABASE_URL');
+    if (!OPERATOR_TOKEN) missing.push('VITE_PG_OPERATOR_TOKEN');
+    if (!SECRET_KEY) missing.push('VITE_PG_SECRET_KEY');
+    if (!TEST_PLAYER) missing.push('VITE_SEAMLESS_TEST_PLAYER');
+    if (missing.length) {
+        console.warn(`⚠️ Missing env: ${missing.join(', ')}`);
+        console.warn('Run: node tests/seamless-wallet.test.js (after exporting required vars)');
         process.exit(1);
     }
     runTests().catch(err => {

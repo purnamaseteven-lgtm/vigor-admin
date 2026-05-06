@@ -4,6 +4,8 @@ import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsActions, tableWrap, badge, renderPagerHTML, openModal, closeModalBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, COMPANIES } from '../utils/helpers.js';
 import { SUPABASE_ENABLED } from '../core/supabase.js';
+import { scopedCompanies, getScopeSummary } from '../utils/scope.js';
+const STRICT_REAL_MODE = String((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_STRICT_REAL_MODE) || '').toLowerCase() === 'true';
 
 // ══════════════════════════════════════════════════════════════
 //  ISP CONFIGURATION
@@ -15,33 +17,57 @@ const ISP_LIST = [
     { id: 'xl',        name: 'XL',         fullName: 'XL Axiata',                 color: '#3b82f6', bgColor: 'rgba(59,130,246,.12)', icon: 'fa-signal' },
     { id: 'smartfren', name: 'Smartfren',  fullName: 'Smartfren Telecom',         color: '#10b981', bgColor: 'rgba(16,185,129,.12)', icon: 'fa-signal' },
 ];
+const DOMAIN_RE = /^(?!-)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,}$/i;
 
 // ── State helpers ──
 function getNawalaResults() {
     if (!STATE.nawalaResults) STATE.nawalaResults = {};
     return STATE.nawalaResults;
 }
-function getNawalaTargets() {
+
+// Returns ALL nawala targets stored globally (cross-role).
+// Each target has an optional `addedBy` field (admin id who added it).
+function _getAllNawalaTargets() {
     if (!STATE.nawalaTargets || STATE.nawalaTargets.length === 0) {
-        // Pre-populate from registered companies
-        STATE.nawalaTargets = (STATE.companies || []).slice(0, 30).map(c => ({
-            id: c.id || ('NT_' + (c.username || c.name)),
+        // Auto-seed from ALL companies on first run (SuperAdmin level)
+        STATE.nawalaTargets = (STATE.companies || []).map(c => ({
+            id: c.id ? ('NT_' + c.id) : ('NT_' + (c.username || c.name)),
             company: c.username || c.name || c,
             domain: c.domain || c.website || guessCompanyDomain(c.username || c.name || c),
             active: true,
+            addedBy: 'adm-1',  // attributed to SuperAdmin seed
         }));
         // Fallback demo targets if companies list is empty
-        if (STATE.nawalaTargets.length === 0) {
-            const demos = COMPANIES.slice(0, 12);
-            STATE.nawalaTargets = demos.map((c, i) => ({
+        if (STATE.nawalaTargets.length === 0 && !STRICT_REAL_MODE) {
+            STATE.nawalaTargets = COMPANIES.slice(0, 12).map((c, i) => ({
                 id: 'NT_' + i,
                 company: c,
                 domain: guessCompanyDomain(c),
                 active: true,
+                addedBy: 'adm-1',
             }));
         }
     }
     return STATE.nawalaTargets;
+}
+
+// Scoped view: filter to only companies visible to the current admin.
+function getNawalaTargets() {
+    const all = _getAllNawalaTargets();
+    const { role } = STATE.currentAdmin;
+    if (role === 'SuperAdmin') return all;
+
+    // Build set of company usernames in scope
+    const myCos = scopedCompanies();
+    const scopeSet = new Set(myCos.map(c => (c.username || c.name || c).toLowerCase()));
+
+    return all.filter(t => scopeSet.has((t.company || '').toLowerCase()));
+}
+
+// Returns scoped company list for dropdowns/datalists
+function getScopedCompanyList() {
+    const cos = scopedCompanies();
+    return cos.map(c => (typeof c === 'string' ? c : (c.username || c.name)));
 }
 function guessCompanyDomain(name) {
     return (name || 'site').toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
@@ -83,8 +109,9 @@ function ispBadge(result) {
 // ══════════════════════════════════════════════════════════════
 pages['nawala-scan'] = () => {
     const PG = 'nawala-scan';
-    const targets = getNawalaTargets();
+    const targets = getNawalaTargets();   // already scoped
     const results = getNawalaResults();
+    const scopeInfo = getScopeSummary();
 
     // KPI aggregation
     let totalAccessible = 0, totalBlocked = 0, totalPartial = 0, totalUnchecked = 0;
@@ -118,6 +145,17 @@ pages['nawala-scan'] = () => {
             </button>
         </div>
     `)}
+
+    <!-- SCOPE BANNER (non-SuperAdmin only) -->
+    ${scopeInfo ? `
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem;background:rgba(14,165,233,.07);border:1px solid rgba(14,165,233,.2);border-radius:10px;margin-bottom:1.25rem;font-size:.8rem">
+        <i class="fa-solid fa-sitemap" style="color:var(--acc)"></i>
+        <div>
+            <strong style="color:var(--acc)">${scopeInfo.roleLabel}: ${scopeInfo.company}</strong>
+            <span style="color:var(--text3);margin-left:.75rem">Menampilkan <strong>${targets.length}</strong> website milik organisasi Anda dan downline-nya</span>
+        </div>
+        <span style="margin-left:auto;font-size:.72rem;color:var(--text3)">${scopeInfo.companyCount} company dalam scope</span>
+    </div>` : ''}
 
     <!-- KPI CARDS -->
     <div class="stat-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:1.5rem">
@@ -322,6 +360,9 @@ async function checkOneDomain(domain, ispId, signal) {
     const timeout = parseInt(STATE.settings?.nawala_timeout || '5000', 10);
 
     // Demo / no-backend mode: simulate results
+    if (STRICT_REAL_MODE && (!SUPABASE_ENABLED || proxyUrl.includes('vigor.internal'))) {
+        return { status: 'error', latency: 0, message: 'Missing real proxy URL in strict real mode', timestamp: new Date().toISOString() };
+    }
     if (!SUPABASE_ENABLED || proxyUrl.includes('vigor.internal')) {
         const delay = 400 + Math.floor(Math.random() * 1800);
         await new Promise(resolve => {
@@ -547,15 +588,25 @@ window.scanSingleISP = async (targetId, domain, ispId) => {
 //  TARGET MANAGEMENT
 // ══════════════════════════════════════════════════════════════
 window.openAddNawalaTarget = (existingId = null) => {
-    const existing = existingId ? getNawalaTargets().find(t => t.id === existingId) : null;
+    const existing = existingId ? _getAllNawalaTargets().find(t => t.id === existingId) : null;
+    const scopedCoList = getScopedCompanyList();
+
     openModal(existing ? 'Edit Target' : 'Add Scan Target', `
         <div class="form-grid">
             <div class="form-field">
                 <label>Company / Label <span style="color:var(--red)">*</span></label>
                 <input id="nt_company" class="form-control" value="${existing?.company || ''}" placeholder="e.g. vigor88" list="nt_company_list" />
                 <datalist id="nt_company_list">
-                    ${COMPANIES.map(c => `<option>${c}</option>`).join('')}
+                    ${scopedCoList.map(c => `<option>${c}</option>`).join('')}
                 </datalist>
+                ${scopedCoList.length > 0 ? `
+                <div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.3rem">
+                    ${scopedCoList.slice(0, 10).map(c => `
+                        <span style="font-size:.68rem;padding:.1rem .45rem;border-radius:20px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;color:var(--text2)"
+                              onclick="document.getElementById('nt_company').value='${c}';window._autoFillDomain('${c}')">${c}</span>
+                    `).join('')}
+                    ${scopedCoList.length > 10 ? `<span style="font-size:.65rem;color:var(--text3)">+${scopedCoList.length - 10} more</span>` : ''}
+                </div>` : ''}
             </div>
             <div class="form-field">
                 <label>Domain <span style="color:var(--red)">*</span></label>
@@ -563,7 +614,7 @@ window.openAddNawalaTarget = (existingId = null) => {
             </div>
         </div>
         <div style="font-size:.75rem;color:var(--text3);margin-top:.5rem">
-            <i class="fa-solid fa-info-circle"></i> Enter domain without protocol (e.g. <code>vigorbetting.com</code>)
+            <i class="fa-solid fa-info-circle"></i> Masukkan domain tanpa protokol (contoh: <code>vigor88.com</code>)
         </div>
     `, `
         <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
@@ -571,39 +622,60 @@ window.openAddNawalaTarget = (existingId = null) => {
     `);
 };
 
+// Auto-fill domain guess when company chip is clicked
+window._autoFillDomain = (companyName) => {
+    const coData = (STATE.companies || []).find(c => (c.username || c.name) === companyName);
+    const domain = coData?.domain || coData?.website || guessCompanyDomain(companyName);
+    const el = document.getElementById('nt_domain');
+    if (el && !el.value) el.value = domain;
+};
+
 window.saveNawalaTarget = (existingId = '') => {
     const company = document.getElementById('nt_company')?.value.trim();
     let domain = document.getElementById('nt_domain')?.value.trim().toLowerCase().replace(/^https?:\/\//i, '').split('/')[0];
     if (!company) { toast('Company name is required', 'error'); return; }
     if (!domain) { toast('Domain is required', 'error'); return; }
-    const targets = getNawalaTargets();
+    if (company.length < 2) { toast('Company name is too short', 'error'); return; }
+    if (!DOMAIN_RE.test(domain)) { toast('Invalid domain format', 'error'); return; }
+
+    const allTargets = _getAllNawalaTargets();
     if (existingId) {
-        const t = targets.find(x => x.id === existingId);
+        const t = allTargets.find(x => x.id === existingId);
         if (t) { t.company = company; t.domain = domain; }
     } else {
-        if (targets.some(t => t.domain === domain)) { toast('Domain already in scan list', 'warning'); return; }
-        targets.unshift({ id: 'NT_' + Date.now(), company, domain, active: true });
+        if (allTargets.some(t => t.domain === domain)) { toast('Domain sudah ada di scan list', 'warning'); return; }
+        allTargets.unshift({
+            id: 'NT_' + Date.now(),
+            company, domain, active: true,
+            addedBy: STATE.currentAdmin.id,
+        });
     }
     saveState();
     closeModalBtn();
-    toast(existingId ? 'Target updated' : `${domain} added to scan list`, 'success');
+    toast(existingId ? 'Target updated' : `${domain} ditambahkan ke scan list`, 'success');
     window.go('nawala-scan');
 };
 
 window.removeNawalaTarget = (id) => {
-    const t = getNawalaTargets().find(x => x.id === id);
+    const t = _getAllNawalaTargets().find(x => x.id === id);
     if (!t) return;
+    // Non-SuperAdmin: only allow removing targets they added
+    const { role, id: adminId } = STATE.currentAdmin;
+    if (role !== 'SuperAdmin' && t.addedBy && t.addedBy !== adminId) {
+        toast('Hanya bisa menghapus target yang Anda tambahkan sendiri', 'warning');
+        return;
+    }
     if (typeof window.confirmAction === 'function') {
-        window.confirmAction('Remove Target', `Remove ${t.domain} from scan list?`, () => {
-            STATE.nawalaTargets = getNawalaTargets().filter(x => x.id !== id);
+        window.confirmAction('Remove Target', `Hapus ${t.domain} dari scan list?`, () => {
+            STATE.nawalaTargets = _getAllNawalaTargets().filter(x => x.id !== id);
             delete (STATE.nawalaResults || {})[t.domain];
             saveState();
-            toast(`${t.domain} removed`, 'success');
+            toast(`${t.domain} dihapus`, 'success');
             window.go('nawala-scan');
         }, 'Remove', 'danger');
     } else {
-        STATE.nawalaTargets = getNawalaTargets().filter(x => x.id !== id);
-        saveState(); toast('Removed', 'success'); window.go('nawala-scan');
+        STATE.nawalaTargets = _getAllNawalaTargets().filter(x => x.id !== id);
+        saveState(); toast('Dihapus', 'success'); window.go('nawala-scan');
     }
 };
 
@@ -633,7 +705,7 @@ window.openNawalaSettings = () => {
             </div>
         </div>
         <div style="margin-top:1rem;padding:.75rem;background:var(--bg2);border-radius:8px;font-size:.75rem;color:var(--text3)">
-            <strong>Demo Mode:</strong> If proxy URLs are empty or contain <code>vigor.internal</code>, the scanner uses simulated results based on realistic Indonesian ISP nawala patterns.
+            <strong>Strict Real Mode:</strong> Set <code>VITE_STRICT_REAL_MODE=true</code> to disable simulated checks and require real ISP proxy URLs.
         </div>
     `, `
         <button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button>
@@ -664,7 +736,10 @@ window.testNawalaProxies = async () => {
     toast('Testing proxy endpoints...', 'info');
     const results = await Promise.allSettled(ISP_LIST.map(async isp => {
         const url = document.getElementById(`np_${isp.id}`)?.value.trim();
-        if (!url || url.includes('vigor.internal')) return { isp: isp.name, status: 'demo', msg: 'Demo mode (simulated)' };
+        if (!url || url.includes('vigor.internal')) {
+            if (STRICT_REAL_MODE) return { isp: isp.name, status: 'error', msg: 'Missing real proxy URL' };
+            return { isp: isp.name, status: 'demo', msg: 'Demo mode (simulated)' };
+        }
         try {
             const res = await fetch(url + '?url=https://google.com&test=1', { signal: AbortSignal.timeout(4000) });
             return { isp: isp.name, status: res.ok ? 'ok' : 'error', msg: `HTTP ${res.status}` };

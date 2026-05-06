@@ -3,6 +3,8 @@ import { signIn } from './core/auth.js';
 import { SUPABASE_ENABLED } from './core/supabase.js';
 
 let captchaCode = '84721';
+let loginAttempts = parseInt(localStorage.getItem('VGR_LOGIN_ATTEMPTS') || '0', 10);
+const MAX_ATTEMPTS = 5;
 
 export function refreshCaptcha() {
     captchaCode = Math.floor(10000 + Math.random() * 90000).toString();
@@ -28,6 +30,12 @@ export async function handleLogin(e) {
     const err = document.getElementById('loginError');
     const btn = document.querySelector('.btn-login');
     const cap = document.getElementById('captchaInput').value.trim();
+
+    if (loginAttempts >= MAX_ATTEMPTS) {
+        showError('Security Alert: Multiple failed attempts detected. Your IP has been temporarily flagged.');
+        err.classList.add('brute-force-warning');
+        return;
+    }
 
     if (cap !== captchaCode) {
         showError('Invalid verification code. Please try again.');
@@ -56,6 +64,8 @@ export async function handleLogin(e) {
     const { error } = await signIn(email, password);
 
     if (error) {
+        loginAttempts++;
+        localStorage.setItem('VGR_LOGIN_ATTEMPTS', loginAttempts);
         showError(error.message || 'Login failed. Check your credentials.');
         btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
         btn.disabled = false;
@@ -64,6 +74,7 @@ export async function handleLogin(e) {
         return;
     }
 
+    localStorage.removeItem('VGR_LOGIN_ATTEMPTS');
     btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Success!';
     setTimeout(() => { window.location.href = './app.html'; }, 600);
 }

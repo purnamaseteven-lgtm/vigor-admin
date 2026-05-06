@@ -6,6 +6,9 @@
 import { config as loadEnv } from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import seamlessRouter from './routes/seamless.js';
 import paymentRouter from './routes/payment.js';
 import cloudflareRouter from './routes/cloudflare.js';
@@ -30,12 +33,31 @@ app.use(cors({
     },
     credentials: true,
 }));
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+app.use(compression());
+
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: Number(process.env.API_RATE_LIMIT_PER_MIN || 300),
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+const webhookLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: Number(process.env.WEBHOOK_RATE_LIMIT_PER_MIN || 1200),
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
+app.use('/api/webhooks', webhookLimiter);
 
 // Raw body for webhook signature validation
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 // JSON for everything else
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.URLENCODED_BODY_LIMIT || '1mb' }));
 
 // ── Health check ─────────────────────────────────────────────────
 app.get('/health', (req, res) => {

@@ -1,5 +1,6 @@
 /* ─── REPORTS, STATISTICS & ANALYTICS PAGES ─── */
 import { STATE, fmt, fmtCur, MEMBERS, COMPANIES, saveState, addLog } from '../core/state.js';
+import { scopedDeposits, scopedWithdrawals, scopedMembers, scopedCompanies, getScopeSummary } from '../utils/scope.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsDateFilter, fsActions, tableWrap, badge, renderPagerHTML, openModal, closeModalBtn, toast } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, rnd, makeDates, makeData, getFilter, setFilter } from '../utils/helpers.js';
@@ -22,18 +23,26 @@ const GAMES_BY_PROVIDER = {
 /* ─── STATISTICS ─── */
 pages['statistics'] = () => {
   const dates = makeDates(14);
-  const totalDeposit = STATE.deposits.filter(d => d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
-  const totalWithdraw = STATE.withdrawals.filter(w => w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
-  const ggr = totalDeposit - totalWithdraw;
-  const members = STATE.members.length;
-  const active = STATE.members.filter(m => m.status === 'Active').length;
 
-  // Real: group deposits/withdrawals/members by company from STATE
-  const companyStats = (STATE.companies.length > 0 ? STATE.companies : COMPANIES.map(c => ({ username: c, name: c }))).map(c => {
+  // Scoped data
+  const myDeposits = scopedDeposits();
+  const myWithdrawals = scopedWithdrawals();
+  const myMembers = scopedMembers();
+  const myCompanies = scopedCompanies();
+  const scopeInfo = getScopeSummary();
+
+  const totalDeposit = myDeposits.filter(d => d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+  const totalWithdraw = myWithdrawals.filter(w => w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+  const ggr = totalDeposit - totalWithdraw;
+  const members = myMembers.length;
+  const active = myMembers.filter(m => m.status === 'Active').length;
+
+  // Group by company — only companies in scope
+  const companyStats = myCompanies.map(c => {
     const key = c.username || c.name;
-    const dep = STATE.deposits.filter(d => d.company === key && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
-    const wd  = STATE.withdrawals.filter(w => w.company === key && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
-    const mems = STATE.members.filter(m => m.company === key).length;
+    const dep = myDeposits.filter(d => d.company === key && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+    const wd = myWithdrawals.filter(w => w.company === key && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+    const mems = myMembers.filter(m => m.company === key).length;
     return { company: key, deposit: dep, withdraw: wd, members: mems, ggr: dep - wd };
   }).filter(c => c.deposit > 0 || c.members > 0).slice(0, 15);
 
@@ -97,8 +106,8 @@ pages['statistics'] = () => {
             </thead>
             <tbody>
               ${STATE.banks.map((b, i) => {
-      const totalIn = STATE.deposits.filter(d => d.bank === b.bank && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
-      const totalOut = STATE.withdrawals.filter(w => w.bank === b.bank && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+      const totalIn = myDeposits.filter(d => d.bank === b.bank && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+      const totalOut = myWithdrawals.filter(w => w.bank === b.bank && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
       const net = totalIn - totalOut;
       const usage = Math.round((totalIn / totalDeposit) * 100) || 0;
       return `
@@ -130,11 +139,7 @@ pages['statistics'] = () => {
     <div class="card">
       <div class="card-header">
         <span class="card-title">Agent / Company Performance</span>
-        ${(()=>{
-          const r = STATE.currentAdmin.role;
-          if (r === 'Company' || r === 'Master') return `<span style="margin-left:.5rem;font-size:.72rem;background:var(--acc)22;color:var(--acc);padding:.2rem .6rem;border-radius:6px">${r} View — Your agents shown below</span>`;
-          return '';
-        })()}
+        ${scopeInfo ? `<span style="margin-left:.5rem;font-size:.72rem;background:var(--acc)22;color:var(--acc);padding:.2rem .6rem;border-radius:6px">${scopeInfo.roleLabel}: ${scopeInfo.company}</span>` : ''}
       </div>
       <div class="card-body">
         ${tableWrap(`
@@ -181,20 +186,25 @@ pages['statistics'] = () => {
 
 // ── Feature #12: Agent Statistics Drill-down ──
 window.showAgentStatDetail = (companyKey) => {
-  const compMembers = STATE.members.filter(m => m.company === companyKey);
-  const compDeps = STATE.deposits.filter(d => d.company === companyKey && d.status === 'Approved');
-  const compWds  = STATE.withdrawals.filter(w => w.company === companyKey && w.status === 'Approved');
+  // Use scoped base so agents can't drill into companies outside their tree
+  const base = window.scope || {};
+  const baseMembers = base.scopedMembers ? base.scopedMembers() : (STATE.members || []);
+  const baseDeps = base.scopedDeposits ? base.scopedDeposits() : (STATE.deposits || []);
+  const baseWds = base.scopedWithdrawals ? base.scopedWithdrawals() : (STATE.withdrawals || []);
+  const compMembers = baseMembers.filter(m => m.company === companyKey);
+  const compDeps = baseDeps.filter(d => d.company === companyKey && d.status === 'Approved');
+  const compWds = baseWds.filter(w => w.company === companyKey && w.status === 'Approved');
   const totalDep = compDeps.reduce((s, d) => s + d.amount, 0);
-  const totalWd  = compWds.reduce((s, w) => s + w.amount, 0);
+  const totalWd = compWds.reduce((s, w) => s + w.amount, 0);
   const totalBets = (STATE.lotteryBets || []).filter(b => b.company === companyKey);
   const totalTO = totalBets.reduce((s, b) => s + (b.betAmount || 0), 0);
   const ggr = totalDep - totalWd;
 
   // Top players by deposit
   const memberStats = compMembers.map(m => {
-    const mDep = compDeps.filter(d => d.member === m.username).reduce((s,d)=>s+d.amount,0);
-    const mWd  = compWds.filter(w => w.member === m.username).reduce((s,w)=>s+w.amount,0);
-    const mTO  = totalBets.filter(b => b.member === m.username).reduce((s,b)=>s+(b.betAmount||0),0);
+    const mDep = compDeps.filter(d => d.member === m.username).reduce((s, d) => s + d.amount, 0);
+    const mWd = compWds.filter(w => w.member === m.username).reduce((s, w) => s + w.amount, 0);
+    const mTO = totalBets.filter(b => b.member === m.username).reduce((s, b) => s + (b.betAmount || 0), 0);
     return { username: m.username, deposit: mDep, withdraw: mWd, turnover: mTO, ggr: mDep - mWd };
   }).sort((a, b) => b.deposit - a.deposit).slice(0, 10);
 
@@ -202,11 +212,11 @@ window.showAgentStatDetail = (companyKey) => {
     m.openModal(`Agent Detail: ${companyKey}`, `
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem">
         ${[
-          ['Members', fmt(compMembers.length), 'fa-users', 'var(--acc)'],
-          ['Deposit', fmtCur(totalDep), 'fa-arrow-down-to-bracket', 'var(--green)'],
-          ['Withdraw', fmtCur(totalWd), 'fa-arrow-up-from-bracket', 'var(--red)'],
-          ['GGR', fmtCur(ggr), 'fa-chart-line', ggr>=0?'var(--green)':'var(--red)'],
-        ].map(([label, val, icon, color]) => `
+        ['Members', fmt(compMembers.length), 'fa-users', 'var(--acc)'],
+        ['Deposit', fmtCur(totalDep), 'fa-arrow-down-to-bracket', 'var(--green)'],
+        ['Withdraw', fmtCur(totalWd), 'fa-arrow-up-from-bracket', 'var(--red)'],
+        ['GGR', fmtCur(ggr), 'fa-chart-line', ggr >= 0 ? 'var(--green)' : 'var(--red)'],
+      ].map(([label, val, icon, color]) => `
           <div style="background:var(--bg2);border-radius:10px;padding:.75rem;text-align:center;border:1px solid var(--border)">
             <i class="fa-solid ${icon}" style="color:${color};font-size:1.1rem;margin-bottom:.4rem"></i>
             <div style="font-size:.7rem;color:var(--text3)">${label}</div>
@@ -224,7 +234,7 @@ window.showAgentStatDetail = (companyKey) => {
                 <td style="padding:.4rem .6rem;text-align:right;color:var(--green)">${fmtCur(ms.deposit)}</td>
                 <td style="padding:.4rem .6rem;text-align:right;color:var(--red)">${fmtCur(ms.withdraw)}</td>
                 <td style="padding:.4rem .6rem;text-align:right">${fmtCur(ms.turnover)}</td>
-                <td style="padding:.4rem .6rem;text-align:right;font-weight:700;color:${ms.ggr>=0?'var(--green)':'var(--red)'}">${fmtCur(ms.ggr)}</td>
+                <td style="padding:.4rem .6rem;text-align:right;font-weight:700;color:${ms.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtCur(ms.ggr)}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -236,12 +246,12 @@ window.showAgentStatDetail = (companyKey) => {
 
 /* ─── PROVIDER ANALYTICS ─── */
 pages['provider-analytics'] = () => {
-  const curAdmin = STATE.currentAdmin;
-  // Company-level admins only see their own data
-  let txs = (STATE.seamless?.transactions || []);
-  if (curAdmin.role === 'Company' || curAdmin.role === 'Shop') {
-    txs = txs.filter(t => t.company === curAdmin.company);
-  }
+  // Scoped: only transactions from members visible to current admin
+  const _sMembers = scopedMembers();
+  const _playerSet = new Set(_sMembers.map(m => m.username));
+  let txs = (STATE.seamless?.transactions || []).filter(t =>
+    STATE.currentAdmin.role === 'SuperAdmin' || _playerSet.has(t.player)
+  );
   // Aggregate per provider from real seamless transaction data
   const providerMap = {};
   txs.forEach(tx => {
@@ -344,29 +354,30 @@ pages['provider-analytics'] = () => {
 };
 
 /* ─── AGENT DAILY REPORT ─── */
-pages['reports-agent-daily'] = () => {
+pages['report-agent-daily'] = () => {
   const PG = 'reports-agent-daily';
-  // Real: aggregate deposits/withdrawals/members from STATE by company
+  const _deps = scopedDeposits();
+  const _wds = scopedWithdrawals();
+  const _mbrs = scopedMembers();
+  const _cos = scopedCompanies();
   const commRate = parseFloat(STATE.settings?.commission_rate || STATE.settings?.commission || 5) / 100;
-  const allKeys = STATE.companies.length > 0
-    ? STATE.companies.map(c => c.username || c.name)
-    : COMPANIES.slice(0, 15);
+  const allKeys = _cos.length > 0 ? _cos.map(c => c.username || c.name) : COMPANIES.slice(0, 15);
   const rows = allKeys.map(company => {
-    const deps = STATE.deposits.filter(d => d.company === company && d.status === 'Approved');
-    const wds  = STATE.withdrawals.filter(w => w.company === company && w.status === 'Approved');
+    const deps = _deps.filter(d => d.company === company && d.status === 'Approved');
+    const wds = _wds.filter(w => w.company === company && w.status === 'Approved');
     const totalDep = deps.reduce((s, d) => s + d.amount, 0);
-    const totalWd  = wds.reduce((s, w) => s + w.amount, 0);
+    const totalWd = wds.reduce((s, w) => s + w.amount, 0);
     const ggr = totalDep - totalWd;
     return {
       company,
-      members:      STATE.members.filter(m => m.company === company).length,
-      newMembers:   0,
-      deposit:      totalDep,
+      members: _mbrs.filter(m => m.company === company).length,
+      newMembers: 0,
+      deposit: totalDep,
       depositCount: deps.length,
-      withdraw:     totalWd,
+      withdraw: totalWd,
       withdrawCount: wds.length,
       ggr,
-      commission:   Math.max(0, Math.round(ggr * commRate)),
+      commission: Math.max(0, Math.round(ggr * commRate)),
       date: new Date().toLocaleDateString('id-ID'),
     };
   }).filter(r => r.members > 0 || r.deposit > 0);
@@ -444,17 +455,20 @@ pages['reports-agent-daily'] = () => {
 };
 
 /* ─── WIN LOSS REPORT ─── */
-pages['reports-winloss'] = () => {
+pages['report-winloss'] = () => {
   const PG = 'reports-winloss';
-  // Real: aggregate from lottery bets + seamless transactions by member
+  // Scoped: filter by members visible to current admin
+  const _wlMembers = scopedMembers();
+  const _wlSet = new Set(_wlMembers.map(m => m.username));
+  const isSuper = STATE.currentAdmin.role === 'SuperAdmin';
   const betMap = {};
-  (STATE.lotteryBets || []).forEach(b => {
+  (STATE.lotteryBets || []).filter(b => isSuper || _wlSet.has(b.member)).forEach(b => {
     if (!betMap[b.member]) betMap[b.member] = { member: b.member, company: b.company, betAmt: 0, winAmt: 0, bets: 0, wins: 0 };
     betMap[b.member].betAmt += b.betAmount || 0;
     betMap[b.member].bets++;
     if (b.status === 'Won') { betMap[b.member].winAmt += b.winAmount || 0; betMap[b.member].wins++; }
   });
-  (STATE.seamless?.transactions || []).forEach(t => {
+  (STATE.seamless?.transactions || []).filter(t => isSuper || _wlSet.has(t.player)).forEach(t => {
     const key = t.player;
     if (!betMap[key]) betMap[key] = { member: t.player, company: t.company, betAmt: 0, winAmt: 0, bets: 0, wins: 0 };
     betMap[key].betAmt += t.betAmount || 0;
@@ -551,13 +565,13 @@ pages['reports-winloss'] = () => {
   </div>`;
 };
 /* ─── LIMIT CREDIT REPORT ─── */
-pages['reports-limit-credit'] = () => {
+pages['report-limit-credit'] = () => {
   // Real: use STATE.companies credit field as creditUsed
   const defaultLimit = parseFloat(STATE.settings?.default_credit_limit || 5000000000);
   const rows = (STATE.companies.length > 0 ? STATE.companies : COMPANIES.slice(0, 12).map(c => ({ username: c, credit: 0 }))).map(c => {
-    const creditUsed  = Math.abs(c.credit || 0);
+    const creditUsed = Math.abs(c.credit || 0);
     const creditLimit = c.maxCredit || defaultLimit;
-    const percentage  = creditLimit > 0 ? Math.min(100, Math.round((creditUsed / creditLimit) * 100)) : 0;
+    const percentage = creditLimit > 0 ? Math.min(100, Math.round((creditUsed / creditLimit) * 100)) : 0;
     return { company: c.username || c.name, creditLimit, creditUsed, percentage, date: new Date().toLocaleDateString('id-ID') };
   });
 
@@ -616,7 +630,7 @@ pages['reports-limit-credit'] = () => {
 };
 
 /* ─── TOGEL LOST MONEY ─── */
-pages['reports-togel-lost'] = () => {
+pages['report-togel-lost'] = () => {
   // Real: aggregate STATE.lotteryBets by pool
   const poolMap = {};
   (STATE.lotteryBets || []).forEach(b => {
@@ -627,10 +641,12 @@ pages['reports-togel-lost'] = () => {
   });
   const rows = Object.values(poolMap).map(r => ({ pool: r.pool, totalBet: r.totalBet, totalPayout: r.totalPayout, net: r.totalBet - r.totalPayout, periods: r.periodSet.size }));
 
-  // Members with highest loss (deposit - withdrawal per member)
-  const memberLoss = STATE.members.slice(0, 12).map(m => {
-    const dep  = STATE.deposits.filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
-    const wd   = STATE.withdrawals.filter(w => w.member === m.username && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+  // Members with highest loss (scoped)
+  const _tDeps = scopedDeposits();
+  const _tWds = scopedWithdrawals();
+  const memberLoss = scopedMembers().slice(0, 12).map(m => {
+    const dep = _tDeps.filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+    const wd = _tWds.filter(w => w.member === m.username && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
     const loss = dep - wd;
     const bets = (STATE.lotteryBets || []).filter(b => b.member === m.username);
     const topPool = bets.length > 0
@@ -696,12 +712,14 @@ pages['reports-togel-lost'] = () => {
 };
 
 /* ─── LOST MONEY REPORT ─── */
-pages['reports-lost-money'] = () => {
-  // Real: compute per-member net from actual deposits/withdrawals/bonuses
-  const rows = STATE.members.map(m => {
-    const totalDeposit  = STATE.deposits.filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
-    const totalWithdraw = STATE.withdrawals.filter(w => w.member === m.username && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
-    const bonusUsed     = (STATE.bonuses || []).filter(b => b.member === m.username && b.status === 'Claimed').reduce((s, b) => s + (b.bonusAmount || 0), 0);
+pages['report-lost-money'] = () => {
+  const _deps = scopedDeposits();
+  const _wds = scopedWithdrawals();
+  const _mbrs = scopedMembers();
+  const rows = _mbrs.map(m => {
+    const totalDeposit = _deps.filter(d => d.member === m.username && d.status === 'Approved').reduce((s, d) => s + d.amount, 0);
+    const totalWithdraw = _wds.filter(w => w.member === m.username && w.status === 'Approved').reduce((s, w) => s + w.amount, 0);
+    const bonusUsed = (STATE.bonuses || []).filter(b => b.member === m.username && b.status === 'Claimed').reduce((s, b) => s + (b.bonusAmount || 0), 0);
     return { member: m.username, name: m.name, company: m.company, bank: m.bank, totalDeposit, totalWithdraw, bonusUsed, net: totalDeposit - totalWithdraw - bonusUsed };
   }).filter(r => r.totalDeposit > 0 || r.totalWithdraw > 0);
 
@@ -758,10 +776,12 @@ pages['reports-lost-money'] = () => {
 };
 
 /* ─── TOP TURNOVER MEMBERS ─── */
-pages['reports-top-turnover'] = () => {
-  // Real: aggregate turnover from lotteryBets + seamless transactions per member
+pages['report-top-turnover'] = () => {
+  const _ttMembers = scopedMembers();
+  const _ttSet = new Set(_ttMembers.map(m => m.username));
+  const _ttSuper = STATE.currentAdmin.role === 'SuperAdmin';
   const turnoverMap = {};
-  (STATE.lotteryBets || []).forEach(b => {
+  (STATE.lotteryBets || []).filter(b => _ttSuper || _ttSet.has(b.member)).forEach(b => {
     if (!turnoverMap[b.member]) turnoverMap[b.member] = { member: b.member, company: b.company, turnover: 0, bets: 0, wins: 0, netWin: 0, lastActivity: b.date || '' };
     turnoverMap[b.member].turnover += b.betAmount || 0;
     turnoverMap[b.member].bets++;
@@ -769,16 +789,16 @@ pages['reports-top-turnover'] = () => {
     else { turnoverMap[b.member].netWin -= b.betAmount || 0; }
     if ((b.date || '') > turnoverMap[b.member].lastActivity) turnoverMap[b.member].lastActivity = b.date;
   });
-  (STATE.seamless?.transactions || []).forEach(t => {
+  (STATE.seamless?.transactions || []).filter(t => _ttSuper || _ttSet.has(t.player)).forEach(t => {
     if (!turnoverMap[t.player]) turnoverMap[t.player] = { member: t.player, company: t.company, turnover: 0, bets: 0, wins: 0, netWin: 0, lastActivity: '' };
     turnoverMap[t.player].turnover += t.betAmount || 0;
     turnoverMap[t.player].bets++;
     turnoverMap[t.player].netWin += (t.winAmount || 0) - (t.betAmount || 0);
     if ((t.winAmount || 0) > 0) turnoverMap[t.player].wins++;
   });
-  // Enrich with member info from STATE.members
+  // Enrich with member info (scoped)
   const rows = Object.values(turnoverMap).map(r => {
-    const m = STATE.members.find(x => x.username === r.member);
+    const m = _ttMembers.find(x => x.username === r.member);
     return { ...r, name: m?.name || r.member, rank: 0 };
   }).sort((a, b) => b.turnover - a.turnover).map((r, i) => ({ ...r, rank: i + 1 }));
 
@@ -839,24 +859,19 @@ pages['reports-top-turnover'] = () => {
 
 /* ─── DEVICE REPORT ─── */
 pages['device-report'] = () => {
-  const curAdmin = STATE.currentAdmin;
-  // Filter members by company for non-SuperAdmin roles
-  let scopedMembers = STATE.members || [];
-  if (curAdmin.role === 'Company' || curAdmin.role === 'Shop') {
-    scopedMembers = scopedMembers.filter(m => m.company === curAdmin.company);
-  }
-  const total = scopedMembers.length;
+  const scopedMembersArr = scopedMembers();
+  const total = scopedMembersArr.length;
 
   const devices = [
-    { platform: 'Windows', browser: 'Chrome', count: Math.round(total*0.1), active: Math.round(total*0.04), trend: '+5%' },
-    { platform: 'macOS', browser: 'Safari', count: Math.round(total*0.04), active: Math.round(total*0.01), trend: '-2%' },
-    { platform: 'iOS', browser: 'Mobile Safari', count: Math.round(total*0.23), active: Math.round(total*0.12), trend: '+18%' },
-    { platform: 'Android (APK)', browser: 'App WebView', count: Math.round(total*0.46), active: Math.round(total*0.35), trend: '+24%' },
-    { platform: 'Android (Br.)', browser: 'Chrome Mobile', count: Math.round(total*0.17), active: Math.round(total*0.07), trend: '+7%' },
+    { platform: 'Windows', browser: 'Chrome', count: Math.round(total * 0.1), active: Math.round(total * 0.04), trend: '+5%' },
+    { platform: 'macOS', browser: 'Safari', count: Math.round(total * 0.04), active: Math.round(total * 0.01), trend: '-2%' },
+    { platform: 'iOS', browser: 'Mobile Safari', count: Math.round(total * 0.23), active: Math.round(total * 0.12), trend: '+18%' },
+    { platform: 'Android (APK)', browser: 'App WebView', count: Math.round(total * 0.46), active: Math.round(total * 0.35), trend: '+24%' },
+    { platform: 'Android (Br.)', browser: 'Chrome Mobile', count: Math.round(total * 0.17), active: Math.round(total * 0.07), trend: '+7%' },
   ];
 
   const platforms = ['Windows', 'macOS', 'iPhone', 'Android (APK)', 'Android (Br.)'];
-  const memberDevices = scopedMembers.slice(0, 20).map((m, i) => {
+  const memberDevices = scopedMembersArr.slice(0, 20).map((m, i) => {
     const plat = platforms[i % platforms.length];
     return {
       username: m.username, company: m.company,
@@ -979,7 +994,7 @@ window.triggerCampaign = (username, type, btn) => {
   if (btn) {
     btn.disabled = true;
     btn.style.opacity = '0.5';
-    btn.innerHTML = `< i class="fa-solid fa-check" ></i > ${type === 'add5k' ? '5k Added' : 'Cashback Sent'} `;
+    btn.innerHTML = `<i class="fa-solid fa-check"></i> ${type === 'add5k' ? '5k Added' : 'Cashback Sent'}`;
   }
 };
 
@@ -992,7 +1007,7 @@ window.onProviderFilterChange = (val) => {
 
 // ─── Credit Limit Edit Modal ──────────────────────────────────
 window.openCreditLimitModal = (company, currentLimit) => {
-    openModal(`Edit Credit Limit — ${company}`, `
+  openModal(`Edit Credit Limit — ${company}`, `
         <div class="form-grid">
             <div class="form-field" style="grid-column:1/-1">
                 <label>Company</label>
@@ -1015,31 +1030,31 @@ window.openCreditLimitModal = (company, currentLimit) => {
 };
 
 window.saveCreditLimit = async (company) => {
-    const limit = parseInt(document.getElementById('cl_limit')?.value || '0', 10);
-    const notes = document.getElementById('cl_notes')?.value.trim() || '';
-    if (isNaN(limit) || limit < 0) { toast('Invalid credit limit', 'error'); return; }
-    if (!STATE.settings) STATE.settings = {};
-    STATE.settings[`creditLimit_${company}`] = limit;
-    STATE.settings.defaultCreditLimit = limit; // fallback update
-    // Also update in companies array if exists
-    const co = STATE.companies.find(c => (c.username || c.name) === company);
-    if (co) co.creditLimit = limit;
-    saveState();
-    if (window.db?.dbSaveSetting) {
-        await window.db.dbSaveSetting(`credit_limit_${company}`, String(limit), company);
-    }
-    addLog('Credit Limit', company, `Credit limit set to ${limit}${notes ? ' — ' + notes : ''}`);
-    closeModalBtn();
-    toast(`Credit limit for ${company} updated`, 'success');
-    window.go('report-limit-credit');
+  const limit = parseInt(document.getElementById('cl_limit')?.value || '0', 10);
+  const notes = document.getElementById('cl_notes')?.value.trim() || '';
+  if (isNaN(limit) || limit < 0) { toast('Invalid credit limit', 'error'); return; }
+  if (!STATE.settings) STATE.settings = {};
+  STATE.settings[`creditLimit_${company}`] = limit;
+  STATE.settings.defaultCreditLimit = limit; // fallback update
+  // Also update in companies array if exists
+  const co = STATE.companies.find(c => (c.username || c.name) === company);
+  if (co) co.creditLimit = limit;
+  saveState();
+  if (window.db?.dbSaveSetting) {
+    await window.db.dbSaveSetting(`credit_limit_${company}`, String(limit), company);
+  }
+  addLog('Credit Limit', company, `Credit limit set to ${limit}${notes ? ' — ' + notes : ''}`);
+  closeModalBtn();
+  toast(`Credit limit for ${company} updated`, 'success');
+  window.go('report-limit-credit');
 };
 
 // ─── PDF Print Export ──────────────────────────────────────────
 window.printReport = (title) => {
-    const content = document.getElementById('main-content')?.innerHTML || document.querySelector('.page-content')?.innerHTML || document.body.innerHTML;
-    const win = window.open('', '_blank', 'width=900,height=700');
-    if (!win) { toast('Pop-up blocked. Allow pop-ups to print.', 'warning'); return; }
-    win.document.write(`<!DOCTYPE html><html><head>
+  const content = document.getElementById('main-content')?.innerHTML || document.querySelector('.page-content')?.innerHTML || document.body.innerHTML;
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if (!win) { toast('Pop-up blocked. Allow pop-ups to print.', 'warning'); return; }
+  win.document.write(`<!DOCTYPE html><html><head>
         <title>${title || 'VIGOR Report'}</title>
         <style>
             @media print { @page { size: A4 landscape; margin: 10mm; } }
@@ -1056,5 +1071,5 @@ window.printReport = (title) => {
         ${content}
         <script>window.onload=()=>{ window.print(); window.close(); }<\/script>
     </body></html>`);
-    win.document.close();
+  win.document.close();
 };

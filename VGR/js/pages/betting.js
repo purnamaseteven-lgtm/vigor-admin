@@ -60,7 +60,7 @@ pages['bets-list'] = () => {
   `;
 };
 
-pages['transferred-list'] = pages['bets-transferred'];
+// moved after definition below
 
 pages['bets-table'] = () => {
   const POOLS = ['4D Togel External', '4D Togel Vigor', '4D Togel Global', '6D Togel Vigor', 'SINGAPORE', 'HONGKONG', 'SYDNEY', 'PCSO', 'CAMBODIA'];
@@ -207,3 +207,5 @@ pages['bets-transferred'] = () => {
       </div>
     </div>`;
 };
+
+pages['transferred-list'] = pages['bets-transferred'];

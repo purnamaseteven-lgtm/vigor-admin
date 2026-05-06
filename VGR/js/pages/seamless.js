@@ -3,10 +3,11 @@ import { STATE, PG_CURRENCIES, saveState } from '../core/state.js';
 import { pages } from '../core/router.js';
 import { pageHeader, filterCard, fsInput, fsSelect, fsActions, tableWrap, badge, renderPagerHTML, toast, openModal, closeModalBtn } from '../ui/components.js';
 import { filterData, paginate, getCurPage, getPerPage, fmtCur } from '../utils/helpers.js';
-import { mockseamlessApiRequest } from '../api/seamless-api.js';
 
 const fmt = (n) => Number(n).toLocaleString('id-ID');
 const fmtTime = (ts) => new Date(ts).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const STRICT_REAL_MODE = String((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_STRICT_REAL_MODE) || '').toLowerCase() === 'true';
+const IP_OR_CIDR_RE = /^(?:\d{1,3}\.){3}\d{1,3}(?:\/(?:[0-9]|[12][0-9]|3[0-2]))?$/;
 
 function ensurePgState() {
     if (!STATE.seamless.config.whitelistedIPs) STATE.seamless.config.whitelistedIPs = [];
@@ -326,6 +327,10 @@ window.pgSaveIP = () => {
         toast('IP is required', 'error');
         return;
     }
+    if (!IP_OR_CIDR_RE.test(ip)) {
+        toast('Invalid IP/CIDR format', 'error');
+        return;
+    }
     STATE.seamless.config.whitelistedIPs.push(ip);
     saveState();
     closeModalBtn();
@@ -394,9 +399,64 @@ window.pgExecuteSim = () => {
     const ep = document.getElementById('sim_endpoint')?.value;
     const dataStr = document.getElementById('sim_data')?.value || '';
     const params = Object.fromEntries(new URLSearchParams(dataStr));
-    const res = mockseamlessApiRequest(ep, params);
-    toast(`API response ${res.status} returned`, res.status === 200 ? 'success' : 'error');
-    closeModalBtn();
-    setTimeout(() => go('seamless-api-logs'), 200);
-};
+    const base = ((typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SUPABASE_URL) || '').replace(/\/$/, '');
+    const url = base ? `${base}/functions/v1/seamless-wallet${ep}` : '';
 
+    const run = async () => {
+        if (!url) {
+            toast('Supabase URL is not configured', 'error');
+            return;
+        }
+        if (url) {
+            try {
+                const body = new URLSearchParams(params).toString();
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body,
+                });
+                const json = await res.json().catch(() => ({}));
+                toast(`API response ${res.status} returned`, res.ok ? 'success' : 'error');
+                STATE.seamless.apiLogs.unshift({
+                    id: 'SIM' + Date.now(),
+                    timestamp: Date.now(),
+                    endpoint: ep,
+                    method: 'POST',
+                    httpStatus: res.status,
+                    traceId: json?.data?.trace_id || ('sim-' + Date.now()),
+                    responseTime: '0ms',
+                    provider: params.provider || 'PG_SOFT',
+                    player: params.player_name || params.operator_player_session || 'Unknown',
+                    status: res.ok ? 'OK' : 'Error',
+                    requestBody: body,
+                    responseBody: JSON.stringify(json),
+                });
+                saveState();
+                closeModalBtn();
+                setTimeout(() => go('seamless-api-logs'), 200);
+                return;
+            } catch (error) {
+                STATE.seamless.apiLogs.unshift({
+                    id: 'SIM' + Date.now(),
+                    timestamp: Date.now(),
+                    endpoint: ep,
+                    method: 'POST',
+                    httpStatus: 0,
+                    traceId: 'sim-' + Date.now(),
+                    responseTime: '0ms',
+                    provider: params.provider || 'PG_SOFT',
+                    player: params.player_name || params.operator_player_session || 'Unknown',
+                    status: 'Error',
+                    requestBody: new URLSearchParams(params).toString(),
+                    responseBody: JSON.stringify({ error: error?.message || 'Network error' }),
+                });
+                saveState();
+                toast(STRICT_REAL_MODE ? 'Request failed in strict real mode' : 'Request failed', 'error');
+                closeModalBtn();
+                setTimeout(() => go('seamless-api-logs'), 200);
+                return;
+            }
+        }
+    };
+    run();
+};

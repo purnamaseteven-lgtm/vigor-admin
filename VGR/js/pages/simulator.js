@@ -47,39 +47,55 @@ pages['frontend-simulator'] = () => {
     `)}
 
     <div style="background:#0b1120; padding: 2rem; display:flex; justify-content:center">
-        <div class="sim-body">
-            <!-- Navigation simulation -->
-            <div style="padding: 1rem 1.5rem; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05)">
-                <div style="font-weight:900; font-size:1.2rem; color:${t.primary}">VIGOR</div>
-                <div style="display:flex; gap:1.5rem; font-size:.85rem; font-weight:600">
-                    <span>SPORTS</span>
-                    <span>CASINO</span>
-                    <span>SLOTS</span>
-                </div>
-                <button style="background:${t.primary}; border:none; padding:.5rem 1rem; border-radius:${t.radius}; color:#fff; font-weight:bold; font-size:.8rem">JOIN NOW</button>
-            </div>
-
-            <!-- Dynamic Sections -->
-            ${zones.map(z => `
-                <div class="sim-section" style="min-height:${z.height}px">
-                    <div class="sim-widget-wrap">
-                        ${z.widget ? renderWidgetPreview(z.widget) : `
-                            <div style="height:100%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.02); color:rgba(255,255,255,0.1); font-weight:bold">${z.label}</div>
-                        `}
+        ${builderState.device === 'mobile' ? `
+            <div class="device-mockup">
+                <div class="device-screen">
+                    <div class="sim-body" style="box-shadow:none; max-width:100%">
+                        ${renderSimContent(t, zones)}
                     </div>
                 </div>
-            `).join('')}
-
-            <!-- Bottom Nav (Mobile Only) -->
-            ${builderState.device === 'mobile' ? `
-                <div style="position:sticky; bottom:0; padding:1rem; background:rgba(15,23,42,0.95); display:flex; justify-content:around; border-top:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(10px)">
-                    <div style="text-align:center"><i class="fa-solid fa-house" style="color:${t.primary}"></i><div style="font-size:.6rem">HOME</div></div>
-                    <div style="text-align:center"><i class="fa-solid fa-gift"></i><div style="font-size:.6rem">PROMO</div></div>
-                    <div style="text-align:center"><i class="fa-solid fa-gamepad"></i><div style="font-size:.6rem">GAMES</div></div>
-                    <div style="text-align:center"><i class="fa-solid fa-user"></i><div style="font-size:.6rem">PROFILE</div></div>
-                </div>
-            ` : ''}
-        </div>
+            </div>
+        ` : `
+            <div class="sim-body">
+                ${renderSimContent(t, zones)}
+            </div>
+        `}
     </div>
     `;
 };
+
+function renderSimContent(t, zones) {
+    return `
+        <!-- Navigation simulation -->
+        <div style="padding: 1rem 1.5rem; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05)">
+            <div style="font-weight:900; font-size:1.2rem; color:${t.primary}">VIGOR</div>
+            <div style="display:flex; gap:1.5rem; font-size:.85rem; font-weight:600">
+                <span>SPORTS</span>
+                <span>CASINO</span>
+                <span>SLOTS</span>
+            </div>
+            <button style="background:${t.primary}; border:none; padding:.5rem 1rem; border-radius:${t.radius}; color:#fff; font-weight:bold; font-size:.8rem">JOIN NOW</button>
+        </div>
+
+        <!-- Dynamic Sections -->
+        ${zones.map(z => `
+            <div class="sim-section" style="min-height:${z.height}px">
+                <div class="sim-widget-wrap">
+                    ${z.widget ? renderWidgetPreview(z.widget) : `
+                        <div style="height:100%; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.02); color:rgba(255,255,255,0.1); font-weight:bold">${z.label}</div>
+                    `}
+                </div>
+            </div>
+        `).join('')}
+
+        <!-- Bottom Nav (Mobile Only) -->
+        ${builderState.device === 'mobile' ? `
+            <div style="position:sticky; bottom:0; padding:1rem; background:rgba(15,23,42,0.95); display:flex; justify-content:space-around; border-top:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(10px)">
+                <div style="text-align:center"><i class="fa-solid fa-house" style="color:${t.primary}"></i><div style="font-size:.6rem">HOME</div></div>
+                <div style="text-align:center"><i class="fa-solid fa-gift"></i><div style="font-size:.6rem">PROMO</div></div>
+                <div style="text-align:center"><i class="fa-solid fa-gamepad"></i><div style="font-size:.6rem">GAMES</div></div>
+                <div style="text-align:center"><i class="fa-solid fa-user"></i><div style="font-size:.6rem">PROFILE</div></div>
+            </div>
+        ` : ''}
+    `;
+}

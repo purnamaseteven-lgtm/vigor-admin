@@ -92,10 +92,10 @@ export const STATE = {
     bannerLayoutSections: {},
     seamless: {
         config: {
-            operatorToken: 'VGR-OPR-2024-ABCD', secretKey: 'sk_live_a1b25cde5f3gh46ijkl',
+            operatorToken: '', secretKey: '',
             apiDomain: 'https://api.seamless.vigor', callbackDomain: 'https://api.vigor88.com',
             currency: 'IDR', baseUnit: 1000, hashAuth: true,
-            salt: 'SALT_VGR_2024_XYZ', groupId: 1,
+            salt: '', groupId: 1,
             whitelistedIPs: ['103.28.12.0/24', '202.134.56.78', '10.0.0.0/8'],
             status: 'Active', env: 'Production', lastSync: '2026-04-28 22:15:00',
             endpoints: {
@@ -113,6 +113,12 @@ export const STATE = {
     systemNotifications: [], // Broadcast notifications: maintenance, update, info
     notifPreferences: { sound: true, depositAlert: true, withdrawalAlert: true, maintenanceAlert: true },
     refreshSettings: { interval: 0, lastRefresh: null }, // interval in seconds; 0 = off
+    autonomous: {
+        autoScan: true,
+        autoRebate: false,
+        autoRiskAudit: true,
+        scanInterval: 5, // minutes
+    },
     popupBanners: [], // Popup banners for frontend player sites
     rollingAdjustments: {}, // Per-member rolling multiplier overrides: { username: pct }
     campaignUsage: {}, // Tracks one-time campaign triggers per member
@@ -350,11 +356,14 @@ export function initState() {
             responseTime: rnd(5, hs > 200 ? 9500 : 350) + 'ms',
             player: STATE.members[rnd(0, STATE.members.length - 1)].username,
             status: hs === 200 ? 'OK' : hs === 400 ? 'Bad Request' : 'Server Error',
-            requestBody: `operator_token=VGR-OPR-2024-ABCD&secret_key=***&player_name=${STATE.members[rnd(0, STATE.members.length - 1)].username}`,
+            requestBody: `operator_token=SERVER_TOKEN&secret_key=***&player_name=${STATE.members[rnd(0, STATE.members.length - 1)].username}`,
             responseBody: hs === 200 ? '{"data":{"balance_amount":' + rnd(100, 50000) + '.00,"currency_code":"IDR"},"error":null}' : '{"data":null,"error":{"code":' + (hs === 400 ? '1034' : '1200') + ',"message":"' + (hs === 400 ? 'Request is not valid' : 'Internal server error') + '"}}'
         });
     }
 
+    addLog('system_init', 'System', 'Autonomous OS core services initialized');
+    addLog('config_update', 'Site Config', 'Global branding updated by system');
+    addLog('security_audit', 'Infrastructure', 'Automated security scan completed: 0 vulnerabilities');
     addLog('login', 'adminsub40', 'Admin logged in successfully');
     applyTheme();
     saveState();

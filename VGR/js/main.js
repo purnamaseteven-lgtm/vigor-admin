@@ -2,22 +2,38 @@
 import { initState } from './core/state.js';
 import { go, toggleMenu, setPageResolver } from './core/router.js';
 import { requireAuth, onAuthChange } from './core/auth.js';
-import { initRealtime } from './core/realtime.js';
+import { initRealtimeFeed } from './core/realtime.js';
 import { fetchSettings } from './core/db.js';
-import { SUPABASE_ENABLED } from './core/supabase.js';
+import { SUPABASE_ENABLED, DEMO_AUTH_ENABLED } from './core/supabase.js';
 import { t, applyTranslations, changeLanguage } from './core/i18n.js';
 import { renderSidebar, renderProfileDisplay, toast } from './ui/components.js';
 import './api/payment.js';  // register window.paymentAPI
 
 import * as stateFuncs from './core/state.js';
 import * as routerFuncs from './core/router.js';
-import * as uiFuncs from './ui/components.js';
-import * as chartFuncs from './ui/charts.js';
 import * as helperFuncs from './utils/helpers.js';
 import * as formFuncs from './utils/forms.js';
-import * as tierFuncs from './utils/tier.js';
 
-Object.assign(window, stateFuncs, routerFuncs, uiFuncs, chartFuncs, helperFuncs, formFuncs, tierFuncs);
+// Expose only the globals required by inline handlers.
+Object.assign(window, {
+    fmt: stateFuncs.fmt,
+    fmtCur: stateFuncs.fmtCur,
+    stateAdd: stateFuncs.stateAdd,
+    stateUpdate: stateFuncs.stateUpdate,
+    stateDelete: stateFuncs.stateDelete,
+    go: routerFuncs.go,
+    toggleMenu: routerFuncs.toggleMenu,
+    setFilter: helperFuncs.setFilter,
+    resetFilters: helperFuncs.resetFilters,
+    goToPage: helperFuncs.goToPage,
+    setPerPage: helperFuncs.setPerPage,
+    exportTableCSV: helperFuncs.exportTableCSV,
+    exportCSV: helperFuncs.exportCSV,
+    openFormModal: formFuncs.openFormModal,
+    saveMember: formFuncs.saveMember,
+    saveCompany: formFuncs.saveCompany,
+    saveBank: formFuncs.saveBank,
+});
 
 const lazyPageModules = [
     { loaded: false, match: (p) => p === 'dashboard', load: () => import('./pages/dashboard.js') },
@@ -53,7 +69,8 @@ const lazyPageModules = [
     { loaded: false, match: (p) => p.includes('crm'), load: () => import('./pages/crm.js') },
     { loaded: false, match: (p) => p.includes('manual'), load: () => import('./pages/manual.js') },
     { loaded: false, match: (p) => p.includes('nawala') || p.includes('sawala'), load: () => import('./pages/nawala.js') },
-    { loaded: false, match: (p) => p.includes('autonomous') || p.startsWith('agent-'), load: () => import('./pages/autonomous.js') },
+    { loaded: false, match: (p) => p.includes('autonomous') || p.startsWith('agent-') || p === 'risk-management', load: () => import('./pages/autonomous.js') },
+    { loaded: false, match: (p) => p === 'risk-management', load: () => import('./pages/risk.js') },
     { loaded: false, match: (p) => p.includes('simulator'), load: () => import('./pages/simulator.js') },
     { loaded: false, match: () => true, load: () => import('./pages/missing-pages.js') },
 ];
@@ -161,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initState();
     try {
         await ensurePageForRoute('dashboard');
+        initRealtimeFeed();
     } catch (e) {
         console.error('[Init] Dashboard preload failed:', e);
     }
@@ -202,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(startRealTimeWidgets, 500);
 
     if (SUPABASE_ENABLED) {
-        initRealtime();
+        initRealtimeFeed();
         onAuthChange((event) => {
             if (event === 'TOKEN_REFRESHED') console.log('[Auth] Token refreshed');
         });
@@ -211,7 +229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('[VIGOR] Supabase mode — live data enabled');
     } else {
         showModeBanner();
-        showRoleSimulator();
+        if (DEMO_AUTH_ENABLED) showRoleSimulator();
         console.log('[VIGOR] Demo mode — using mock data');
     }
 });
@@ -326,15 +344,23 @@ window.runGlobalSearch = (val) => {
 window.appendLiveFeed = (htmlStr) => {
     const container = document.getElementById('liveFeedContainer');
     if (!container) return;
-    const el = document.createElement('div');
-    el.innerHTML = htmlStr;
-    container.appendChild(el);
-    container.scrollTop = container.scrollHeight;
+
+    // Clear initial state
+    if (container.querySelector('.fa-circle-nodes')) container.innerHTML = '';
+
+    const div = document.createElement('div');
+    div.innerHTML = htmlStr;
+    const item = div.firstElementChild;
+    
+    container.insertBefore(item, container.firstChild);
+
+    // Limit to 20 items for performance
+    const items = container.querySelectorAll('.feed-item');
+    if (items.length > 20) items[items.length - 1].remove();
 };
 
 
 // Global Hotkey Listener
-});
 
 // ── AUTOMATION WORKERS (Feature #21) ──
 window.refreshAutomations = () => {
@@ -362,4 +388,3 @@ window.refreshAutomations = () => {
 
 // Start automations after state is loaded
 setTimeout(window.refreshAutomations, 2000);
-

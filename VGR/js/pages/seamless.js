@@ -55,10 +55,13 @@ pages['seamless-config'] = () => {
             <div class="card-header"><span class="card-title"><i class="fa-solid fa-key" style="color:var(--acc);margin-right:.5rem"></i>Authentication</span></div>
             <div class="card-body">
                 <div class="form-grid" style="gap:.85rem">
-                    <div class="form-field"><label>Operator Token</label><input id="pgf_token" value="${c.operatorToken}" style="font-family:monospace;font-size:.8rem"/></div>
-                    <div class="form-field"><label>Secret Key</label><div style="display:flex;gap:.5rem"><input id="pgf_secret" type="password" value="${c.secretKey}" style="flex:1;font-family:monospace"/><button class="btn btn-sm btn-secondary" onclick="document.getElementById('pgf_secret').type=document.getElementById('pgf_secret').type==='password'?'text':'password'"><i class="fa-solid fa-eye"></i></button></div></div>
-                    <div class="form-field"><label>Hash Salt</label><input id="pgf_salt" value="${c.salt}" style="font-family:monospace;font-size:.8rem"/></div>
+                    <div class="form-field"><label>Operator Token</label><input id="pgf_token" value="[managed on server]" disabled style="font-family:monospace;font-size:.8rem;opacity:.75"/></div>
+                    <div class="form-field"><label>Secret Key</label><input id="pgf_secret" type="password" value="********" disabled style="flex:1;font-family:monospace;opacity:.75"/></div>
+                    <div class="form-field"><label>Hash Salt</label><input id="pgf_salt" value="[managed on server]" disabled style="font-family:monospace;font-size:.8rem;opacity:.75"/></div>
                     <div class="form-field"><label>Hash Authentication</label><div style="display:flex;align-items:center;gap:.75rem"><label class="toggle"><input type="checkbox" ${c.hashAuth ? 'checked' : ''} id="pgf_hash"/><span class="toggle-slider"></span></label><span style="font-size:.78rem;color:var(--text2)">${c.hashAuth ? 'Enabled (HMAC-SHA256)' : 'Disabled'}</span></div></div>
+                </div>
+                <div style="margin-top:.75rem;padding:.6rem .75rem;border:1px dashed var(--border);border-radius:8px;color:var(--text3);font-size:.75rem">
+                    Sensitive credentials are server-side only and are not stored in browser state.
                 </div>
             </div>
         </div>
@@ -282,9 +285,6 @@ pages['seamless-docs'] = () => {
 
 window.pgSaveConfig = () => {
     const c = STATE.seamless.config;
-    c.operatorToken = document.getElementById('pgf_token')?.value || c.operatorToken;
-    c.secretKey = document.getElementById('pgf_secret')?.value || c.secretKey;
-    c.salt = document.getElementById('pgf_salt')?.value || c.salt;
     c.hashAuth = document.getElementById('pgf_hash')?.checked ?? c.hashAuth;
     c.apiDomain = document.getElementById('pgf_api')?.value || c.apiDomain;
     c.callbackDomain = document.getElementById('pgf_cb')?.value || c.callbackDomain;
@@ -365,8 +365,6 @@ window.pgShowLogDetail = (id) => {
 
 window.pgSimulateRequest = () => {
     const m = STATE.members[0];
-    const operatorToken = STATE.seamless.config.operatorToken;
-    const secretKey = STATE.seamless.config.secretKey;
     openModal('Simulate Seamless Wallet Request', `
         <div class="form-grid" style="gap:.75rem">
             <div class="form-field"><label>Endpoint</label>
@@ -378,15 +376,15 @@ window.pgSimulateRequest = () => {
                 </select>
             </div>
             <div class="form-field"><label>Payload</label>
-                <textarea id="sim_data" rows="5" style="width:100%;font-family:monospace;font-size:.75rem;padding:.5rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text)">operator_token=${operatorToken}&secret_key=${secretKey}&operator_player_session=${m.username}&game_id=54&bet_type=1</textarea>
+                <textarea id="sim_data" rows="5" style="width:100%;font-family:monospace;font-size:.75rem;padding:.5rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text)">operator_token=SERVER_TOKEN&secret_key=SERVER_SECRET&operator_player_session=${m.username}&game_id=54&bet_type=1</textarea>
             </div>
         </div>
     `, `<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.pgExecuteSim()"><i class="fa-solid fa-paper-plane"></i> Send Request</button>`);
 };
 
 window.pgGetSimTemplate = (ep) => {
-    const ot = STATE.seamless.config.operatorToken;
-    const sk = STATE.seamless.config.secretKey;
+    const ot = 'SERVER_TOKEN';
+    const sk = 'SERVER_SECRET';
     const m = STATE.members[0].username;
     if (ep === '/VerifySession') return `operator_token=${ot}&secret_key=${sk}&operator_player_session=${m}&game_id=35&bet_type=1&provider=PRAGMATIC_PLAY`;
     if (ep === '/Cash/Get') return `operator_token=${ot}&secret_key=${sk}&player_name=${m}&game_id=35&provider=PRAGMATIC_PLAY`;

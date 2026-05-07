@@ -21,10 +21,9 @@ const formatError = (code, message) => {
 export function mockseamlessApiRequest(endpoint, params, hash = '') {
     const config = STATE.seamless.config;
     const { operator_token, secret_key } = params;
-
-    // Validate Auth
-    if (operator_token !== config.operatorToken || secret_key !== config.secretKey) {
-        return formatError(1204, "Invalid operator token or secret key");
+    // Client mock no longer owns real credentials. Keep basic field validation only.
+    if (!operator_token || !secret_key) {
+        return formatError(1204, "operator_token and secret_key are required");
     }
 
     let response;

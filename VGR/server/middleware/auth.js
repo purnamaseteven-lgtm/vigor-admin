@@ -21,7 +21,7 @@ export const supabaseAdmin = createClient(
  */
 export function pgWhitelistMiddleware(req, res, next) {
     const whitelist = (process.env.PG_WHITELISTED_IPS || '').split(',').map(ip => ip.trim());
-    const clientIp  = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+    const clientIp  = normalizeIp(req.ip || req.socket.remoteAddress || '');
 
     if (!whitelist.length || whitelist.includes('*')) return next(); // dev mode
 
@@ -39,12 +39,24 @@ export function pgWhitelistMiddleware(req, res, next) {
 
 function ipInCIDR(ip, cidr) {
     try {
+        const normalizedIp = normalizeIp(ip);
         const [range, bits] = cidr.split('/');
-        const mask = ~(0xffffffff >>> parseInt(bits));
-        return (ipToInt(ip) & mask) === (ipToInt(range) & mask);
+        const normalizedRange = normalizeIp(range);
+        if (!normalizedIp || !normalizedRange) return false;
+        if (normalizedIp.includes(':') || normalizedRange.includes(':')) return false; // IPv6 CIDR unsupported in this helper
+        const mask = ~(0xffffffff >>> parseInt(bits, 10));
+        return (ipToInt(normalizedIp) & mask) === (ipToInt(normalizedRange) & mask);
     } catch { return false; }
 }
 
+function normalizeIp(ip) {
+    const raw = String(ip || '').trim();
+    if (!raw) return '';
+    if (raw === '::1') return '127.0.0.1';
+    if (raw.startsWith('::ffff:')) return raw.slice(7);
+    return raw;
+}
+
 function ipToInt(ip) {
-    return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct), 0) >>> 0;
+    return ip.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct, 10), 0) >>> 0;
 }

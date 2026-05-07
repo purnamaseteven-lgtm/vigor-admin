@@ -1,50 +1,34 @@
 import { Router } from 'express';
-import { createHmac } from 'crypto';
 import { supabaseAdmin } from '../middleware/auth.js';
+import { requireActiveAdmin } from '../middleware/session.js';
+import {
+    parseWebhookBody,
+    validateRequiredFields,
+    validateUnopaySignature,
+    validateCoin2PaySignature,
+    validateSawalaIp,
+} from '../lib/webhook-validation.js';
 
 const router = Router();
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-async function requireAdminSession(req, res, next) {
-    try {
-        const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-        if (!token) return res.status(401).json({ error: 'Unauthorized: missing bearer token' });
-        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-            headers: {
-                apikey: SUPABASE_SERVICE_KEY,
-                Authorization: `Bearer ${token}`,
-            },
-        });
-        const user = await userRes.json().catch(() => ({}));
-        if (!userRes.ok || !user?.id) return res.status(401).json({ error: 'Unauthorized: invalid session' });
-
-        const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/admin_profiles?id=eq.${encodeURIComponent(user.id)}&select=id,status`, {
-            headers: {
-                apikey: SUPABASE_SERVICE_KEY,
-                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            },
-        });
-        const profiles = await profileRes.json().catch(() => []);
-        if (!profileRes.ok || profiles[0]?.status !== 'Active') {
-            return res.status(403).json({ error: 'Forbidden: active admin profile required' });
-        }
-        next();
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+function normalizeIp(ip) {
+    const raw = String(ip || '').trim();
+    if (!raw) return '';
+    if (raw === '::1') return '127.0.0.1';
+    if (raw.startsWith('::ffff:')) return raw.slice(7);
+    return raw;
 }
 
-function parseWebhookBody(raw) {
-    if (Buffer.isBuffer(raw)) return JSON.parse(raw.toString('utf8'));
-    if (typeof raw === 'string') return JSON.parse(raw);
-    return raw || {};
+function reqMeta(req) {
+    return {
+        requestId: req.requestId || null,
+        route: req.originalUrl || req.path,
+        method: req.method,
+    };
 }
 
-function rawBodyString(raw) {
-    if (Buffer.isBuffer(raw)) return raw.toString('utf8');
-    if (typeof raw === 'string') return raw;
-    return JSON.stringify(raw || {});
+function badRequest(res, req, message) {
+    return res.status(400).json({ error: message, requestId: req.requestId || null });
 }
 
 async function approveDepositByPaymentRef(paymentRef, processedBy, replacementRef = null) {
@@ -96,7 +80,7 @@ async function providerPost(url, apiKey, body, extraHeaders = {}) {
     return { response, data };
 }
 
-router.post('/unopay/create', requireAdminSession, async (req, res) => {
+router.post('/unopay/create', requireActiveAdmin, async (req, res) => {
     const apiUrl = process.env.UNOPAY_API_URL;
     const apiKey = process.env.UNOPAY_API_KEY;
     if (!requireConfig(res, [['UNOPAY_API_URL', apiUrl], ['UNOPAY_API_KEY', apiKey]])) return;
@@ -109,7 +93,7 @@ router.post('/unopay/create', requireAdminSession, async (req, res) => {
     }
 });
 
-router.post('/unopay/status', requireAdminSession, async (req, res) => {
+router.post('/unopay/status', requireActiveAdmin, async (req, res) => {
     const apiUrl = process.env.UNOPAY_API_URL;
     const apiKey = process.env.UNOPAY_API_KEY;
     if (!requireConfig(res, [['UNOPAY_API_URL', apiUrl], ['UNOPAY_API_KEY', apiKey]])) return;
@@ -122,7 +106,7 @@ router.post('/unopay/status', requireAdminSession, async (req, res) => {
     }
 });
 
-router.post('/coin2pay/create', requireAdminSession, async (req, res) => {
+router.post('/coin2pay/create', requireActiveAdmin, async (req, res) => {
     const apiUrl = process.env.COIN2PAY_API_URL;
     const apiKey = process.env.COIN2PAY_API_KEY;
     if (!requireConfig(res, [['COIN2PAY_API_URL', apiUrl], ['COIN2PAY_API_KEY', apiKey]])) return;
@@ -135,7 +119,7 @@ router.post('/coin2pay/create', requireAdminSession, async (req, res) => {
     }
 });
 
-router.post('/coin2pay/status', requireAdminSession, async (req, res) => {
+router.post('/coin2pay/status', requireActiveAdmin, async (req, res) => {
     const apiUrl = process.env.COIN2PAY_API_URL;
     const apiKey = process.env.COIN2PAY_API_KEY;
     if (!requireConfig(res, [['COIN2PAY_API_URL', apiUrl], ['COIN2PAY_API_KEY', apiKey]])) return;
@@ -148,7 +132,7 @@ router.post('/coin2pay/status', requireAdminSession, async (req, res) => {
     }
 });
 
-router.post('/sawala/create', requireAdminSession, async (req, res) => {
+router.post('/sawala/create', requireActiveAdmin, async (req, res) => {
     const apiUrl = process.env.SAWALA_API_URL;
     const token = process.env.SAWALA_TOKEN;
     if (!requireConfig(res, [['SAWALA_API_URL', apiUrl], ['SAWALA_TOKEN', token]])) return;
@@ -166,23 +150,25 @@ router.post('/unopay', async (req, res) => {
         const raw = req.body;
         const body = parseWebhookBody(raw);
         const sig = req.headers['x-unopay-signature'];
-        const expected = createHmac('sha256', process.env.UNOPAY_SECRET || '')
-            .update(rawBodyString(raw))
-            .digest('hex');
-
-        if (process.env.NODE_ENV === 'production' && sig !== expected) {
-            return res.status(401).json({ error: 'Invalid signature' });
+        const prod = process.env.NODE_ENV === 'production';
+        if (!validateUnopaySignature(raw, sig, process.env.UNOPAY_SECRET || '', prod)) {
+            console.warn(JSON.stringify({ level: 'warn', event: 'unopay_invalid_signature', ...reqMeta(req) }));
+            return res.status(401).json({ error: 'Invalid signature', requestId: req.requestId || null });
         }
 
         const { reference_id, status } = body;
+        const required = validateRequiredFields(body, ['reference_id', 'status']);
+        if (!required.ok) {
+            return badRequest(res, req, `${required.missing.join(', ')} are required`);
+        }
         if ((status === 'PAID' || status === 'SUCCESS') && reference_id) {
             await approveDepositByPaymentRef(reference_id, 'unopay_auto');
         }
 
-        res.json({ status: 'received' });
+        res.json({ status: 'received', requestId: req.requestId || null });
     } catch (e) {
-        console.error('[Unopay webhook]', e.message);
-        res.status(500).json({ error: e.message });
+        console.error(JSON.stringify({ level: 'error', event: 'unopay_webhook_error', message: e.message, ...reqMeta(req) }));
+        res.status(500).json({ error: e.message, requestId: req.requestId || null });
     }
 });
 
@@ -190,44 +176,52 @@ router.post('/coin2pay', async (req, res) => {
     try {
         const body = parseWebhookBody(req.body);
         const { order_id, status, tx_hash } = body;
+        const required = validateRequiredFields(body, ['order_id', 'status']);
+        if (!required.ok) {
+            return badRequest(res, req, `${required.missing.join(', ')} are required`);
+        }
         const sig = req.headers['x-c2p-signature'];
-        const expected = createHmac('sha256', process.env.COIN2PAY_API_KEY || '')
-            .update(order_id + status + (process.env.COIN2PAY_API_KEY || ''))
-            .digest('hex');
-
-        if (process.env.NODE_ENV === 'production' && sig !== expected) {
-            return res.status(401).json({ error: 'Invalid signature' });
+        const prod = process.env.NODE_ENV === 'production';
+        if (!validateCoin2PaySignature(order_id, status, sig, process.env.COIN2PAY_API_KEY || '', prod)) {
+            console.warn(JSON.stringify({ level: 'warn', event: 'coin2pay_invalid_signature', ...reqMeta(req) }));
+            return res.status(401).json({ error: 'Invalid signature', requestId: req.requestId || null });
         }
 
         if (status === 'CONFIRMED' && order_id) {
             await approveDepositByPaymentRef(order_id, 'coin2pay_auto', tx_hash || order_id);
         }
 
-        res.json({ status: 'received' });
+        res.json({ status: 'received', requestId: req.requestId || null });
     } catch (e) {
-        console.error('[Coin2Pay webhook]', e.message);
-        res.status(500).json({ error: e.message });
+        console.error(JSON.stringify({ level: 'error', event: 'coin2pay_webhook_error', message: e.message, ...reqMeta(req) }));
+        res.status(500).json({ error: e.message, requestId: req.requestId || null });
     }
 });
 
 router.post('/sawala', async (req, res) => {
     try {
-        const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+        const clientIp = normalizeIp(req.ip || req.socket.remoteAddress);
         const sawalaIp = process.env.SAWALA_CALLBACK_IP || '103.21.44.0';
-        if (process.env.NODE_ENV === 'production' && clientIp !== sawalaIp) {
-            return res.status(403).json({ error: 'IP not allowed' });
+        const prod = process.env.NODE_ENV === 'production';
+        if (!validateSawalaIp(clientIp, sawalaIp, prod)) {
+            console.warn(JSON.stringify({ level: 'warn', event: 'sawala_invalid_ip', clientIp, expectedIp: sawalaIp, ...reqMeta(req) }));
+            return res.status(403).json({ error: 'IP not allowed', requestId: req.requestId || null });
         }
 
         const body = parseWebhookBody(req.body);
         const { transaction_id, status } = body;
+        const required = validateRequiredFields(body, ['transaction_id', 'status']);
+        if (!required.ok) {
+            return badRequest(res, req, `${required.missing.join(', ')} are required`);
+        }
         if ((status === 'success' || status === 'SUCCESS') && transaction_id) {
             await approveDepositByPaymentRef(transaction_id, 'sawala_auto');
         }
 
-        res.json({ status: 'ok' });
+        res.json({ status: 'ok', requestId: req.requestId || null });
     } catch (e) {
-        console.error('[Sawala webhook]', e.message);
-        res.status(500).json({ error: e.message });
+        console.error(JSON.stringify({ level: 'error', event: 'sawala_webhook_error', message: e.message, ...reqMeta(req) }));
+        res.status(500).json({ error: e.message, requestId: req.requestId || null });
     }
 });
 

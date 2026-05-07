@@ -376,8 +376,8 @@ pages['master-wl-list'] = pages['master-whitelabel-list'];
 pages['whitelabel-list'] = pages['master-whitelabel-list'];
 
 
-/* â”€â”€â”€ WHITELABEL LIST â”€â”€â”€ */
-pages['whitelabel-list'] = () => {
+/* â”€â”€â”€ WHITELABEL LIST LEGACY â”€â”€â”€ */
+pages['whitelabel-list-legacy'] = () => {
   const PG = 'whitelabel-list';
   const all = STATE.companies.filter(c => c.type === 'Whitelabel');
   const filtered = filterData(all, PG);
@@ -966,4 +966,3 @@ pages['company-tree'] = () => {
     </div>
   `;
 };
-

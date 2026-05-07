@@ -353,6 +353,14 @@ pages['provider-analytics'] = () => {
     </div>`;
 };
 
+// Sidebar route aliases -> canonical report pages
+pages['reports-agent-daily'] = pages['report-agent-daily'];
+pages['reports-winloss'] = pages['report-winloss'];
+pages['reports-limit-credit'] = pages['report-limit-credit'];
+pages['reports-togel-lost'] = pages['report-togel-lost'];
+pages['reports-lost-money'] = pages['report-lost-money'];
+pages['reports-top-turnover'] = pages['report-top-turnover'];
+
 /* ─── AGENT DAILY REPORT ─── */
 pages['report-agent-daily'] = () => {
   const PG = 'reports-agent-daily';
@@ -1074,8 +1082,8 @@ window.printReport = (title) => {
   win.document.close();
 };
 
-/* ─── PROVIDER ANALYTICS (Feature #20) ─── */
-pages['provider-analytics'] = () => {
+/* ─── PROVIDER ANALYTICS LEGACY (Feature #20) ─── */
+pages['provider-analytics-legacy'] = () => {
     const PG = 'provider-analytics';
     const txs = STATE.seamless?.transactions || [];
     const providers = [...new Set(txs.map(t => t.provider || 'PG_SOFT'))];

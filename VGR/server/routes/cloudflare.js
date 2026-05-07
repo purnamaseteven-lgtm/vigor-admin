@@ -8,8 +8,10 @@
    ═══════════════════════════════════════════════════════════════ */
 import { Router } from 'express';
 import fetch from 'node-fetch';
+import { requireRole } from '../middleware/session.js';
 
 const router = Router();
+const requireSuperAdmin = requireRole('SuperAdmin');
 
 const CF_TOKEN      = process.env.CLOUDFLARE_API_TOKEN;
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -30,8 +32,8 @@ async function cfRequest(method, path, body = null) {
 }
 
 // ── Add domain (create zone) ─────────────────────────────────────
-router.post('/add-domain', async (req, res) => {
-    if (!CF_TOKEN) return res.json({ error: 'Cloudflare not configured', mock: true, ns: ['mock.ns1.cloudflare.com', 'mock.ns2.cloudflare.com'] });
+router.post('/add-domain', requireSuperAdmin, async (req, res) => {
+    if (!CF_TOKEN) return res.status(503).json({ error: 'Cloudflare not configured' });
     try {
         const { domain, company } = req.body;
         if (!domain) return res.status(400).json({ error: 'domain is required' });
@@ -69,8 +71,8 @@ router.post('/add-domain', async (req, res) => {
 });
 
 // ── Remove domain (delete zone) ──────────────────────────────────
-router.post('/remove-domain', async (req, res) => {
-    if (!CF_TOKEN) return res.json({ error: 'Cloudflare not configured', mock: true });
+router.post('/remove-domain', requireSuperAdmin, async (req, res) => {
+    if (!CF_TOKEN) return res.status(503).json({ error: 'Cloudflare not configured' });
     try {
         const { zoneId } = req.body;
         if (!zoneId) return res.status(400).json({ error: 'zoneId is required' });
@@ -82,8 +84,8 @@ router.post('/remove-domain', async (req, res) => {
 });
 
 // ── Add/update redirect rule ─────────────────────────────────────
-router.post('/update-redirect', async (req, res) => {
-    if (!CF_TOKEN) return res.json({ error: 'Cloudflare not configured', mock: true });
+router.post('/update-redirect', requireSuperAdmin, async (req, res) => {
+    if (!CF_TOKEN) return res.status(503).json({ error: 'Cloudflare not configured' });
     try {
         const { zoneId, from, to, code = 301 } = req.body;
         const result = await cfRequest('POST', `/zones/${zoneId}/pagerules`, {
@@ -98,8 +100,8 @@ router.post('/update-redirect', async (req, res) => {
 });
 
 // ── List domains (zones) ─────────────────────────────────────────
-router.get('/domains', async (req, res) => {
-    if (!CF_TOKEN) return res.json({ result: [], mock: true });
+router.get('/domains', requireSuperAdmin, async (req, res) => {
+    if (!CF_TOKEN) return res.status(503).json({ error: 'Cloudflare not configured' });
     try {
         const result = await cfRequest('GET', `/zones?account.id=${CF_ACCOUNT_ID}&per_page=50`);
         return res.json(result);
@@ -109,8 +111,8 @@ router.get('/domains', async (req, res) => {
 });
 
 // ── Check NS propagation ─────────────────────────────────────────
-router.get('/check-propagation/:zoneId', async (req, res) => {
-    if (!CF_TOKEN) return res.json({ status: 'mock_active' });
+router.get('/check-propagation/:zoneId', requireSuperAdmin, async (req, res) => {
+    if (!CF_TOKEN) return res.status(503).json({ error: 'Cloudflare not configured' });
     try {
         const result = await cfRequest('GET', `/zones/${req.params.zoneId}`);
         return res.json({ status: result.result?.status, ns: result.result?.name_servers });

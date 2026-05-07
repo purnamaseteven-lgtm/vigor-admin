@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../middleware/auth.js';
-import { requireActiveAdmin } from '../middleware/session.js';
+import { requireActiveAdmin, requireRole } from '../middleware/session.js';
 import {
     parseWebhookBody,
     validateRequiredFields,
@@ -10,6 +10,7 @@ import {
 } from '../lib/webhook-validation.js';
 
 const router = Router();
+const requirePaymentOps = requireRole('SuperAdmin', 'Whitelabel');
 
 function normalizeIp(ip) {
     const raw = String(ip || '').trim();
@@ -80,7 +81,7 @@ async function providerPost(url, apiKey, body, extraHeaders = {}) {
     return { response, data };
 }
 
-router.post('/unopay/create', requireActiveAdmin, async (req, res) => {
+router.post('/unopay/create', requirePaymentOps, async (req, res) => {
     const apiUrl = process.env.UNOPAY_API_URL;
     const apiKey = process.env.UNOPAY_API_KEY;
     if (!requireConfig(res, [['UNOPAY_API_URL', apiUrl], ['UNOPAY_API_KEY', apiKey]])) return;
@@ -93,7 +94,7 @@ router.post('/unopay/create', requireActiveAdmin, async (req, res) => {
     }
 });
 
-router.post('/unopay/status', requireActiveAdmin, async (req, res) => {
+router.post('/unopay/status', requirePaymentOps, async (req, res) => {
     const apiUrl = process.env.UNOPAY_API_URL;
     const apiKey = process.env.UNOPAY_API_KEY;
     if (!requireConfig(res, [['UNOPAY_API_URL', apiUrl], ['UNOPAY_API_KEY', apiKey]])) return;
@@ -106,7 +107,7 @@ router.post('/unopay/status', requireActiveAdmin, async (req, res) => {
     }
 });
 
-router.post('/coin2pay/create', requireActiveAdmin, async (req, res) => {
+router.post('/coin2pay/create', requirePaymentOps, async (req, res) => {
     const apiUrl = process.env.COIN2PAY_API_URL;
     const apiKey = process.env.COIN2PAY_API_KEY;
     if (!requireConfig(res, [['COIN2PAY_API_URL', apiUrl], ['COIN2PAY_API_KEY', apiKey]])) return;
@@ -119,7 +120,7 @@ router.post('/coin2pay/create', requireActiveAdmin, async (req, res) => {
     }
 });
 
-router.post('/coin2pay/status', requireActiveAdmin, async (req, res) => {
+router.post('/coin2pay/status', requirePaymentOps, async (req, res) => {
     const apiUrl = process.env.COIN2PAY_API_URL;
     const apiKey = process.env.COIN2PAY_API_KEY;
     if (!requireConfig(res, [['COIN2PAY_API_URL', apiUrl], ['COIN2PAY_API_KEY', apiKey]])) return;
@@ -132,7 +133,7 @@ router.post('/coin2pay/status', requireActiveAdmin, async (req, res) => {
     }
 });
 
-router.post('/sawala/create', requireActiveAdmin, async (req, res) => {
+router.post('/sawala/create', requirePaymentOps, async (req, res) => {
     const apiUrl = process.env.SAWALA_API_URL;
     const token = process.env.SAWALA_TOKEN;
     if (!requireConfig(res, [['SAWALA_API_URL', apiUrl], ['SAWALA_TOKEN', token]])) return;

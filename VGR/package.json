@@ -10,11 +10,12 @@
     "test:wiring": "node tests/feature-wiring.test.mjs",
     "test:contracts": "node tests/payment-contract.test.mjs",
     "test:rbac": "node tests/rbac-regression.test.mjs",
+    "test:rbac-backend": "node tests/rbac-backend-routes.test.mjs",
     "test:webhooks": "node tests/webhook-runtime.test.mjs",
     "test:webhook-routes": "node tests/payment-webhook-routes.test.mjs",
     "test:pages": "node tests/pages-registry.test.mjs",
     "test:e2e-pages": "node tests/e2e-pages-smoke.mjs",
-    "test:critical": "npm run test:wiring && npm run test:contracts && npm run test:rbac && npm run test:webhooks && npm run test:webhook-routes && npm run test:pages",
+    "test:critical": "npm run test:wiring && npm run test:contracts && npm run test:rbac && npm run test:rbac-backend && npm run test:webhooks && npm run test:webhook-routes && npm run test:pages",
     "test:release": "npm run build && npm run test:critical && npm run test:e2e-pages"
   },
   "devDependencies": {

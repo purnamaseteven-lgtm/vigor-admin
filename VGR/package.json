@@ -13,9 +13,12 @@
     "test:webhooks": "node tests/webhook-runtime.test.mjs",
     "test:webhook-routes": "node tests/payment-webhook-routes.test.mjs",
     "test:pages": "node tests/pages-registry.test.mjs",
-    "test:critical": "npm run test:wiring && npm run test:contracts && npm run test:rbac && npm run test:webhooks && npm run test:webhook-routes && npm run test:pages"
+    "test:e2e-pages": "node tests/e2e-pages-smoke.mjs",
+    "test:critical": "npm run test:wiring && npm run test:contracts && npm run test:rbac && npm run test:webhooks && npm run test:webhook-routes && npm run test:pages",
+    "test:release": "npm run build && npm run test:critical && npm run test:e2e-pages"
   },
   "devDependencies": {
+    "playwright": "^1.59.1",
     "vite": "^5.0.0"
   },
   "dependencies": {

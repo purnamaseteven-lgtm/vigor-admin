@@ -39,3 +39,12 @@ To connect a new provider:
 
 ---
 *© 2026 BERSAMA ALL RIGHTS RESERVED*
+
+## Security Notes (2026-05)
+- Seamless credentials are server-side only (PG_OPERATOR_TOKEN, PG_SECRET_KEY), not VITE_*.
+- Request signature verification is enforced by default via PG_REQUIRE_SIGNATURE=true.
+- Reverse proxy IP trust is controlled with TRUST_PROXY; whitelist checks rely on normalized eq.ip.
+
+## Test Commands
+- 
+pm run test:critical runs wiring, contract, RBAC, webhook runtime/routes, and pages-registry audits.

@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:wiring": "node tests/feature-wiring.test.mjs"
+    "test:wiring": "node tests/feature-wiring.test.mjs",
+    "test:contracts": "node tests/payment-contract.test.mjs",
+    "test:rbac": "node tests/rbac-regression.test.mjs",
+    "test:webhooks": "node tests/webhook-runtime.test.mjs",
+    "test:webhook-routes": "node tests/payment-webhook-routes.test.mjs",
+    "test:pages": "node tests/pages-registry.test.mjs",
+    "test:critical": "npm run test:wiring && npm run test:contracts && npm run test:rbac && npm run test:webhooks && npm run test:webhook-routes && npm run test:pages"
   },
   "devDependencies": {
     "vite": "^5.0.0"

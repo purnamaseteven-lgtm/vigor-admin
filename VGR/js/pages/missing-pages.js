@@ -13,32 +13,32 @@ import { WIDGET_DEFS } from '../widgets/definitions.js';
 pages['app-notification-legacy'] = () => {
     const notifs = STATE.notifications || [];
     return `
-    ${pageHeader('App Notification', '<span>Customization</span><span class="sep">›</span><span>App Notification</span>', '<button class="btn btn-primary btn-sm" onclick="window.addAppNotif()"><i class="fa-solid fa-plus"></i> Add Notification</button>')}
+    ${pageHeader('App Notification', '<span>Customization</span><span class="sep">›</span><span>App Notification</span>', '<button class="btn btn-primary btn-sm" onclick="window.appNotif.add()"><i class="fa-solid fa-plus"></i> Add Notification</button>')}
     <div class="card">
         <div class="card-header"><span class="card-title">App Notification List</span></div>
         <div class="card-body">
             ${tableWrap(`<table><thead><tr><th>#</th><th>Created Date</th><th>Title</th><th>Content</th><th>Target</th><th>Action</th></tr></thead><tbody>` +
         (notifs.length ? notifs.map((n, i) =>
-            `<tr><td>${i + 1}</td><td style="font-size:.75rem">${n.date || '-'}</td><td style="color:var(--acc)">${n.title || '-'}</td><td style="font-size:.75rem;max-width:300px;color:var(--text3)">${n.content || '-'}</td><td>${badge(n.target || 'All', 'secondary')}</td><td><div style="display:flex;gap:.25rem"><button class="btn btn-success btn-xs" onclick="toast('Edit','info')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-xs" onclick="window.delAppNotif('${n.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`
+            `<tr><td>${i + 1}</td><td style="font-size:.75rem">${n.date || '-'}</td><td style="color:var(--acc)">${n.title || '-'}</td><td style="font-size:.75rem;max-width:300px;color:var(--text3)">${n.content || '-'}</td><td>${badge(n.target || 'All', 'secondary')}</td><td><div style="display:flex;gap:.25rem"><button class="btn btn-success btn-xs" onclick="toast('Edit','info')"><i class="fa-solid fa-pen"></i></button><button class="btn btn-danger btn-xs" onclick="window.appNotif.del('${n.id}')"><i class="fa-solid fa-trash"></i></button></div></td></tr>`
         ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:2rem">No notifications</td></tr>') +
         '</tbody></table>')}
         </div>
     </div>`;
 };
 
-window.addAppNotif = () => {
+window.appNotif = window.appNotif || {};window.appNotif.add = () => {
     openModal('Add Notification',
         '<div class="form-grid"><div class="form-field"><label>Title</label><input id="an_title" placeholder="Title" /></div><div class="form-field"><label>Content</label><textarea id="an_content" rows="3" placeholder="Content..."></textarea></div><div class="form-field"><label>Target</label><input id="an_target" value="All" /></div></div>',
-        '<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.saveAppNotif()">Save</button>');
+        '<button class="btn btn-secondary" onclick="closeModalBtn()">Cancel</button><button class="btn btn-primary" onclick="window.appNotif.save()">Save</button>');
 };
-window.saveAppNotif = () => {
+window.appNotif.save = () => {
     const title = document.getElementById('an_title')?.value?.trim();
     if (!title) { toast('Title required', 'error'); return; }
     if (!STATE.notifications) STATE.notifications = [];
     STATE.notifications.unshift({ id: 'NOT' + Date.now().toString().slice(-4), date: new Date().toLocaleString('id-ID'), title, content: document.getElementById('an_content')?.value || '', target: document.getElementById('an_target')?.value || 'All' });
     saveState(); closeModalBtn(); go('custom-app-notification'); toast('Added', 'success');
 };
-window.delAppNotif = (id) => { STATE.notifications = (STATE.notifications || []).filter(x => x.id !== id); saveState(); go('custom-app-notification'); toast('Deleted', 'success'); };
+window.appNotif.del = (id) => { STATE.notifications = (STATE.notifications || []).filter(x => x.id !== id); saveState(); go('custom-app-notification'); toast('Deleted', 'success'); };
 
 // ────────────────────────────────────────────────────
 // SYSTEM NOTIFICATIONS PAGE
@@ -185,3 +185,5 @@ window.saveWidgetConfig = (wid) => {
     if (typeof window.toast === 'function') window.toast('Widget saved successfully', 'success');
     window.go('widget-library');
 };
+
+

@@ -10,6 +10,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
 import seamlessRouter from './routes/seamless.js';
 import paymentRouter from './routes/payment.js';
 import cloudflareRouter from './routes/cloudflare.js';
@@ -146,14 +147,19 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error', message: err.message, requestId: req.requestId || null });
 });
 
-app.listen(PORT, () => {
-    console.log(`[VIGOR] Backend server running on port ${PORT}`);
-    console.log(`[VIGOR] Strict config mode: ${STRICT_CONFIG ? 'ON' : 'OFF'}`);
-    console.log(`[VIGOR] Supabase: ${process.env.SUPABASE_URL ? '✅ configured' : '❌ MISSING'}`);
-    console.log(`[VIGOR] PGSoft:   ${process.env.PG_OPERATOR_TOKEN ? '✅ configured' : '❌ MISSING'}`);
-    console.log(`[VIGOR] Unopay:   ${process.env.UNOPAY_API_KEY ? '✅ configured' : '⚠️  not configured'}`);
-    console.log(`[VIGOR] Coin2Pay: ${process.env.COIN2PAY_API_KEY ? '✅ configured' : '⚠️  not configured'}`);
-    console.log(`[VIGOR] Sawala:   ${process.env.SAWALA_TOKEN ? '✅ configured' : '⚠️  not configured'}`);
-});
+export function startServer(port = PORT) {
+    return app.listen(port, () => {
+        console.log(`[VIGOR] Backend server running on port ${port}`);
+        console.log(`[VIGOR] Strict config mode: ${STRICT_CONFIG ? 'ON' : 'OFF'}`);
+        console.log(`[VIGOR] Supabase: ${process.env.SUPABASE_URL ? 'configured' : 'MISSING'}`);
+        console.log(`[VIGOR] PGSoft:   ${process.env.PG_OPERATOR_TOKEN ? 'configured' : 'MISSING'}`);
+        console.log(`[VIGOR] Unopay:   ${process.env.UNOPAY_API_KEY ? 'configured' : 'not configured'}`);
+        console.log(`[VIGOR] Coin2Pay: ${process.env.COIN2PAY_API_KEY ? 'configured' : 'not configured'}`);
+        console.log(`[VIGOR] Sawala:   ${process.env.SAWALA_TOKEN ? 'configured' : 'not configured'}`);
+    });
+}
+
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isDirectRun) startServer();
 
 export default app;

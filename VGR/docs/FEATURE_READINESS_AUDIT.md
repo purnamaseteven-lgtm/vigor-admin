@@ -36,3 +36,8 @@ Last updated: 2026-05-05
 2. Run smoke checks from `docs/FEATURE_SMOKE_CHECKLIST.md`.
 3. Run wiring regression script `node tests/feature-wiring.test.mjs`.
 4. Execute seamless wallet integration test in a non-mock env.
+
+## Added Guards (2026-05-07)
+1. `tests/pages-registry.test.mjs` now blocks duplicate `pages['...']` registrations.
+2. The same test validates each `go('...')` route in `app.html` resolves to a registered page key.
+3. `tests/payment-webhook-routes.test.mjs` now runs in-process (no child `spawn`) to avoid environment EPERM failures.
